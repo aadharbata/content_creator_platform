@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Content Platform
 
 A modern, animated landing page built with React, Chakra UI, and Framer Motion.
@@ -39,3 +40,6 @@ npm run dev
 - `src/components/` - Reusable components
 - `src/App.tsx` - Main application component
 - `src/main.tsx` - Application entry point 
+=======
+# content_creator_platform
+>>>>>>> 39ebbc95fba829eac581ec7bd16bbf492c29a564
