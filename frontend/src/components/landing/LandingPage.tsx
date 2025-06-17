@@ -13,6 +13,7 @@ import {
 } from '@chakra-ui/react'
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { FiUserPlus, FiBriefcase, FiBookOpen, FiCamera, FiMessageCircle, FiTwitter, FiInstagram, FiGlobe } from 'react-icons/fi'
+import { useNavigate } from 'react-router-dom'
 
 type Star = { x: number; y: number; size: number; delay: number };
 type Line = { start: { x: number; y: number }; end: { x: number; y: number }; delay: number };
@@ -219,6 +220,7 @@ const LandingPage = () => {
   const y = useTransform(scrollYProgress, [0, 1], [0, -100])
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
   const [dots, setDots] = useState<Array<{ x: number; y: number; delay: number }>>([])
+  const navigate = useNavigate()
 
   useEffect(() => {
     // Generate random dots
@@ -303,7 +305,7 @@ const LandingPage = () => {
             py={8}
             style={{ perspective: '1500px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}
           >
-            <LaptopHero />
+            <LaptopHero navigate={navigate} />
           </MotionBox>
 
           {/* Features Section */}
@@ -451,7 +453,7 @@ const LandingPage = () => {
   )
 }
 
-const LaptopHero = () => {
+const LaptopHero = ({ navigate }) => {
   const laptopRef = useRef<HTMLDivElement>(null)
   const screenRef = useRef<HTMLDivElement>(null)
   const glareRef = useRef<HTMLDivElement>(null)
@@ -635,17 +637,19 @@ const LaptopHero = () => {
                       whileTap={{ scale: 0.95 }}
                       bgGradient="linear(to-r, blue.600, orange.400, purple.600)"
                       color="white"
-                      size="sm"
-                      px={6}
-                      py={2}
+                      size="lg"
+                      px={8}
+                      py={3}
                       borderRadius="2xl"
-                      fontSize={{ base: 'sm', md: 'md' }}
+                      fontSize="lg"
                       fontWeight="bold"
                       boxShadow="xl"
                       _hover={{ bgGradient: 'linear(to-r, blue.700, orange.500, purple.700)', borderColor: 'orange.400' }}
                       border="2px solid"
                       borderColor="transparent"
                       leftIcon={<Icon as={FiUserPlus} />}
+                      style={{ transform: 'translateZ(40px)' }}
+                      onClick={() => navigate('/signup')}
                     >
                       Join as Creator or Fan
                     </Button>
@@ -657,16 +661,18 @@ const LaptopHero = () => {
                       border="2px solid"
                       borderColor="blue.500"
                       color="white"
-                      size="sm"
-                      px={6}
-                      py={2}
+                      size="lg"
+                      px={8}
+                      py={3}
                       borderRadius="2xl"
-                      fontSize={{ base: 'sm', md: 'md' }}
+                      fontSize="lg"
                       fontWeight="bold"
                       bg="transparent"
                       boxShadow="xl"
                       _hover={{ bg: 'whiteAlpha.100', borderColor: 'blue.400' }}
                       leftIcon={<Icon as={FiBriefcase} />}
+                      style={{ transform: 'translateZ(40px)' }}
+                      onClick={() => navigate('/brand/signup')}
                     >
                       Join as Brand
                     </Button>
