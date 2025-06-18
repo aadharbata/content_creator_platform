@@ -1,22 +1,22 @@
 import React, { useState } from 'react';
-import {
-  Box, Button, FormControl, FormLabel, Input, VStack, Heading, Text, useToast
-} from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 
 const Login = () => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const toast = useToast();
-  const navigate = useNavigate();
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const router = useRouter();
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
+    setSuccess('');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -26,46 +26,52 @@ const Login = () => {
       const data = await res.json();
       if (res.ok && data.token) {
         localStorage.setItem('token', data.token);
-        toast({ status: 'success', title: 'Login successful!' });
-        navigate('/');
+        setSuccess('Login successful! Redirecting...');
+        setTimeout(() => router.push('/'), 1500);
       } else {
-        toast({ status: 'error', title: data.message || 'Login failed.' });
+        setError(data.message || 'Login failed.');
       }
     } catch (err) {
-      toast({ status: 'error', title: 'Server error.' });
+      setError('Server error.');
     }
     setLoading(false);
   };
 
   return (
-    <Box minH="100vh" bgGradient="linear(to-br, blue.900, purple.900, orange.400)" display="flex" alignItems="center" justifyContent="center" px={2} py={8}>
-      <Box bg="whiteAlpha.900" boxShadow="2xl" borderRadius="2xl" p={{ base: 8, md: 12 }} maxW="md" w="full" textAlign="center">
-        <Box bgGradient="linear(to-tr, blue.500, orange.400, purple.500)" borderRadius="full" w={16} h={16} mx="auto" mb={4} display="flex" alignItems="center" justifyContent="center" boxShadow="xl" border="4px solid white">
-          <Text color="white" fontSize="2xl" fontWeight="extrabold" letterSpacing="widest">CP</Text>
-        </Box>
-        <Heading as="h1" fontSize={{ base: '3xl', md: '4xl' }} fontWeight="black" mb={2} color="blue.900">Login</Heading>
-        <Text color="gray.700" mb={6}>Welcome back! Please login to your account.</Text>
-        <form onSubmit={handleSubmit}>
-          <VStack spacing={4} align="stretch">
-            <FormControl isRequired>
-              <FormLabel>Email</FormLabel>
-              <Input name="email" type="email" value={form.email} onChange={handleChange} placeholder="you@email.com" />
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Password</FormLabel>
-              <Input name="password" type="password" value={form.password} onChange={handleChange} placeholder="Password" />
-            </FormControl>
-            <Button type="submit" colorScheme="orange" size="lg" mt={4} isLoading={loading} w="full" bgGradient="linear(to-r, blue.600, orange.400, purple.600)" _hover={{ filter: 'brightness(1.1)' }}>
-              Login
-            </Button>
-          </VStack>
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-orange-400 flex flex-col justify-center items-center px-2 py-8 font-inter">
+      <main className="w-full max-w-md mx-auto glass p-8 md:p-12 mt-10 mb-8 flex flex-col items-center text-center">
+        <div className="bg-gradient-to-tr from-blue-500 via-orange-400 to-purple-500 rounded-full w-16 h-16 flex items-center justify-center shadow-xl border-4 border-white mb-4">
+          <span className="text-white text-2xl font-extrabold tracking-widest">CP</span>
+        </div>
+        <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-blue-900 font-poppins">Login</h1>
+        <p className="text-md text-gray-700 mb-6">Welcome back! Please login to your account.</p>
+        <form className="w-full flex flex-col gap-4 text-left" onSubmit={handleSubmit}>
+          <label className="font-semibold text-gray-800">Email
+            <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="you@email.com" required className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none" />
+          </label>
+          <label className="font-semibold text-gray-800">Password
+            <input name="password" type="password" value={form.password} onChange={handleChange} placeholder="Password" required className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none" />
+          </label>
+          <button type="submit" className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200" disabled={loading}>{loading ? "Logging in..." : "Login"}</button>
         </form>
-        <Text mt={6} fontSize="sm" color="gray.600">
-          Don&apos;t have an account?{' '}
-          <a href="/signup" style={{ color: '#F59E42', fontWeight: 600, textDecoration: 'underline' }}>Sign up</a>
-        </Text>
-      </Box>
-    </Box>
+        {error && <p className="mt-4 text-red-600 font-semibold">{error}</p>}
+        {success && <p className="mt-4 text-green-600 font-semibold">{success}</p>}
+        <p className="mt-6 text-sm text-gray-600">Don't have an account?{' '}
+          <a href="/signup" className="text-orange-500 font-semibold hover:underline">Sign up</a>
+        </p>
+      </main>
+      <style jsx global>{`
+        .font-inter { font-family: 'Inter', sans-serif; }
+        .font-poppins, .hero-title { font-family: 'Poppins', sans-serif; }
+        .glass {
+          background: rgba(255,255,255,0.8);
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+          backdrop-filter: blur(8px);
+          border-radius: 2rem;
+          border: 1px solid rgba(255,255,255,0.18);
+        }
+      `}</style>
+    </div>
   );
 };
 
