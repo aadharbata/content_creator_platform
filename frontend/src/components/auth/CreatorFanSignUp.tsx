@@ -1,96 +1,156 @@
 import React, { useState } from 'react';
-import {
-  Box, Button, FormControl, FormLabel, Input, Select, VStack, Heading, Text, useToast
-} from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
+
+const countryCodes = [
+  { code: '+1', name: 'US/Canada', flag: '🇺🇸' },
+  { code: '+91', name: 'India', flag: '🇮🇳' },
+  { code: '+44', name: 'UK', flag: '🇬🇧' },
+  { code: '+61', name: 'Australia', flag: '🇦🇺' },
+  { code: '+81', name: 'Japan', flag: '🇯🇵' },
+  // Add more as needed
+];
 
 const CreatorFanSignUp = () => {
+  const [signupMethod, setSignupMethod] = useState<'email' | 'phone'>('email');
   const [form, setForm] = useState({
-    name: '', email: '', password: '', confirm_password: '', role: 'creator',
+    name: '',
+    email: '',
+    countryCode: '+91',
+    phone: '',
+    password: '',
+    confirm_password: '',
+    role: 'creator',
   });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const toast = useToast();
-  const navigate = useNavigate();
+  const router = useRouter();
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSignupMethodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSignupMethod(e.target.value as 'email' | 'phone');
+    setForm({ ...form, email: '', phone: '' }); // Clear the other field
+    setError('');
+  };
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validatePhone = (phone: string) => {
+    return /^\d{6,15}$/.test(phone.replace(/\D/g, ''));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+    if (signupMethod === 'email') {
+      if (!form.email) {
+        setError('Email is required.');
+        return;
+      }
+      if (!validateEmail(form.email)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+    } else {
+      if (!form.phone) {
+        setError('Phone number is required.');
+        return;
+      }
+      if (!validatePhone(form.phone)) {
+        setError('Please enter a valid phone number.');
+        return;
+      }
+      if (!form.countryCode) {
+        setError('Please select a country code.');
+        return;
+      }
+    }
     if (form.password !== form.confirm_password) {
-      toast({ status: 'error', title: 'Passwords do not match.' });
+      setError('Passwords do not match.');
       return;
     }
     setLoading(true);
-    try {
-      const res = await fetch('/api/auth/creator-fan/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          role: form.role,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast({ status: 'success', title: 'Sign up successful!' });
-        navigate('/login');
-      } else {
-        toast({ status: 'error', title: data.message || 'Sign up failed.' });
-      }
-    } catch (err) {
-      toast({ status: 'error', title: 'Server error.' });
-    }
-    setLoading(false);
+    // Simulate API call for now
+    setTimeout(() => {
+      setSuccess('Sign up successful!');
+      setLoading(false);
+    }, 1000);
   };
 
   return (
-    <Box minH="100vh" bgGradient="linear(to-br, blue.900, purple.900, orange.400)" display="flex" alignItems="center" justifyContent="center" px={2} py={8}>
-      <Box bg="whiteAlpha.800" boxShadow="2xl" borderRadius="2xl" p={{ base: 8, md: 12 }} maxW="md" w="full" textAlign="center">
-        <Box bgGradient="linear(to-tr, blue.500, orange.400, purple.500)" borderRadius="full" w={16} h={16} mx="auto" mb={4} display="flex" alignItems="center" justifyContent="center" boxShadow="xl" border="4px solid white">
-          <Text color="white" fontSize="2xl" fontWeight="extrabold" letterSpacing="widest">CP</Text>
-        </Box>
-        <Heading as="h1" fontSize={{ base: '3xl', md: '4xl' }} fontWeight="black" mb={2} color="blue.900">Sign Up</Heading>
-        <Text color="gray.700" mb={6}>Join as a Creator or Fan and start your journey!</Text>
-        <form onSubmit={handleSubmit}>
-          <VStack spacing={4} align="stretch">
-            <FormControl isRequired>
-              <FormLabel>Name</FormLabel>
-              <Input name="name" value={form.name} onChange={handleChange} placeholder="Your Name" />
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Email</FormLabel>
-              <Input name="email" type="email" value={form.email} onChange={handleChange} placeholder="you@email.com" />
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Password</FormLabel>
-              <Input name="password" type="password" value={form.password} onChange={handleChange} placeholder="Password" />
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Confirm Password</FormLabel>
-              <Input name="confirm_password" type="password" value={form.confirm_password} onChange={handleChange} placeholder="Confirm Password" />
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Sign up as</FormLabel>
-              <Select name="role" value={form.role} onChange={handleChange}>
-                <option value="creator">Creator</option>
-                <option value="fan">Fan</option>
-              </Select>
-            </FormControl>
-            <Button type="submit" colorScheme="orange" size="lg" mt={4} isLoading={loading} w="full" bgGradient="linear(to-r, blue.600, orange.400, purple.600)" _hover={{ filter: 'brightness(1.1)' }}>
-              Sign Up
-            </Button>
-          </VStack>
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-orange-400 flex flex-col justify-center items-center px-2 py-8 font-inter">
+      <main className="w-full max-w-md mx-auto glass p-8 md:p-12 mt-10 mb-8 flex flex-col items-center text-center">
+        <div className="bg-gradient-to-tr from-blue-500 via-orange-400 to-purple-500 rounded-full w-16 h-16 flex items-center justify-center shadow-xl border-4 border-white mb-4">
+          <span className="text-white text-2xl font-extrabold tracking-widest">CP</span>
+        </div>
+        <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-blue-900 font-poppins">Sign Up</h1>
+        <p className="text-md text-gray-700 mb-6">Join as a Creator or Fan and start your journey!</p>
+        <form className="w-full flex flex-col gap-4 text-left" onSubmit={handleSubmit}>
+          <label className="font-semibold text-gray-800">Name
+            <input type="text" name="name" value={form.name} onChange={handleChange} required className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="Name" />
+          </label>
+          <div className="flex gap-4 items-center mb-2">
+            <label className="flex items-center gap-1">
+              <input type="radio" name="signupMethod" value="email" checked={signupMethod === 'email'} onChange={handleSignupMethodChange} className="accent-blue-600" />
+              <span className="text-gray-800">Sign up with Email</span>
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="radio" name="signupMethod" value="phone" checked={signupMethod === 'phone'} onChange={handleSignupMethodChange} className="accent-orange-500" />
+              <span className="text-gray-800">Sign up with Phone</span>
+            </label>
+          </div>
+          {signupMethod === 'email' ? (
+            <label className="font-semibold text-gray-800">Email
+              <input type="email" name="email" value={form.email} onChange={handleChange} required className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="Email" />
+            </label>
+          ) : (
+            <label className="font-semibold text-gray-800">Phone Number
+              <div className="flex gap-2 mt-1">
+                <select name="countryCode" value={form.countryCode} onChange={handleChange} className="px-2 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white">
+                  {countryCodes.map((c) => (
+                    <option key={c.code} value={c.code}>{c.flag} {c.code} ({c.name})</option>
+                  ))}
+                </select>
+                <input type="tel" name="phone" value={form.phone} onChange={handleChange} required className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="Phone Number" />
+              </div>
+            </label>
+          )}
+          <label className="font-semibold text-gray-800">Password
+            <input type="password" name="password" value={form.password} onChange={handleChange} required className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="Password" />
+          </label>
+          <label className="font-semibold text-gray-800">Confirm Password
+            <input type="password" name="confirm_password" value={form.confirm_password} onChange={handleChange} required className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="Confirm Password" />
+          </label>
+          <label className="font-semibold text-gray-800">Sign up as
+            <select name="role" value={form.role} onChange={handleChange} required className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none">
+              <option value="creator">Creator</option>
+              <option value="fan">Fan</option>
+            </select>
+          </label>
+          <button type="submit" className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200" disabled={loading}>{loading ? 'Signing up...' : 'Sign Up'}</button>
         </form>
-        <Text mt={6} fontSize="sm" color="gray.600">
-          Are you a brand?{' '}
-          <a href="/brand/signup" style={{ color: '#F59E42', fontWeight: 600, textDecoration: 'underline' }}>Sign up as a Brand</a>
-        </Text>
-      </Box>
-    </Box>
+        {error && <p className="mt-4 text-red-600 font-semibold">{error}</p>}
+        {success && <p className="mt-4 text-green-600 font-semibold">{success}</p>}
+        <p className="mt-6 text-sm text-gray-600">Already have an account? <a href="/login" className="text-orange-500 font-semibold hover:underline">Sign in</a></p>
+      </main>
+      <style jsx global>{`
+        .font-inter { font-family: 'Inter', sans-serif; }
+        .font-poppins, .hero-title { font-family: 'Poppins', sans-serif; }
+        .glass {
+          background: rgba(255,255,255,0.8);
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+          backdrop-filter: blur(8px);
+          border-radius: 2rem;
+          border: 1px solid rgba(255,255,255,0.18);
+        }
+      `}</style>
+    </div>
   );
 };
 

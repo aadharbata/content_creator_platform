@@ -1,47 +1,31 @@
 import React from 'react';
-import { ChakraProvider, extendTheme } from '@chakra-ui/react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LandingPage from './components/landing/LandingPage';
-import Login from './components/auth/Login';
-import CreatorFanSignUp from './components/auth/CreatorFanSignUp';
-import BrandSignUp from './components/auth/BrandSignUp';
+import './i18n';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './components/LanguageSwitcher';
+// import other components as needed
 
-const theme = extendTheme({
-  styles: {
-    global: {
-      body: {
-        bg: 'gray.50',
-      },
-    },
-  },
-  colors: {
-    brand: {
-      50: '#f0f9ff',
-      100: '#e0f2fe',
-      200: '#bae6fd',
-      300: '#7dd3fc',
-      400: '#38bdf8',
-      500: '#0ea5e9',
-      600: '#0284c7',
-      700: '#0369a1',
-      800: '#075985',
-      900: '#0c4a6e',
-    },
-  },
-});
+const App: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
+  const { t } = useTranslation();
 
-const App: React.FC = () => {
   return (
-    <ChakraProvider theme={theme}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<CreatorFanSignUp />} />
-          <Route path="/brand/signup" element={<BrandSignUp />} />
-        </Routes>
-      </Router>
-    </ChakraProvider>
+    <div>
+      <header className="flex items-center justify-between px-4 py-2 bg-white/80 border-b border-white/20">
+        <div className="flex items-center space-x-2">
+          <span className="font-bold text-xl">LearnHub</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <LanguageSwitcher />
+          <button className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition" type="button">
+            {t('nav.signIn')}
+          </button>
+          <button className="px-4 py-2 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600 transition" type="button">
+            {t('nav.signUp')}
+          </button>
+        </div>
+      </header>
+      {/* Render children or main content here */}
+      {children}
+    </div>
   );
 };
 

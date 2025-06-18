@@ -1,0 +1,40 @@
+{
+  "nav": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "language": "English"
+  },
+  "hero": {
+    "title": "Discover & Learn from",
+    "subtitle": "World's Best Creators",
+    "description": "Access premium courses, ebooks, templates, and digital products from top creators worldwide. Start learning today!",
+    "startLearning": "Start Learning",
+    "viewAll": "View All"
+  },
+  "auth": {
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "phone": "Phone Number",
+    "signInTitle": "Sign In to Your Account",
+    "signUpTitle": "Create Your Account",
+    "forgotPassword": "Forgot Password?",
+    "createAccount": "Create Account",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "signUpMethod": "Sign up with",
+    "countryCode": "Country Code",
+    "confirmPassword": "Confirm Password",
+    "signUpAs": "Sign up as",
+    "creator": "Creator",
+    "fan": "Fan",
+    "required": "is required.",
+    "invalid": "is invalid.",
+    "mismatch": "do not match.",
+    "success": "Sign up successful!",
+    "signingUp": "Signing up...",
+    "signingIn": "Signing in...",
+    "loginFailed": "Login failed.",
+    "serverError": "Server error."
+  }
+} 
