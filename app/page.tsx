@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Header from "@/frontend/components/Header"
 import Hero from "@/frontend/components/Hero"
 import SearchSection from "@/frontend/components/SearchSection"
@@ -9,12 +9,40 @@ import TopCreatorsSection from "@/frontend/components/TopCreatorsSection"
 import CreatorCTA from "@/frontend/components/CreatorCTA"
 import Footer from "@/frontend/components/Footer"
 import { translations } from "@/frontend/data/translations"
-import { topCourses } from "@/frontend/data/courses"
+// import { topCourses } from "@/frontend/data/courses"
 import { topCreators } from "@/frontend/data/creators"
 import { categories } from "@/frontend/data/categories"
+import axios from 'axios';
+
+interface TopCourses {
+  id: string,
+  title: string,
+  author: string,
+  price: number,
+  rating: number,
+  students: number,
+  imgUrl: string,
+  category: string
+}
 
 export default function LandingPage() {
-  const [language, setLanguage] = useState<"en" | "hi">("en")
+  const [language, setLanguage] = useState<"en" | "hi">("en");
+  const [topCourses, setTopCourses] = useState<TopCourses[]>([]);
+
+  const fetchTopCourses = async () => {
+    try {
+      const res = await axios.get("/api/courses/topcourses");
+      console.log("Top courses: ", res.data);
+      setTopCourses(res.data.courses);
+    } catch (error) {
+      console.log("Error in fetching top courses: ", error);
+      setTopCourses([]);
+    }
+  }
+
+  useEffect(()=>{
+    fetchTopCourses();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
