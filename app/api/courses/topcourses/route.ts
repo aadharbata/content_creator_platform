@@ -1,9 +1,9 @@
-import prisma from "@/lib/prisma";
+// import prisma from "@/lib/prisma";
+
+import prisma from "@/backend2/src/lib/prisma";
 import { NextRequest, NextResponse } from "next/server"
-// import { topCourses } from "@/frontend/data/courses"
 
 export async function GET(req: NextRequest) {
-  // In a real application, this would fetch from a database
   try {
     const topCourses = await prisma.course.findMany({
       orderBy: {

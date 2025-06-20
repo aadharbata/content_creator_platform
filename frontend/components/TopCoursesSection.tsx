@@ -96,7 +96,7 @@ export default function TopCoursesSection({ language, translations, topCourses }
                   <div className="flex items-center space-x-1">
                     <Users className="w-4 h-4" />
                     <span>
-                      {course.students.toLocaleString()} {t.students}
+                      {(course.students ?? 0).toLocaleString()} {t.students}
                     </span>
                   </div>
                 </div>
