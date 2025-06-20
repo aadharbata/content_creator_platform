@@ -1,6 +1,6 @@
 'use client';
-import CreatorFanSignUp from '@/frontend/src/components/auth/CreatorFanSignUp';
+import CreatorSignUp from '@/frontend/src/components/auth/CreatorSignUp';
 
 export default function SignUpPage() {
-  return <CreatorFanSignUp />;
+  return <CreatorSignUp />;
 } 

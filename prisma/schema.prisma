@@ -55,13 +55,19 @@ model Content {
   type        ContentType
   url         String
   status      ContentStatus @default(DRAFT)
+  price       Float?        @default(0)
+  language    String?
+  tags        String?       // JSON string of tags
+  demoLink    String?
+  notes       String?
+  metadata    String?       // JSON string for additional metadata
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   author           User               @relation(fields: [authorId], references: [id])
   authorId         String
   course           Course?            @relation(fields: [courseId], references: [id])
-  courseId         String
+  courseId         String?
   Category         Category?          @relation(fields: [categoryId], references: [id])
   categoryId       String?
   Tag              Tag?               @relation(fields: [tagId], references: [id])
@@ -185,6 +191,12 @@ enum ContentType {
   ARTICLE
   PODCAST
   COURSE
+  TEMPLATE
+  SOFTWARE
+  EBOOK
+  AUDIO
+  IMAGE
+  OTHER
 }
 
 enum ContentStatus {
