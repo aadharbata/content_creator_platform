@@ -2,6 +2,7 @@
 
 import { Upload, Users, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 interface CreatorCTAProps {
   language: "en" | "hi"
@@ -10,6 +11,7 @@ interface CreatorCTAProps {
 
 export default function CreatorCTA({ language, translations }: CreatorCTAProps) {
   const t = translations[language]
+  const router = useRouter()
 
   return (
     <section className="py-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white relative overflow-hidden">
@@ -53,7 +55,11 @@ export default function CreatorCTA({ language, translations }: CreatorCTAProps) 
             </div>
           </div>
 
-          <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 text-xl px-12 py-6 h-auto font-bold">
+          <Button 
+            size="lg" 
+            className="bg-white text-blue-600 hover:bg-gray-100 text-xl px-12 py-6 h-auto font-bold cursor-pointer"
+            onClick={() => router.push('/signup')}
+          >
             {t.getStarted}
           </Button>
         </div>
