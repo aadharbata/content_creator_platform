@@ -1,5 +1,5 @@
-import ContentManager from '@/components/content-upload/ContentManager';
+import { redirect } from 'next/navigation';
 
 export default function ContentPage() {
-  return <ContentManager />;
+  redirect('/upload/manager');
 } 

@@ -1,7 +1,5 @@
-// import prisma from "@/lib/prisma";
-
-import prisma from "@/backend2/src/lib/prisma";
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +18,7 @@ export async function GET(req: NextRequest) {
     });
     
     // Transform data to match frontend interface
-    const topCourses = courses.map(course => ({
+    const topCourses = courses.map((course: any) => ({
       id: course.id,
       title: course.title,
       author: course.author.name,
