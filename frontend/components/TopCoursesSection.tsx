@@ -56,15 +56,7 @@ export default function TopCoursesSection({ language, translations, topCourses }
             >
               <CardHeader className="p-0">
                 <div className="relative overflow-hidden rounded-t-lg">
-                  {/* <img
-                    src={course.image || "/placeholder.svg"}
-                    alt={language === "en" ? course.title : course.titleHi}
-                    className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
-                  /> */}
                   <img src={course.imgUrl} alt={course.title} className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300" />
-                  {/* <Badge className="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                    {language === "en" ? course.badge : course.badgeHi}
-                  </Badge> */}
                   <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm rounded-full px-2 py-1">
                     <div className="flex items-center space-x-1">
                       <Star className="w-3 h-3 text-yellow-400 fill-current" />
@@ -76,20 +68,16 @@ export default function TopCoursesSection({ language, translations, topCourses }
               <CardContent className="p-6">
                 <div className="mb-2">
                   <Badge variant="outline" className="text-xs">
-                    {/* {language === "en" ? course.category : course.categoryHi} */}
                     {course.category}
                   </Badge>
                 </div>
                 <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                  {/* {language === "en" ? course.title : course.titleHi} */}
                   {course.title}
                 </h3>
-                {/* <p className="text-gray-600 mb-3">{course.creator}</p> */}
                 <p className="text-gray-600 mb-3">{course.author}</p>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl font-bold text-blue-600">${course.price}</span>
-                    {/* <span className="text-gray-400 line-through">${course.originalPrice}</span> */}
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-sm text-gray-600">

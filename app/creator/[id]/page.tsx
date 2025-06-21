@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, use } from "react"
+import { useState, useEffect, use } from "react"
 import { 
   BookOpen, 
   Users, 
@@ -156,7 +156,7 @@ function CourseCard({ course, language, onBookmark, isBookmarked }: {
             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
             <span className="ml-1 text-sm font-medium">{course.rating}</span>
           </div>
-          <span className="text-sm text-gray-500">({course.students.toLocaleString()} students)</span>
+          <span className="text-sm text-gray-500">({course.students.toLocaleString()} reviews)</span>
         </div>
         
         <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
@@ -243,122 +243,114 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [showBookmarked, setShowBookmarked] = useState(false)
   const [bookmarkedCourses, setBookmarkedCourses] = useState<number[]>([])
+  
+  // State for real data
+  const [creator, setCreator] = useState<Creator | null>(null)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data - in real app, this would come from API based on id
-  const creator: Creator = {
-    id: id,
-    name: "Sarah Johnson",
-    nameHi: "सारा जॉनसन",
-    bio: "Full-stack developer and educator with 8+ years of experience. I'm passionate about making complex web development concepts simple and accessible to everyone. I've helped thousands of students transition into tech careers through my comprehensive courses and mentorship programs.",
-    bioHi: "8+ साल के अनुभव के साथ फुल-स्टैक डेवलपर और शिक्षक। मैं जटिल वेब डेवलपमेंट अवधारणाओं को सरल और सभी के लिए सुलभ बनाने का जुनून रखती हूं।",
-    avatar: "/placeholder.svg?height=120&width=120",
-    coverImage: "/placeholder.svg?height=400&width=1200",
-    specialty: "Web Development",
-    specialtyHi: "वेब डेवलपमेंट",
-    location: "San Francisco, CA",
-    website: "https://sarahjohnson.dev",
-    joinedDate: "March 2022",
-    isVerified: true,
-    badge: "Top Creator",
-    badgeHi: "टॉप क्रिएटर",
-    totalStudents: 45123,
-    totalCourses: 12,
-    averageRating: 4.9,
-    followers: 28430,
-    totalReviews: 8934,
-    socialLinks: {
-      twitter: "https://twitter.com/sarahdev",
-      instagram: "https://instagram.com/sarahcodes",
-      linkedin: "https://linkedin.com/in/sarahjohnson",
-      youtube: "https://youtube.com/c/sarahcodes"
-    }
-  }
+  // Fetch creator data
+  useEffect(() => {
+    const fetchCreatorData = async () => {
+      try {
+        setLoading(true)
+        
+        // Fetch creator profile
+        const creatorResponse = await fetch(`/api/creator/${id}`)
+        if (!creatorResponse.ok) throw new Error('Failed to fetch creator data')
+        const creatorData = await creatorResponse.json()
+        
+        // Transform creator data to match interface
+        const transformedCreator: Creator = {
+          id: creatorData.id,
+          name: creatorData.name,
+          nameHi: creatorData.name, // Use same name for Hindi
+          bio: creatorData.profile?.bio || "No bio available",
+          bioHi: creatorData.profile?.bio || "कोई बायो उपलब्ध नहीं",
+          avatar: creatorData.profile?.avatarUrl || "/placeholder.svg?height=120&width=120",
+          coverImage: "/placeholder.svg?height=400&width=1200", // Default cover image
+          specialty: "Content Creator",
+          specialtyHi: "कंटेंट क्रिएटर",
+          location: "India",
+          website: creatorData.profile?.website || "#",
+          joinedDate: new Date(creatorData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          isVerified: true,
+          badge: "Top Creator",
+          badgeHi: "टॉप क्रिएटर",
+          totalStudents: 0, // Will be calculated from courses
+          totalCourses: 0,   // Will be calculated from courses
+          averageRating: 0,  // Will be calculated from courses
+          followers: Math.floor(Math.random() * 10000) + 1000, // Random for now
+          totalReviews: 0,   // Will be calculated from reviews
+          socialLinks: {
+            twitter: creatorData.profile?.twitter || undefined,
+            instagram: creatorData.profile?.instagram || undefined,
+            youtube: creatorData.profile?.youtube || undefined
+          }
+        }
 
-  const courses: Course[] = [
-    {
-      id: 1,
-      title: "Complete Web Development Bootcamp",
-      titleHi: "कम्प्लीट वेब डेवलपमेंट बूटकैंप",
-      price: 89,
-      originalPrice: 199,
-      students: 12543,
-      rating: 4.9,
-      image: "/placeholder.svg?height=200&width=300",
-      category: "Development",
-      badge: "Bestseller",
-      description: "Learn HTML, CSS, JavaScript, React, Node.js, and more in this comprehensive bootcamp",
-      descriptionHi: "इस व्यापक बूटकैंप में HTML, CSS, JavaScript, React, Node.js और अन्य सीखें",
-      lastUpdated: "Dec 2024",
-      duration: "42h 30m",
-      level: "Intermediate"
-    },
-    {
-      id: 2,
-      title: "React Advanced Patterns",
-      titleHi: "रिएक्ट एडवांस्ड पैटर्न",
-      price: 67,
-      originalPrice: 149,
-      students: 8932,
-      rating: 4.8,
-      image: "/placeholder.svg?height=200&width=300",
-      category: "Development",
-      badge: "Hot",
-      description: "Master advanced React patterns including hooks, context, and performance optimization",
-      descriptionHi: "हुक्स, कॉन्टेक्स्ट और प्रदर्शन अनुकूलन सहित उन्नत रिएक्ट पैटर्न में महारत हासिल करें",
-      lastUpdated: "Nov 2024",
-      duration: "28h 15m",
-      level: "Advanced"
-    },
-    {
-      id: 3,
-      title: "JavaScript Fundamentals",
-      titleHi: "जावास्क्रिप्ट फंडामेंटल्स",
-      price: 45,
-      students: 15678,
-      rating: 4.7,
-      image: "/placeholder.svg?height=200&width=300",
-      category: "Development",
-      badge: "Popular",
-      description: "Build a solid foundation in JavaScript with practical projects and real-world examples",
-      descriptionHi: "व्यावहारिक परियोजनाओं और वास्तविक दुनिया के उदाहरणों के साथ जावास्क्रिप्ट में मजबूत आधार बनाएं",
-      lastUpdated: "Oct 2024",
-      duration: "35h 45m",
-      level: "Beginner"
-    }
-  ]
+        // Fetch creator courses
+        const coursesResponse = await fetch(`/api/creator/${id}/courses`)
+        if (!coursesResponse.ok) throw new Error('Failed to fetch courses')
+        const coursesData = await coursesResponse.json()
+        
+        // Transform courses data
+        const transformedCourses: Course[] = coursesData.map((course: any, index: number) => ({
+          id: index + 1, // Use index as ID for now
+          title: course.title,
+          titleHi: course.title, // Use same title for Hindi
+          price: course.price,
+          originalPrice: course.price * 1.5, // 50% discount simulation
+          students: course.salesCount,
+          rating: course.rating,
+          image: course.imgURL || "/placeholder.svg?height=200&width=300",
+          category: "Development",
+          badge: course.salesCount > 100 ? "Bestseller" : "Popular",
+          description: course.description,
+          descriptionHi: course.description, // Use same description for Hindi
+          lastUpdated: new Date(course.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          duration: course.duration ? `${Math.floor(course.duration / 60)}h ${course.duration % 60}m` : "N/A",
+          level: course.price > 3000 ? "Advanced" : course.price > 2000 ? "Intermediate" : "Beginner"
+        }))
 
-  const reviews: Review[] = [
-    {
-      id: 1,
-      userName: "Priya Sharma",
-      userAvatar: "/placeholder.svg?height=40&width=40",
-      rating: 5,
-      comment: "Sarah's teaching style is incredible! She breaks down complex concepts into easy-to-understand pieces. The Web Development Bootcamp changed my career.",
-      date: "2 weeks ago",
-      courseName: "Complete Web Development Bootcamp",
-      isVerified: true
-    },
-    {
-      id: 2,
-      userName: "Michael Chen",
-      userAvatar: "/placeholder.svg?height=40&width=40",
-      rating: 5,
-      comment: "The React course was exactly what I needed to level up my skills. Clear explanations and practical projects made learning enjoyable.",
-      date: "1 month ago",
-      courseName: "React Advanced Patterns",
-      isVerified: true
-    },
-    {
-      id: 3,
-      userName: "Amit Kumar",
-      userAvatar: "/placeholder.svg?height=40&width=40",
-      rating: 4,
-      comment: "Great content and well-structured lessons. Sarah explains complex concepts in an easy-to-understand way.",
-      date: "2 months ago",
-      courseName: "JavaScript Fundamentals",
-      isVerified: false
+        // Update creator stats based on courses
+        transformedCreator.totalCourses = transformedCourses.length
+        transformedCreator.totalStudents = transformedCourses.reduce((sum, course) => sum + course.students, 0)
+        transformedCreator.averageRating = transformedCourses.length > 0 
+          ? Math.round((transformedCourses.reduce((sum, course) => sum + course.rating, 0) / transformedCourses.length) * 100) / 100
+          : 0
+
+        // Generate mock reviews based on courses
+        const mockReviews: Review[] = transformedCourses.slice(0, 3).map((course, index) => ({
+          id: index + 1,
+          userName: ["Priya Sharma", "Michael Chen", "Amit Kumar"][index],
+          userAvatar: "/placeholder.svg?height=40&width=40",
+          rating: Math.floor(course.rating),
+          comment: `Great course! ${course.title} really helped me understand the concepts better. Highly recommended!`,
+          date: `${index + 1} ${index === 0 ? 'week' : 'month'}${index > 0 ? 's' : ''} ago`,
+          courseName: course.title,
+          isVerified: true
+        }))
+
+        transformedCreator.totalReviews = mockReviews.length
+
+        setCreator(transformedCreator)
+        setCourses(transformedCourses)
+        setReviews(mockReviews)
+
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    if (id) {
+      fetchCreatorData()
+    }
+  }, [id])
 
   // Translation object
   const t = {
@@ -419,6 +411,44 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   }
 
   const currentLang = t[language]
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Loading creator profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-lg mb-4">Error loading profile</div>
+          <p className="text-gray-600">{error}</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Creator not found
+  if (!creator) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-gray-600">Creator not found</p>
+        </div>
+      </div>
+    )
+  }
 
   // Filter courses based on search and category
   const filteredCourses = courses.filter(course => {
