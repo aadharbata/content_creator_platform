@@ -21,7 +21,7 @@ router.get("/topcourses", (req, res) => __awaiter(void 0, void 0, void 0, functi
             orderBy: {
                 salesCount: "desc",
             },
-            take: 5,
+            take: 4,
         });
         console.log("Fetching top courses: ", topCourses);
         return res.status(200).json(topCourses);
