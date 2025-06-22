@@ -249,6 +249,20 @@ exports.Prisma.NotificationScalarFieldEnum = {
   userId: 'userId'
 };
 
+exports.Prisma.MessageScalarFieldEnum = {
+  id: 'id',
+  subject: 'subject',
+  content: 'content',
+  type: 'type',
+  isRead: 'isRead',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  senderId: 'senderId',
+  receiverId: 'receiverId',
+  courseId: 'courseId',
+  parentMessageId: 'parentMessageId'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -309,6 +323,13 @@ exports.NotificationType = exports.$Enums.NotificationType = {
   SUBSCRIPTION: 'SUBSCRIPTION'
 };
 
+exports.MessageType = exports.$Enums.MessageType = {
+  QUESTION: 'QUESTION',
+  FEEDBACK: 'FEEDBACK',
+  SUPPORT: 'SUPPORT',
+  GENERAL: 'GENERAL'
+};
+
 exports.Prisma.ModelName = {
   User: 'User',
   UserProfile: 'UserProfile',
@@ -321,7 +342,8 @@ exports.Prisma.ModelName = {
   Category: 'Category',
   Tag: 'Tag',
   ContentAnalytics: 'ContentAnalytics',
-  Notification: 'Notification'
+  Notification: 'Notification',
+  Message: 'Message'
 };
 
 /**
