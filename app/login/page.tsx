@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -20,13 +21,23 @@ const Login = () => {
     setError("");
     setSuccess("");
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (res.ok && data.token) {
+      // const res = await fetch('/api/auth/login', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(form),
+      // });
+      console.log("Request sent with the data: ", form);
+      const res = await axios.post("/api/auth/login", {
+        email: form.email,
+        password: form.password,
+      }, {
+        headers: {
+          "Content-Type": "application/json",
+        }
+      })
+      console.log("Response login: ", res);
+      const data = await res.data;
+      if (res.status===200 && data.token) {
         localStorage.setItem("token", data.token);
         setSuccess("Login successful! Redirecting...");
         setTimeout(() => router.push("/"), 1500);

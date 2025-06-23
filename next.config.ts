@@ -12,6 +12,23 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    // Handle module resolution issues
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    };
+
+    // Ensure proper resolution of semver and other modules
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      semver: require.resolve('semver'),
+    };
+
+    return config;
+  },
 };
 
 export default nextConfig;

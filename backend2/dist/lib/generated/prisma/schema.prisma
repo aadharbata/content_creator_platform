@@ -24,13 +24,15 @@ model User {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  profile       UserProfile?
-  contents      Content[]
-  courses       Course[]
-  subscriptions Subscription[]
-  payments      Payment[]
-  reviews       Review[]
-  notifications Notification[]
+  profile          UserProfile?
+  contents         Content[]
+  courses          Course[]
+  subscriptions    Subscription[]
+  payments         Payment[]
+  reviews          Review[]
+  notifications    Notification[]
+  sentMessages     Message[]      @relation("MessageSender")
+  receivedMessages Message[]      @relation("MessageReceiver")
 }
 
 model UserProfile {
@@ -92,6 +94,7 @@ model Course {
   contents Content[]
   lessons  Lesson[]
   reviews  Review[]
+  messages Message[]
 }
 
 model Lesson {
@@ -180,6 +183,37 @@ model Notification {
   userId String
 }
 
+model Message {
+  id        String      @id @default(uuid())
+  subject   String
+  content   String
+  type      MessageType @default(GENERAL)
+  isRead    Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Sender (fan/student)
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id])
+  senderId String
+
+  // Receiver (creator)
+  receiver   User   @relation("MessageReceiver", fields: [receiverId], references: [id])
+  receiverId String
+
+  // Optional: Related course
+  course   Course? @relation(fields: [courseId], references: [id])
+  courseId String?
+
+  // Message thread
+  parentMessage   Message?  @relation("MessageThread", fields: [parentMessageId], references: [id])
+  parentMessageId String?
+  replies         Message[] @relation("MessageThread")
+
+  @@index([receiverId, isRead, createdAt])
+  @@index([senderId, createdAt])
+  @@index([courseId])
+}
+
 enum Role {
   ADMIN
   CREATOR
@@ -224,4 +258,11 @@ enum NotificationType {
   PAYMENT
   CONTENT
   SUBSCRIPTION
+}
+
+enum MessageType {
+  QUESTION
+  FEEDBACK
+  SUPPORT
+  GENERAL
 }

@@ -31,9 +31,9 @@ export default function LandingPage() {
 
   const fetchTopCourses = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/courses/topcourses");
-      console.log("Top courses: ", res.data);
-      setTopCourses(res.data);
+      const res = await axios.get("http://localhost:3000/api/courses/topcourses");
+      console.log("Top courses: ", res.data.courses);
+      setTopCourses(res.data.courses);
     } catch (error) {
       console.log("Error in fetching top courses: ", error);
       setTopCourses([]);
