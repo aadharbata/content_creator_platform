@@ -4,6 +4,7 @@ import { Star, Users } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 interface TopCourses {
   id: string,
@@ -24,6 +25,7 @@ interface TopCoursesSectionProps {
 
 export default function TopCoursesSection({ language, translations, topCourses }: TopCoursesSectionProps) {
   const t = translations[language]
+  const router = useRouter();
 
   return (
     <section className="py-20 relative">
@@ -94,7 +96,7 @@ export default function TopCoursesSection({ language, translations, topCourses }
         </div>
 
         <div className="text-center mt-12">
-          <Button size="lg" variant="outline" className="text-lg px-8 py-4 h-auto border-2 hover:bg-gray-50">
+          <Button onClick={()=>router.push("/viewAll")} size="lg" variant="outline" className="text-lg px-8 py-4 h-auto border-2 hover:bg-gray-50">
             {t.viewAll} {t.topCourses}
           </Button>
         </div>
