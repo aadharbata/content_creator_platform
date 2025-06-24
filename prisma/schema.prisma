@@ -124,17 +124,23 @@ model Subscription {
 }
 
 model Payment {
-  id             String        @id @default(uuid())
-  amount         Float
-  currency       String        @default("INR")
-  status         PaymentStatus
-  paymentvia     String
-  paymentId      String
-  createdAt      DateTime      @default(now())
-  subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
-  subscriptionId String
-  user           User          @relation(fields: [userId], references: [id])
-  userId         String
+  id               String        @id @default(uuid())
+  amount           Float
+  currency         String        @default("INR")
+  status           PaymentStatus
+  paymentvia       String
+  paymentId        String
+  razorpayOrderId  String?
+  creatorId        String?
+  originalAmount   Float?
+  originalCurrency String?
+  convertedAmount  Float?
+  createdAt        DateTime      @default(now())
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id])
+  subscriptionId   String
+  user             User          @relation(fields: [userId], references: [id])
+  userId           String
+  creator          Creator?      @relation(fields: [creatorId], references: [id])
 }
 
 model Review {
@@ -200,18 +206,19 @@ model Message {
   receiver   User   @relation("MessageReceiver", fields: [receiverId], references: [id])
   receiverId String
 
-  // Optional: Related course
-  course   Course? @relation(fields: [courseId], references: [id])
-  courseId String?
+  course   Course @relation(fields: [courseId], references: [id])
+  courseId String
+}
 
-  // Message thread
-  parentMessage   Message?  @relation("MessageThread", fields: [parentMessageId], references: [id])
-  parentMessageId String?
-  replies         Message[] @relation("MessageThread")
-
-  @@index([receiverId, isRead, createdAt])
-  @@index([senderId, createdAt])
-  @@index([courseId])
+model Creator {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  bankAccount   String
+  ifsc          String
+  upi           String?
+  createdAt     DateTime @default(now())
+  payments      Payment[]
 }
 
 enum Role {
