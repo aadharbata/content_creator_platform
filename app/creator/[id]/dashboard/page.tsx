@@ -538,8 +538,8 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {courses.slice(0, 3).map((course) => (
-                        <Card key={course.id} className="group hover:shadow-lg transition-all border-0 bg-gray-50/50">
-                          <CardContent className="p-4">
+                        <Card key={course.id} className="group hover:shadow-lg transition-all border-0 bg-gray-50/50 flex flex-col h-full">
+                          <CardContent className="p-4 flex flex-col flex-grow">
                             <div className="relative mb-4">
                               <img
                                 src={course.imgURL}
@@ -555,32 +555,34 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                               {course.title}
                             </h3>
                             
-                            <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                              <div>
-                                <span className="text-gray-600">{currentLang.earnings}:</span>
-                                <span className="font-semibold text-green-600 ml-1">₹{formatNumber(course.price * course.salesCount)}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">{currentLang.students}:</span>
-                                <span className="font-semibold ml-1">{formatNumber(course.salesCount)}</span>
-                              </div>
-                            </div>
+                            <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-grow">
+                              {course.description}
+                            </p>
                             
-                            <div className="flex items-center justify-between text-xs text-gray-500">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex items-center space-x-1">
-                                  <Eye className="w-3 h-3" />
-                                  <span>{formatNumber(course.ContentAnalytics?.[0]?.views || 0)}</span>
+                            {/* Stats at extreme bottom */}
+                            <div className="flex justify-between items-end mt-auto pt-4 text-sm">
+                                {/* Left Column */}
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="text-gray-600">Price:</span>
+                                        <span className="font-semibold ml-1">₹{formatNumber(course.price)}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-1 text-xs">
+                                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                                        <span>{course.rating.toFixed(1)}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center space-x-1">
-                                  <Heart className="w-3 h-3" />
-                                  <span>{formatNumber(course.ContentAnalytics?.[0]?.likes || 0)}</span>
+                                {/* Right Column */}
+                                <div className="space-y-2 text-right">
+                                    <div>
+                                        <span className="text-gray-600">Students:</span>
+                                        <span className="font-semibold ml-1">{formatNumber(course.salesCount)}</span>
+                                    </div>
+                                    <div className="text-xs">
+                                        <span className="text-gray-600">Earnings:</span>
+                                        <span className="font-semibold text-green-600 ml-1">₹{formatNumber(course.price * course.salesCount)}</span>
+                                    </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                                <span>{course.rating.toFixed(1)}</span>
-                              </div>
                             </div>
                           </CardContent>
                         </Card>
@@ -641,8 +643,8 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {courses.map((course) => (
-                      <Card key={course.id} className="group hover:shadow-lg transition-all border-0 bg-gray-50/50">
-                        <CardContent className="p-4">
+                      <Card key={course.id} className="group hover:shadow-lg transition-all border-0 bg-gray-50/50 flex flex-col h-full">
+                        <CardContent className="p-4 flex flex-col flex-grow">
                           <div className="relative mb-4">
                             <img
                               src={course.imgURL}
@@ -655,20 +657,35 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                             {course.title}
                           </h3>
                           
-                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                          <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-grow">
                             {course.description}
                           </p>
                           
-                          <div className="flex items-center justify-between text-sm">
-                            <div>
-                              <span className="text-gray-600">Price:</span>
-                              <span className="font-semibold ml-1">₹{course.price}</span>
+                          {/* Stats at extreme bottom */}
+                            <div className="flex justify-between items-end mt-auto pt-4 text-sm">
+                                {/* Left Column */}
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="text-gray-600">Price:</span>
+                                        <span className="font-semibold ml-1">₹{formatNumber(course.price)}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-1 text-xs">
+                                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                                        <span>{course.rating.toFixed(1)}</span>
+                                    </div>
+                                </div>
+                                {/* Right Column */}
+                                <div className="space-y-2 text-right">
+                                    <div>
+                                        <span className="text-gray-600">Students:</span>
+                                        <span className="font-semibold ml-1">{formatNumber(course.salesCount)}</span>
+                                    </div>
+                                    <div className="text-xs">
+                                        <span className="text-gray-600">Earnings:</span>
+                                        <span className="font-semibold text-green-600 ml-1">₹{formatNumber(course.price * course.salesCount)}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                              <span className="text-gray-600">Sales:</span>
-                              <span className="font-semibold ml-1">{course.salesCount}</span>
-                            </div>
-                          </div>
                         </CardContent>
                       </Card>
                     ))}
