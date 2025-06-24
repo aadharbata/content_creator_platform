@@ -34,6 +34,7 @@
     "lucide-react": "^0.517.0",
     "next": "15.2.4",
     "pg": "^8.16.0",
+    "razorpay": "^2.9.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-i18next": "^15.5.3",
