@@ -115,5 +115,18 @@
   "mostPopular": "Most Popular",
   "highestRated": "Highest Rated",
   "priceLowToHigh": "Price: Low to High",
-  "priceHighToLow": "Price: High to Low"
+  "priceHighToLow": "Price: High to Low",
+  "bio": "Bio",
+  "noBioAvailable": "No bio available",
+  "noCoursesAvailable": "No courses available",
+  "noRecentActivity": "No recent activity",
+  "general": "General",
+  "noMessagesFound": "No messages found for your search",
+  "addNew": "Add New",
+  "analyticsSoon": "Analytics dashboard coming soon",
+  "settingsSoon": "Settings panel coming soon",
+  "contentCreator": "Content Creator",
+  "new": "New",
+  "topRated": "Top Rated",
+  "price": "Price"
 } 

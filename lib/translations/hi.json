@@ -115,5 +115,18 @@
   "mostPopular": "सबसे लोकप्रिय",
   "highestRated": "उच्चतम रेटेड",
   "priceLowToHigh": "मूल्य: कम से अधिक",
-  "priceHighToLow": "मूल्य: अधिक से कम"
+  "priceHighToLow": "मूल्य: अधिक से कम",
+  "bio": "बायो",
+  "noBioAvailable": "कोई बायो उपलब्ध नहीं",
+  "noCoursesAvailable": "कोई कोर्स उपलब्ध नहीं",
+  "noRecentActivity": "कोई हाल की गतिविधि नहीं",
+  "general": "सामान्य",
+  "noMessagesFound": "आपकी खोज के लिए कोई संदेश नहीं मिला",
+  "addNew": "नया जोड़ें",
+  "analyticsSoon": "एनालिटिक्स डैशबोर्ड जल्द आ रहा है",
+  "settingsSoon": "सेटिंग्स पैनल जल्द आ रहा है",
+  "contentCreator": "कंटेंट क्रिएटर",
+  "new": "नया",
+  "topRated": "टॉप रेटेड",
+  "price": "मूल्य"
 } 
