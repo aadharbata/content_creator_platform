@@ -21,7 +21,7 @@ const SignUp = () => {
     phone: "",
     password: "",
     confirm_password: "",
-    role: 'CONSUMER',
+    role: 'CREATOR',
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -94,8 +94,16 @@ const SignUp = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccess("Sign up successful! Redirecting to login...");
-        setTimeout(() => router.push("/login"), 1500);
+        setSuccess("Sign up successful! Redirecting...");
+        
+        // Redirect based on role
+        setTimeout(() => {
+          if (data.user.role === 'CREATOR') {
+            router.push(`/creator/${data.user.id}/dashboard`);
+          } else {
+            router.push("/login"); // Redirect consumers to login
+          }
+        }, 1500);
       } else {
         setError(data.message || "Sign up failed.");
       }
@@ -117,7 +125,7 @@ const SignUp = () => {
           Sign Up
         </h1>
         <p className="text-md text-gray-700 mb-6">
-          Join as a Creator and start your journey!
+          Join our platform and start your journey!
         </p>
         <form
           className="w-full flex flex-col gap-4 text-left"
@@ -135,6 +143,38 @@ const SignUp = () => {
               placeholder="Name"
             />
           </label>
+
+          {/* Role Selection */}
+          <div className="mb-4">
+            <label className="font-semibold text-gray-800 mb-2 block">
+              I want to join as:
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="role"
+                  value="CREATOR"
+                  checked={form.role === "CREATOR"}
+                  onChange={handleChange}
+                  className="accent-blue-600"
+                />
+                <span className="text-gray-800">Creator</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="role"
+                  value="CONSUMER"
+                  checked={form.role === "CONSUMER"}
+                  onChange={handleChange}
+                  className="accent-orange-500"
+                />
+                <span className="text-gray-800">Consumer</span>
+              </label>
+            </div>
+          </div>
+
           <div className="flex gap-4 items-center mb-2">
             <label className="flex items-center gap-1">
               <input

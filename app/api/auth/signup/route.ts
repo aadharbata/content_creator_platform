@@ -14,9 +14,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (role !== 'CONSUMER') {
+    // Allow both CONSUMER and CREATOR roles
+    if (role !== 'CONSUMER' && role !== 'CREATOR') {
       return NextResponse.json(
-        { message: "This route is only for consumer signup" },
+        { message: "Invalid role. Must be CONSUMER or CREATOR." },
         { status: 400 }
       );
     }
@@ -46,7 +47,15 @@ export async function POST(request: NextRequest) {
 
     console.log("Registered User: ", user);
     return NextResponse.json(
-      { message: "User registered successfully." },
+      { 
+        message: "User registered successfully.",
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
+      },
       { status: 201 }
     );
   } catch (error) {

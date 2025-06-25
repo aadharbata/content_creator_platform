@@ -21,11 +21,6 @@ const Login = () => {
     setError("");
     setSuccess("");
     try {
-      // const res = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(form),
-      // });
       console.log("Request sent with the data: ", form);
       const res = await axios.post("/api/auth/login", {
         email: form.email,
@@ -39,8 +34,17 @@ const Login = () => {
       const data = await res.data;
       if (res.status===200 && data.token) {
         localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
         setSuccess("Login successful! Redirecting...");
-        setTimeout(() => router.push("/"), 1500);
+        
+        // Redirect based on user role
+        setTimeout(() => {
+          if (data.user.role === 'CREATOR') {
+            router.push(`/creator/${data.user.id}/dashboard`);
+          } else {
+            router.push("/"); // Default redirect for consumers
+          }
+        }, 1500);
       } else {
         setError(data.message || "Login failed.");
       }
