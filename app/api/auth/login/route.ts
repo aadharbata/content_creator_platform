@@ -74,15 +74,7 @@ export async function POST(request: NextRequest) {
       type: "user" 
     };
     
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      console.error("JWT_SECRET not configured");
-      return NextResponse.json(
-        { message: "Server configuration error." },
-        { status: 500 }
-      );
-    }
-
+    const jwtSecret = 'aadhar123';
     const token = jwt.sign(payload, jwtSecret, { expiresIn: "7d" });
 
     return NextResponse.json({ 
@@ -91,7 +83,8 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        role: user.role
       }
     }, { status: 200 });
 

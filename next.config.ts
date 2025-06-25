@@ -21,11 +21,11 @@ const nextConfig: NextConfig = {
       tls: false,
     };
 
-    // Ensure proper resolution of semver and other modules
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      semver: require.resolve('semver'),
-    };
+    // Remove semver alias to fix build error
+    // config.resolve.alias = {
+    //   ...config.resolve.alias,
+    //   semver: require.resolve('semver'),
+    // };
 
     return config;
   },
