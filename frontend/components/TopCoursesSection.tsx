@@ -96,7 +96,7 @@ export default function TopCoursesSection({ language, translations, topCourses }
         </div>
 
         <div className="text-center mt-12">
-          <Button onClick={()=>router.push("/viewAll")} size="lg" variant="outline" className="text-lg px-8 py-4 h-auto border-2 hover:bg-gray-50">
+          <Button onClick={()=>router.push("/viewall")} size="lg" variant="outline" className="text-lg px-8 py-4 h-auto border-2 hover:bg-gray-50">
             {t.viewAll} {t.topCourses}
           </Button>
         </div>
