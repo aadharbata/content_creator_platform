@@ -44,14 +44,14 @@ export default function Header({ language, setLanguage, translations }: HeaderPr
               className="cursor-pointer hover:text-purple-200"
               onClick={() => router.push('/login')}
             >
-              CREATOR LOGIN
+              {language === 'hi' ? 'क्रिएटर लॉगिन' : 'CREATOR LOGIN'}
             </span>
             <span className="mx-2">/</span>
             <span
               className="cursor-pointer hover:text-purple-200"
               onClick={() => router.push('/signup')}
             >
-              SIGN UP
+              {language === 'hi' ? 'साइन अप' : 'SIGN UP'}
             </span>
           </div>
         </div>

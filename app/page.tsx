@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useLanguage } from "@/lib/contexts/LanguageContext"
 import Header from "@/frontend/components/Header"
 import Hero from "@/frontend/components/Hero"
 import SearchSection from "@/frontend/components/SearchSection"
@@ -26,7 +27,7 @@ interface TopCourses {
 }
 
 export default function LandingPage() {
-  const [language, setLanguage] = useState<"en" | "hi">("en");
+  const { language, setLanguage } = useLanguage();
   const [topCourses, setTopCourses] = useState<TopCourses[]>([]);
 
   const fetchTopCourses = async () => {

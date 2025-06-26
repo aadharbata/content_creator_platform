@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/contexts/LanguageContext";
 
 const countryCodes = [
   { code: "+1", name: "US/Canada", flag: "🇺🇸" },
@@ -27,6 +28,7 @@ const SignUp = () => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { language } = useLanguage();
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -54,29 +56,29 @@ const SignUp = () => {
     setSuccess("");
     if (signupMethod === "email") {
       if (!form.email) {
-        setError("Email is required.");
+        setError(language === 'hi' ? "ईमेल आवश्यक है।" : "Email is required.");
         return;
       }
       if (!validateEmail(form.email)) {
-        setError("Please enter a valid email address.");
+        setError(language === 'hi' ? "कृपया एक वैध ईमेल पता दर्ज करें।" : "Please enter a valid email address.");
         return;
       }
     } else {
       if (!form.phone) {
-        setError("Phone number is required.");
+        setError(language === 'hi' ? "फोन नंबर आवश्यक है।" : "Phone number is required.");
         return;
       }
       if (!validatePhone(form.phone)) {
-        setError("Please enter a valid phone number.");
+        setError(language === 'hi' ? "कृपया एक वैध फोन नंबर दर्ज करें।" : "Please enter a valid phone number.");
         return;
       }
       if (!form.countryCode) {
-        setError("Please select a country code.");
+        setError(language === 'hi' ? "कृपया एक देश कोड चुनें।" : "Please select a country code.");
         return;
       }
     }
     if (form.password !== form.confirm_password) {
-      setError("Passwords do not match.");
+      setError(language === 'hi' ? "पासवर्ड मेल नहीं खाते।" : "Passwords do not match.");
       return;
     }
     setLoading(true);
@@ -94,7 +96,7 @@ const SignUp = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccess("Sign up successful! Redirecting...");
+        setSuccess(language === 'hi' ? "साइन अप सफल! पुनर्निर्देशित कर रहे हैं..." : "Sign up successful! Redirecting...");
         
         // Redirect based on role
         setTimeout(() => {
@@ -105,10 +107,10 @@ const SignUp = () => {
           }
         }, 1500);
       } else {
-        setError(data.message || "Sign up failed.");
+        setError(data.message || (language === 'hi' ? "साइन अप विफल।" : "Sign up failed."));
       }
     } catch (error) {
-      setError("Server error.");
+      setError(language === 'hi' ? "सर्वर त्रुटि।" : "Server error.");
     }
     setLoading(false);
   };
@@ -122,17 +124,20 @@ const SignUp = () => {
           </span>
         </div>
         <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-blue-900 font-poppins">
-          Sign Up
+          {language === 'hi' ? 'साइन अप' : 'Sign Up'}
         </h1>
         <p className="text-md text-gray-700 mb-6">
-          Join our platform and start your journey!
+          {language === 'hi' 
+            ? 'हमारे प्लेटफॉर्म में शामिल हों और अपनी यात्रा शुरू करें!' 
+            : 'Join our platform and start your journey!'
+          }
         </p>
         <form
           className="w-full flex flex-col gap-4 text-left"
           onSubmit={handleSubmit}
         >
           <label className="font-semibold text-gray-800">
-            Name
+            {language === 'hi' ? 'नाम' : 'Name'}
             <input
               type="text"
               name="name"
@@ -140,14 +145,14 @@ const SignUp = () => {
               onChange={handleChange}
               required
               className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-              placeholder="Name"
+              placeholder={language === 'hi' ? 'नाम' : 'Name'}
             />
           </label>
 
           {/* Role Selection */}
           <div className="mb-4">
             <label className="font-semibold text-gray-800 mb-2 block">
-              I want to join as:
+              {language === 'hi' ? 'मैं इस रूप में शामिल होना चाहता हूं:' : 'I want to join as:'}
             </label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2">
@@ -159,7 +164,7 @@ const SignUp = () => {
                   onChange={handleChange}
                   className="accent-blue-600"
                 />
-                <span className="text-gray-800">Creator</span>
+                <span className="text-gray-800">{language === 'hi' ? 'क्रिएटर' : 'Creator'}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -170,7 +175,7 @@ const SignUp = () => {
                   onChange={handleChange}
                   className="accent-orange-500"
                 />
-                <span className="text-gray-800">Consumer</span>
+                <span className="text-gray-800">{language === 'hi' ? 'उपभोक्ता' : 'Consumer'}</span>
               </label>
             </div>
           </div>
@@ -185,7 +190,7 @@ const SignUp = () => {
                 onChange={handleSignupMethodChange}
                 className="accent-blue-600"
               />
-              <span className="text-gray-800">Sign up with Email</span>
+              <span className="text-gray-800">{language === 'hi' ? 'ईमेल से साइन अप करें' : 'Sign up with Email'}</span>
             </label>
             <label className="flex items-center gap-1">
               <input
@@ -196,12 +201,12 @@ const SignUp = () => {
                 onChange={handleSignupMethodChange}
                 className="accent-orange-500"
               />
-              <span className="text-gray-800">Sign up with Phone</span>
+              <span className="text-gray-800">{language === 'hi' ? 'फोन से साइन अप करें' : 'Sign up with Phone'}</span>
             </label>
           </div>
           {signupMethod === "email" ? (
             <label className="font-semibold text-gray-800">
-              Email
+              {language === 'hi' ? 'ईमेल' : 'Email'}
               <input
                 type="email"
                 name="email"
@@ -209,12 +214,12 @@ const SignUp = () => {
                 onChange={handleChange}
                 required
                 className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-                placeholder="Email"
+                placeholder={language === 'hi' ? 'ईमेल' : 'Email'}
               />
             </label>
           ) : (
             <label className="font-semibold text-gray-800">
-              Phone Number
+              {language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
               <div className="flex gap-2 mt-1">
                 <select
                   name="countryCode"
@@ -235,13 +240,13 @@ const SignUp = () => {
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-                  placeholder="Phone Number"
+                  placeholder={language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
                 />
               </div>
             </label>
           )}
           <label className="font-semibold text-gray-800">
-            Password
+            {language === 'hi' ? 'पासवर्ड' : 'Password'}
             <input
               type="password"
               name="password"
@@ -249,11 +254,11 @@ const SignUp = () => {
               onChange={handleChange}
               required
               className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-              placeholder="Password"
+              placeholder={language === 'hi' ? 'पासवर्ड' : 'Password'}
             />
           </label>
           <label className="font-semibold text-gray-800">
-            Confirm Password
+            {language === 'hi' ? 'पासवर्ड की पुष्टि करें' : 'Confirm Password'}
             <input
               type="password"
               name="confirm_password"
@@ -261,7 +266,7 @@ const SignUp = () => {
               onChange={handleChange}
               required
               className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-              placeholder="Confirm Password"
+              placeholder={language === 'hi' ? 'पासवर्ड की पुष्टि करें' : 'Confirm Password'}
             />
           </label>
 
@@ -270,7 +275,10 @@ const SignUp = () => {
             className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
             disabled={loading}
           >
-            {loading ? "Signing up..." : "Sign Up"}
+            {loading 
+              ? (language === 'hi' ? "साइन अप हो रहा है..." : "Signing up...") 
+              : (language === 'hi' ? "साइन अप" : "Sign Up")
+            }
           </button>
         </form>
         {error && <p className="mt-4 text-red-600 font-semibold">{error}</p>}
@@ -278,12 +286,12 @@ const SignUp = () => {
           <p className="mt-4 text-green-600 font-semibold">{success}</p>
         )}
         <p className="mt-6 text-sm text-gray-600">
-          Already have an account?{" "}
+          {language === 'hi' ? "पहले से ही खाता है?" : "Already have an account?"}{" "}
           <a
             href="/login"
             className="text-orange-500 font-semibold hover:underline"
           >
-            Sign in
+            {language === 'hi' ? "साइन इन करें" : "Sign in"}
           </a>
         </p>
       </main>
