@@ -48,8 +48,12 @@ const Login = () => {
       } else {
         setError(data.message || "Login failed.");
       }
-    } catch (err) {
-      setError("Server error.");
+    } catch (err: any) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError("Server error.");
+      }
     }
     setLoading(false);
   };
