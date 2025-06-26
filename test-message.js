@@ -57,7 +57,7 @@ async function addTestMessage() {
     // Add a new message from Priya Sharma (fan)
     const testMessage = await prisma.message.create({
       data: {
-        content: `Hi John! This is a test message sent at ${new Date().toLocaleTimeString()}. I have a quick question about your React course!`,
+        content: `Another question about the course`,
         conversationId: conversation.id,
         senderId: priyaSharma.id
       }

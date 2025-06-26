@@ -281,6 +281,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   const [sendingMessage, setSendingMessage] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const lastConversationUpdate = useRef<string | null>(null)
 
   // Get translations
   const t = getTranslations(language)
@@ -361,13 +362,39 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     }
   }, [id])
 
-  // Fetch conversations
+  // Fetch conversations with smart update detection
   const fetchConversations = async (silent = false) => {
     try {
       const response = await fetch(`/api/creator/${id}/conversations`)
       if (response.ok) {
         const data = await response.json()
-        setConversations(data)
+        
+        // Create a hash of conversation data to detect changes
+        const conversationHash = JSON.stringify(data.map((conv: any) => ({
+          id: conv.id,
+          lastMessageAt: conv.lastMessageAt,
+          unreadCount: conv.unreadCount,
+          lastMessageContent: conv.lastMessage?.content
+        })))
+        
+        // Only update if data has actually changed
+        if (lastConversationUpdate.current !== conversationHash) {
+          setConversations(data)
+          lastConversationUpdate.current = conversationHash
+          
+          // If there's a new message in the selected conversation, show a subtle notification
+          if (silent && selectedConversation) {
+            const selectedConv = data.find((conv: any) => conv.id === selectedConversation)
+            const currentConv = conversations.find(conv => conv.id === selectedConversation)
+            
+            if (selectedConv && currentConv && 
+                selectedConv.lastMessageAt !== currentConv.lastMessageAt &&
+                selectedConv.lastMessage?.isFromFan) {
+              // New message from fan in current conversation - will be picked up by message polling
+              console.log('New message detected in current conversation')
+            }
+          }
+        }
       }
     } catch (error) {
       if (!silent) {
@@ -392,6 +419,11 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           Math.abs(container.scrollTop + container.clientHeight - container.scrollHeight) < 50 : true
         
         setMessages(data)
+        
+        // Update conversation list to reflect read status changes
+        if (!silent) {
+          fetchConversations(true)
+        }
         
         // Only scroll if user was already at bottom or it's the first load
         if (wasAtBottom || !silent) {
@@ -465,14 +497,24 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
       fetchMessages(selectedConversation)
       // Reset message input when switching conversations
       setNewMessage("")
+      // Immediately update the conversation list to remove unread badge
+      setTimeout(() => {
+        fetchConversations(true)
+      }, 500)
     }
   }, [selectedConversation, id])
 
-  // Polling for new messages
+  // Polling for new messages and conversations
   useEffect(() => {
-    if (activeTab === 'messages' && selectedConversation) {
+    if (activeTab === 'messages') {
       const interval = setInterval(() => {
-        fetchMessages(selectedConversation, true) // Silent update
+        // Always poll conversations list for new messages from any fan
+        fetchConversations(true)
+        
+        // If a conversation is selected, also poll its messages
+        if (selectedConversation) {
+          fetchMessages(selectedConversation, true)
+        }
       }, 5000) // Poll every 5 seconds
 
       return () => clearInterval(interval)
