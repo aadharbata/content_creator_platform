@@ -185,7 +185,7 @@ async function main() {
     }
   })
 
-  // Create more consumers for messages
+  // Create more consumers
   const consumer3 = await prisma.user.create({
     data: {
       email: 'priya.sharma@example.com',
@@ -350,87 +350,99 @@ async function main() {
     ]
   })
 
-  // Create messages
+  // Create conversations and messages with realistic timestamps
+  const conversation1 = await prisma.conversation.create({
+    data: {
+      creatorId: creator1.id,
+      fanId: consumer1.id,
+      lastMessageAt: new Date('2024-12-21T14:30:00.000Z') // Today 2:30 PM
+    }
+  })
+
+  const conversation2 = await prisma.conversation.create({
+    data: {
+      creatorId: creator1.id,
+      fanId: consumer3.id,
+      lastMessageAt: new Date('2024-12-21T16:45:00.000Z') // Today 4:45 PM
+    }
+  })
+
+  const conversation3 = await prisma.conversation.create({
+    data: {
+      creatorId: creator2.id,
+      fanId: consumer2.id,
+      lastMessageAt: new Date('2024-12-21T17:20:00.000Z') // Today 5:20 PM
+    }
+  })
+
+  // Create messages for conversation1 (John Doe & Alice Student)
   await prisma.message.createMany({
     data: [
       {
-        subject: 'Question about React Hooks',
-        content: 'Hi! I\'m having trouble understanding useEffect in your React course. Could you explain when to use dependency arrays? I\'ve been following along but getting confused about the cleanup function.',
-        type: 'QUESTION',
-        isRead: false,
-        senderId: consumer3.id,
-        receiverId: creator1.id,
-        courseId: course1.id,
-        createdAt: new Date('2024-01-15T10:30:00')
-      },
-      {
-        subject: 'Amazing TypeScript Course!',
-        content: 'Just wanted to say thank you for the excellent TypeScript course. The explanations are so clear and the projects really helped me understand the concepts. Best investment I\'ve made in my learning journey!',
-        type: 'FEEDBACK',
-        isRead: true,
-        senderId: consumer4.id,
-        receiverId: creator1.id,
-        courseId: course3.id,
-        createdAt: new Date('2024-01-14T15:45:00')
-      },
-      {
-        subject: 'Course completion certificate',
-        content: 'Hello John, I completed your Full-Stack JavaScript course but haven\'t received my certificate yet. Could you please help me with this? I need it for my job application.',
-        type: 'SUPPORT',
-        isRead: false,
+        content: 'Hi John! I just enrolled in your React course and I\'m really excited to start learning!',
+        conversationId: conversation1.id,
         senderId: consumer1.id,
-        receiverId: creator1.id,
-        courseId: course2.id,
-        createdAt: new Date('2024-01-14T09:20:00')
+        createdAt: new Date('2024-12-21T13:15:00.000Z') // Today 1:15 PM
       },
       {
-        subject: 'Future course suggestions',
-        content: 'Hi John! I\'ve completed all your current courses and loved them. Are you planning any advanced courses on Node.js or GraphQL? I\'d love to continue learning from you.',
-        type: 'GENERAL',
-        isRead: true,
-        senderId: consumer6.id,
-        receiverId: creator1.id,
-        createdAt: new Date('2024-01-13T18:10:00')
+        content: 'That\'s wonderful, Alice! Welcome to the course. Feel free to ask me anything if you get stuck.',
+        conversationId: conversation1.id,
+        senderId: creator1.id,
+        createdAt: new Date('2024-12-21T13:45:00.000Z') // Today 1:45 PM
       },
       {
-        subject: 'Project deployment help',
-        content: 'I\'m trying to deploy the project from your React course to Vercel but getting some errors. The build is failing with module not found errors. Can you guide me through the deployment process?',
-        type: 'QUESTION',
-        isRead: false,
-        senderId: consumer5.id,
-        receiverId: creator1.id,
-        courseId: course1.id,
-        createdAt: new Date('2024-01-13T14:30:00')
+        content: 'Thank you so much! I\'m currently on the hooks section. The useState explanation was really clear.',
+        conversationId: conversation1.id,
+        senderId: consumer1.id,
+        createdAt: new Date('2024-12-21T14:30:00.000Z') // Today 2:30 PM
+      }
+    ]
+  })
+
+  // Create messages for conversation2 (John Doe & Priya Sharma)
+  await prisma.message.createMany({
+    data: [
+      {
+        content: 'Hello John, I have a question about the deployment section in your Next.js course.',
+        conversationId: conversation2.id,
+        senderId: consumer3.id,
+        createdAt: new Date('2024-12-21T16:10:00.000Z') // Today 4:10 PM
       },
       {
-        subject: 'Course refund request',
-        content: 'Hi John, I purchased the TypeScript course by mistake as I already have good knowledge of it. Could I get a refund or exchange it for another course? I\'d prefer the Full-Stack JavaScript course.',
-        type: 'SUPPORT',
-        isRead: true,
+        content: 'Hi Priya! I\'d be happy to help. What specific part of the deployment are you having trouble with?',
+        conversationId: conversation2.id,
+        senderId: creator1.id,
+        createdAt: new Date('2024-12-21T16:25:00.000Z') // Today 4:25 PM
+      },
+      {
+        content: 'I\'m getting an error when trying to deploy to Vercel. The build process fails.',
+        conversationId: conversation2.id,
+        senderId: consumer3.id,
+        createdAt: new Date('2024-12-21T16:45:00.000Z') // Today 4:45 PM
+      }
+    ]
+  })
+
+  // Create messages for conversation3 (Sarah Wilson & Bob Learner)
+  await prisma.message.createMany({
+    data: [
+      {
+        content: 'Hi Sarah! Your UI/UX course is amazing. I\'ve learned so much about design principles.',
+        conversationId: conversation3.id,
         senderId: consumer2.id,
-        receiverId: creator1.id,
-        courseId: course3.id,
-        createdAt: new Date('2024-01-12T11:15:00')
+        createdAt: new Date('2024-12-21T16:50:00.000Z') // Today 4:50 PM
       },
       {
-        subject: 'UI Design Templates Question',
-        content: 'Hi Sarah! I love your UI design course. I was wondering if you have any plans to create more advanced templates for mobile apps? The current templates are great for web but I\'d love mobile-specific ones.',
-        type: 'QUESTION',
-        isRead: false,
-        senderId: consumer1.id,
-        receiverId: creator2.id,
-        courseId: course4.id,
-        createdAt: new Date('2024-01-11T16:20:00')
+        content: 'Thank you so much, Bob! I\'m thrilled to hear you\'re enjoying the course. Design is such a rewarding field!',
+        conversationId: conversation3.id,
+        senderId: creator2.id,
+        createdAt: new Date('2024-12-21T17:05:00.000Z') // Today 5:05 PM
       },
       {
-        subject: 'Excellent Digital Marketing Course',
-        content: 'Sarah, your digital marketing course is fantastic! I\'ve already implemented several strategies from your course and seen great results. Thank you for the practical approach and real-world examples.',
-        type: 'FEEDBACK',
-        isRead: true,
-        senderId: consumer3.id,
-        receiverId: creator2.id,
-        courseId: course5.id,
-        createdAt: new Date('2024-01-10T12:45:00')
+        content: 'I\'m working on my first design project now. Could you review it when I\'m done?',
+        conversationId: conversation3.id,
+        senderId: consumer2.id,
+        createdAt: new Date('2024-12-21T17:20:00.000Z') // Today 5:20 PM
       }
     ]
   })
@@ -442,7 +454,8 @@ async function main() {
   console.log(`💬 Created ${4} reviews`)
   console.log(`📄 Created ${2} content items`)
   console.log(`🔔 Created ${3} notifications`)
-  console.log(`📨 Created ${8} messages`)
+  console.log(`💬 Created ${3} conversations`)
+  console.log(`💬 Created ${9} messages`)
   console.log('')
   console.log('🎯 Sample creator IDs for testing:')
   console.log(`   John Doe: ${creator1.id}`)

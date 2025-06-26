@@ -2,31 +2,17 @@
 
 import { useState, useEffect, use } from "react"
 import { 
-  BookOpen, 
   Users, 
   Star, 
   MessageCircle, 
   Share2, 
-  Heart,
-  Eye,
   Calendar,
   MapPin,
   Globe,
-  ShoppingCart,
   Crown,
   Search,
-  Grid3X3,
-  List,
   Languages,
-  Filter,
-  RefreshCw,
-  MoreHorizontal,
   ExternalLink,
-  Award,
-  TrendingUp,
-  CheckCircle,
-  Bell,
-  Bookmark,
   Clock,
   ArrowLeft
 } from "lucide-react"
@@ -40,51 +26,60 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Image from "next/image"
 import Link from "next/link"
+import { useDebounce } from "@/lib/hooks"
+import { cn } from "@/lib/utils"
+import { getTranslations, type Language } from "@/lib/translations"
+import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
 
+// Constants
+const COURSE_LEVELS = {
+  BEGINNER: { threshold: 0, max: 2000 },
+  INTERMEDIATE: { threshold: 2000, max: 3000 },
+  ADVANCED: { threshold: 3000, max: Infinity }
+} as const
+
+const COURSE_BADGES = {
+  BESTSELLER: { threshold: 100, label: 'bestseller' },
+  POPULAR: { threshold: 50, label: 'mostPopular' },
+  TOP_RATED: { threshold: 20, reviewKey: '_count.reviews', label: 'highestRated' },
+  NEW: { threshold: 0, label: 'new' }
+} as const
+
+const DEBOUNCE_DELAY = 300
+
+// Interfaces
 interface Course {
-  id: number
+  id: string
   title: string
-  titleHi: string
   price: number
-  originalPrice?: number
-  students: number
   rating: number
-  image: string
-  category: string
-  badge?: string
+  imgURL: string
   description: string
-  descriptionHi: string
-  lastUpdated: string
-  duration: string
-  level: "Beginner" | "Intermediate" | "Advanced"
+  salesCount: number
+  createdAt: string
+  duration: number
+  category: string
+  _count: {
+    reviews: number
+  }
+  ContentAnalytics?: {
+    views: number
+    likes: number
+  }[]
 }
 
 interface Creator {
   id: string
   name: string
-  nameHi: string
-  bio: string
-  bioHi: string
-  avatar: string
-  coverImage: string
-  specialty: string
-  specialtyHi: string
-  location: string
-  website: string
-  joinedDate: string
-  isVerified: boolean
-  badge: string
-  badgeHi: string
-  totalStudents: number
-  totalCourses: number
-  averageRating: number
-  followers: number
-  totalReviews: number
-  socialLinks: {
-    twitter?: string
-    instagram?: string
-    linkedin?: string
-    youtube?: string
+  email: string
+  createdAt: string
+  profile?: {
+    bio: string | null
+    avatarUrl: string | null
+    website: string | null
+    twitter: string | null
+    instagram: string | null
+    youtube: string | null
   }
 }
 
@@ -99,92 +94,117 @@ interface Review {
   isVerified: boolean
 }
 
+interface CreatorStats {
+  totalEarnings: number
+  totalStudents: number
+  totalCourses: number
+  averageRating: number
+  growth: string
+  thisMonth: number
+}
+
+// Utility functions
+const formatDuration = (minutes: number | null | undefined): string => {
+  if (!minutes || isNaN(minutes) || minutes < 0) {
+    return '0m'
+  }
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+}
+
+const getBadge = (course: Course, t: any) => {
+  if (course.salesCount >= COURSE_BADGES.BESTSELLER.threshold) return t[COURSE_BADGES.BESTSELLER.label]
+  if (course.salesCount >= COURSE_BADGES.POPULAR.threshold) return t[COURSE_BADGES.POPULAR.label]
+  if (course._count.reviews >= COURSE_BADGES.TOP_RATED.threshold) return t[COURSE_BADGES.TOP_RATED.label]
+  return 'New'
+}
+
+const getLevel = (price: number): string => {
+  if (price >= COURSE_LEVELS.ADVANCED.threshold) return "Advanced"
+  if (price >= COURSE_LEVELS.INTERMEDIATE.threshold) return "Intermediate"
+  return "Beginner"
+}
+
+const validateUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  return uuidRegex.test(id)
+}
+
 // Course Card Component
-function CourseCard({ course, language, onBookmark, isBookmarked }: { 
+function CourseCard({ course, language, t }: { 
   course: Course
-  language: "en" | "hi"
-  onBookmark: (id: number) => void
-  isBookmarked: boolean
+  language: Language
+  t: any
 }) {
   return (
-    <Card className="group hover:shadow-lg transition-shadow duration-300 border-0 bg-white/80 backdrop-blur-sm">
+    <Card className="group hover:shadow-lg transition-shadow duration-300 border-0 bg-white/80 backdrop-blur-sm h-full flex flex-col">
       <div className="relative overflow-hidden rounded-t-lg">
         <Image
-          src={course.image || "/placeholder.svg"}
+          src={course.imgURL || `https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop&crop=center`}
           alt={course.title}
           width={300}
           height={200}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+          priority={false}
         />
         <div className="absolute top-2 left-2 flex gap-2">
           <Badge className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-            {course.level}
+            {getLevel(course.price)}
           </Badge>
-          {course.badge && (
             <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
-              {course.badge}
+            {getBadge(course, t)}
             </Badge>
-          )}
-          {course.originalPrice && (
-            <Badge className="bg-red-500 hover:bg-red-600 text-white">
-              Sale
-            </Badge>
-          )}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onBookmark(course.id)}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm"
-        >
-          <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-current text-blue-600" : "text-gray-600"}`} />
-        </Button>
       </div>
       
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
-          {language === "en" ? course.title : course.titleHi}
+      <CardHeader className="pb-2 flex-shrink-0">
+        <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors min-h-[3.5rem]">
+          {course.title}
         </CardTitle>
-        <CardDescription className="line-clamp-2">
-          {language === "en" ? course.description : course.descriptionHi}
+        <CardDescription className="line-clamp-3 min-h-[4.5rem]">
+          {course.description}
         </CardDescription>
       </CardHeader>
       
-      <CardContent className="pb-2">
-        <div className="flex items-center gap-2 mb-2">
+      <CardContent className="pb-2 flex-grow">
+        <div className="flex items-center gap-2 mb-2 min-h-[1.5rem]">
           <div className="flex items-center">
-            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            <span className="ml-1 text-sm font-medium">{course.rating}</span>
+            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" aria-hidden="true" />
+            <span className="ml-1 text-sm font-medium" aria-label={`Rating: ${course.rating.toFixed(1)} out of 5`}>
+              {course.rating.toFixed(1)}
+            </span>
           </div>
-          <span className="text-sm text-gray-500">({course.students.toLocaleString()} reviews)</span>
+          <span className="text-sm text-gray-500">
+            ({course._count.reviews} {course._count.reviews === 1 ? 'review' : t.reviews})
+          </span>
         </div>
         
-        <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
+        <div className="flex items-center gap-4 text-sm text-gray-500 mb-2 min-h-[1.5rem]">
           <div className="flex items-center gap-1">
-            <Users className="w-4 h-4" />
-            <span>{course.students.toLocaleString()}</span>
+            <Users className="w-4 h-4" aria-hidden="true" />
+            <span>{course.salesCount.toLocaleString()} {t.students}</span>
           </div>
           <div className="flex items-center gap-1">
-            <Clock className="w-4 h-4" />
-            <span>{course.duration}</span>
+            <Clock className="w-4 h-4" aria-hidden="true" />
+            <span>{formatDuration(course.duration)}</span>
           </div>
         </div>
         
-        <Badge variant="outline" className="text-xs">
-          {course.category}
-        </Badge>
+        <div className="min-h-[1.5rem]">
+          <Badge variant="outline" className="text-xs">
+            {course.category}
+          </Badge>
+        </div>
       </CardContent>
       
-      <CardFooter className="pt-2">
+      <CardFooter className="pt-2 mt-auto flex-shrink-0">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-green-600">₹{course.price}</span>
-            {course.originalPrice && (
-              <span className="text-lg text-gray-500 line-through">₹{course.originalPrice}</span>
-            )}
+            <span className="text-2xl font-bold text-green-600">₹{course.price.toLocaleString()}</span>
           </div>
           <Button asChild className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-            <Link href={`/course/${course.id}`}>View Course</Link>
+            <Link href={`/course/${course.id}`}>{t.viewCourse}</Link>
           </Button>
         </div>
       </CardFooter>
@@ -193,13 +213,13 @@ function CourseCard({ course, language, onBookmark, isBookmarked }: {
 }
 
 // Review Card Component
-function ReviewCard({ review }: { review: Review }) {
+function ReviewCard({ review, t }: { review: Review; t: any }) {
   return (
     <Card className="border-0 bg-gray-50/50">
       <CardContent className="pt-6">
         <div className="flex items-start gap-4">
           <Avatar>
-            <AvatarImage src={review.userAvatar || "/placeholder.svg"} alt={review.userName} />
+            <AvatarImage src={review.userAvatar || `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face`} alt={review.userName} />
             <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
               {review.userName.charAt(0)}
             </AvatarFallback>
@@ -207,17 +227,21 @@ function ReviewCard({ review }: { review: Review }) {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <h4 className="font-semibold">{review.userName}</h4>
-              <div className="flex items-center">
+              <div className="flex items-center" role="img" aria-label={`Rating: ${review.rating} out of 5 stars`}>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
                     key={i}
-                    className={`w-4 h-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                    className={cn(
+                      "w-4 h-4",
+                      i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                    )}
+                    aria-hidden="true"
                   />
                 ))}
               </div>
               {review.isVerified && (
                 <Badge variant="secondary" className="text-xs">
-                  Verified
+                  {t.verified}
                 </Badge>
               )}
             </div>
@@ -234,191 +258,150 @@ function ReviewCard({ review }: { review: Review }) {
 
 export default function CreatorProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [language, setLanguage] = useState<"en" | "hi">("en")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [sortBy, setSortBy] = useState("popular")
+  
+  // Validate UUID
+  if (!validateUUID(id)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-red-600">Invalid creator ID</p>
+          <Button asChild className="mt-4">
+            <Link href="/">Go Home</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const [language, setLanguage] = useState<Language>("en")
   const [searchQuery, setSearchQuery] = useState("")
-  const [isFollowing, setIsFollowing] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [showBookmarked, setShowBookmarked] = useState(false)
-  const [bookmarkedCourses, setBookmarkedCourses] = useState<number[]>([])
   
   // State for real data
   const [creator, setCreator] = useState<Creator | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
+  const [stats, setStats] = useState<CreatorStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch creator data
+  // Debounced search
+  const debouncedSearchQuery = useDebounce(searchQuery, DEBOUNCE_DELAY)
+
+  // Get translations
+  const t = getTranslations(language)
+
+  // Fetch all creator data
   useEffect(() => {
+    let isMounted = true
+
     const fetchCreatorData = async () => {
       try {
         setLoading(true)
+        setError(null)
         
-        // Fetch creator profile
-        const creatorResponse = await fetch(`/api/creator/${id}`)
-        if (!creatorResponse.ok) throw new Error('Failed to fetch creator data')
-        const creatorData = await creatorResponse.json()
-        
-        // Transform creator data to match interface
-        const transformedCreator: Creator = {
-          id: creatorData.id,
-          name: creatorData.name,
-          nameHi: creatorData.name, // Use same name for Hindi
-          bio: creatorData.profile?.bio || "No bio available",
-          bioHi: creatorData.profile?.bio || "कोई बायो उपलब्ध नहीं",
-          avatar: creatorData.profile?.avatarUrl || "/placeholder.svg?height=120&width=120",
-          coverImage: "/placeholder.svg?height=400&width=1200", // Default cover image
-          specialty: "Content Creator",
-          specialtyHi: "कंटेंट क्रिएटर",
-          location: "India",
-          website: creatorData.profile?.website || "#",
-          joinedDate: new Date(creatorData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          isVerified: true,
-          badge: "Top Creator",
-          badgeHi: "टॉप क्रिएटर",
-          totalStudents: 0, // Will be calculated from courses
-          totalCourses: 0,   // Will be calculated from courses
-          averageRating: 0,  // Will be calculated from courses
-          followers: Math.floor(Math.random() * 10000) + 1000, // Random for now
-          totalReviews: 0,   // Will be calculated from reviews
-          socialLinks: {
-            twitter: creatorData.profile?.twitter || undefined,
-            instagram: creatorData.profile?.instagram || undefined,
-            youtube: creatorData.profile?.youtube || undefined
+        // Fetch all data in parallel
+        const [creatorResponse, coursesResponse, reviewsResponse, statsResponse] = await Promise.all([
+          fetch(`/api/creator/${id}`),
+          fetch(`/api/creator/${id}/courses`),
+          fetch(`/api/creator/${id}/reviews`),
+          fetch(`/api/creator/${id}/stats`)
+        ])
+
+        // Check if component is still mounted
+        if (!isMounted) return
+
+        // Handle different error types
+        if (!creatorResponse.ok) {
+          if (creatorResponse.status === 404) {
+            throw new ApiError('Creator not found', 404, `/api/creator/${id}`)
           }
+          throw new ApiError('Failed to fetch creator data', creatorResponse.status, `/api/creator/${id}`)
+        }
+        
+        if (!coursesResponse.ok) {
+          throw new ApiError('Failed to fetch courses', coursesResponse.status, `/api/creator/${id}/courses`)
+        }
+        
+        if (!reviewsResponse.ok) {
+          throw new ApiError('Failed to fetch reviews', reviewsResponse.status, `/api/creator/${id}/reviews`)
+        }
+        
+        if (!statsResponse.ok) {
+          throw new ApiError('Failed to fetch stats', statsResponse.status, `/api/creator/${id}/stats`)
         }
 
-        // Fetch creator courses
-        const coursesResponse = await fetch(`/api/creator/${id}/courses`)
-        if (!coursesResponse.ok) throw new Error('Failed to fetch courses')
-        const coursesData = await coursesResponse.json()
-        
-        // Transform courses data
-        const transformedCourses: Course[] = coursesData.map((course: any, index: number) => ({
-          id: index + 1, // Use index as ID for now
-          title: course.title,
-          titleHi: course.title, // Use same title for Hindi
-          price: course.price,
-          originalPrice: course.price * 1.5, // 50% discount simulation
-          students: course.salesCount,
-          rating: course.rating,
-          image: course.imgURL || "/placeholder.svg?height=200&width=300",
-          category: "Development",
-          badge: course.salesCount > 100 ? "Bestseller" : "Popular",
-          description: course.description,
-          descriptionHi: course.description, // Use same description for Hindi
-          lastUpdated: new Date(course.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-          duration: course.duration ? `${Math.floor(course.duration / 60)}h ${course.duration % 60}m` : "N/A",
-          level: course.price > 3000 ? "Advanced" : course.price > 2000 ? "Intermediate" : "Beginner"
-        }))
+        const [creatorData, coursesData, reviewsData, statsData] = await Promise.all([
+          creatorResponse.json(),
+          coursesResponse.json(), 
+          reviewsResponse.json(),
+          statsResponse.json()
+        ])
 
-        // Update creator stats based on courses
-        transformedCreator.totalCourses = transformedCourses.length
-        transformedCreator.totalStudents = transformedCourses.reduce((sum, course) => sum + course.students, 0)
-        transformedCreator.averageRating = transformedCourses.length > 0 
-          ? Math.round((transformedCourses.reduce((sum, course) => sum + course.rating, 0) / transformedCourses.length) * 100) / 100
-          : 0
-
-        // Generate mock reviews based on courses
-        const mockReviews: Review[] = transformedCourses.slice(0, 3).map((course, index) => ({
-          id: index + 1,
-          userName: ["Priya Sharma", "Michael Chen", "Amit Kumar"][index],
-          userAvatar: "/placeholder.svg?height=40&width=40",
-          rating: Math.floor(course.rating),
-          comment: `Great course! ${course.title} really helped me understand the concepts better. Highly recommended!`,
-          date: `${index + 1} ${index === 0 ? 'week' : 'month'}${index > 0 ? 's' : ''} ago`,
-          courseName: course.title,
-          isVerified: true
-        }))
-
-        transformedCreator.totalReviews = mockReviews.length
-
-        setCreator(transformedCreator)
-        setCourses(transformedCourses)
-        setReviews(mockReviews)
+        if (isMounted) {
+          setCreator(creatorData)
+          setCourses(coursesData)
+          setReviews(reviewsData)
+          setStats(statsData)
+        }
 
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred')
+        if (isMounted) {
+          if (err instanceof TypeError && err.message.includes('fetch')) {
+            setError(handleApiError(new NetworkError(), ''))
+          } else {
+            setError(handleApiError(err, `/api/creator/${id}`))
+          }
+        }
       } finally {
+        if (isMounted) {
         setLoading(false)
+        }
       }
     }
 
-    if (id) {
       fetchCreatorData()
+
+    return () => {
+      isMounted = false
     }
   }, [id])
 
-  // Translation object
-  const t = {
-    en: {
-      joinedOn: "Joined",
-      follow: "Follow",
-      unfollow: "Following",
-      message: "Message",
-      students: "Students",
-      totalCourses: "Courses",
-      averageRating: "Rating",
-      followers: "Followers",
-      about: "About",
-      courses: "Courses",
-      reviews: "Reviews",
-      allCourses: "All Courses",
-      searchCourses: "Search courses...",
-      popular: "Popular",
-      newest: "Newest",
-      priceHigh: "Price: High to Low",
-      priceLow: "Price: Low to High",
-      rating: "Rating",
-      addToCart: "Add to Cart",
-      enrollNow: "Enroll Now",
-      preview: "Preview",
-      whatStudentsSay: "What Students Say",
-      verifiedPurchase: "Verified Purchase",
-      expertise: "Expertise",
-      connect: "Connect with me"
-    },
-    hi: {
-      joinedOn: "शामिल हुए",
-      follow: "फॉलो करें",
-      unfollow: "फॉलो कर रहे हैं",
-      message: "संदेश",
-      students: "छात्र",
-      totalCourses: "कोर्स",
-      averageRating: "रेटिंग",
-      followers: "फॉलोअर्स",
-      about: "के बारे में",
-      courses: "कोर्स",
-      reviews: "समीक्षाएं",
-      allCourses: "सभी कोर्स",
-      searchCourses: "कोर्स खोजें...",
-      popular: "लोकप्रिय",
-      newest: "नवीनतम",
-      priceHigh: "मूल्य: उच्च से निम्न",
-      priceLow: "मूल्य: निम्न से उच्च",
-      rating: "रेटिंग",
-      addToCart: "कार्ट में जोड़ें",
-      enrollNow: "अभी नामांकन करें",
-      preview: "पूर्वावलोकन",
-      whatStudentsSay: "छात्र क्या कहते हैं",
-      verifiedPurchase: "सत्यापित खरीदारी",
-      expertise: "विशेषज्ञता",
-      connect: "मुझसे जुड़ें"
+  // Filter courses based on debounced search
+  const filteredCourses = courses.filter(course => {
+    if (!debouncedSearchQuery) return true
+    const query = debouncedSearchQuery.toLowerCase()
+    return course.title.toLowerCase().includes(query) ||
+           course.description.toLowerCase().includes(query)
+  })
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: creator?.name || 'Creator Profile',
+          text: `Check out ${creator?.name}'s courses on our platform!`,
+          url: window.location.href,
+        })
+      } catch (err) {
+        console.log('Error sharing:', err)
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href)
+        // TODO: Show toast notification
+      } catch (err) {
+        console.error('Failed to copy to clipboard:', err)
+      }
     }
   }
-
-  const currentLang = t[language]
 
   // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading creator profile...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4" aria-hidden="true"></div>
+          <p className="text-lg text-gray-600" role="status">{t.loadingProfile}</p>
         </div>
       </div>
     )
@@ -429,10 +412,10 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-red-500 text-lg mb-4">Error loading profile</div>
-          <p className="text-gray-600">{error}</p>
-          <Button onClick={() => window.location.reload()} className="mt-4">
-            Retry
+          <div className="text-red-500 text-lg mb-4">{t.errorLoadingProfile}</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            {t.retry}
           </Button>
         </div>
       </div>
@@ -444,51 +427,13 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lg text-gray-600">Creator not found</p>
+          <p className="text-lg text-gray-600 mb-4">{t.creatorNotFound}</p>
+          <Button asChild>
+            <Link href="/">{t.backToHome}</Link>
+          </Button>
         </div>
       </div>
     )
-  }
-
-  // Filter courses based on search and category
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         course.titleHi.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || course.category.toLowerCase() === selectedCategory
-    const matchesBookmark = !showBookmarked || bookmarkedCourses.includes(course.id)
-    return matchesSearch && matchesCategory && matchesBookmark
-  })
-
-  const toggleBookmark = (courseId: number) => {
-    setBookmarkedCourses(prev => 
-      prev.includes(courseId) 
-        ? prev.filter(id => id !== courseId)
-        : [...prev, courseId]
-    )
-  }
-
-  const handleFollow = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      setIsFollowing(!isFollowing)
-      setIsLoading(false)
-    }, 1000)
-  }
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: creator.name,
-          text: `Check out ${creator.name}'s courses on our platform!`,
-          url: window.location.href,
-        })
-      } catch (err) {
-        console.log('Error sharing:', err)
-      }
-    } else {
-      navigator.clipboard.writeText(window.location.href)
-    }
   }
 
   return (
@@ -502,8 +447,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
               Back
             </Button>
             <div className="flex items-center space-x-3">
-              <Select value={language} onValueChange={(value: "en" | "hi") => setLanguage(value)}>
-                <SelectTrigger className="w-20 bg-white/80 backdrop-blur-sm border-0 shadow-sm" suppressHydrationWarning>
+              <Select value={language} onValueChange={(value: Language) => setLanguage(value)}>
+                <SelectTrigger className="w-20 bg-white/80 backdrop-blur-sm border-0 shadow-sm">
                   <Languages className="w-4 h-4" />
                 </SelectTrigger>
                 <SelectContent>
@@ -511,9 +456,9 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                   <SelectItem value="hi">हि</SelectItem>
                 </SelectContent>
               </Select>
-                              <Button variant="outline" size="sm" onClick={handleShare} className="bg-white/80 backdrop-blur-sm border-0 shadow-sm" suppressHydrationWarning>
+              <Button variant="outline" size="sm" onClick={handleShare} className="bg-white/80 backdrop-blur-sm border-0 shadow-sm">
                   <Share2 className="w-4 h-4 mr-2" />
-                  Share
+                {t.share}
                 </Button>
             </div>
           </div>
@@ -523,10 +468,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       {/* Cover Image */}
       <div className="relative h-64 md:h-80 overflow-hidden">
         <Image 
-          src={creator.coverImage || "/placeholder.svg"} 
+          src="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80" 
           alt="Cover" 
           fill 
           className="object-cover" 
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
       </div>
@@ -537,16 +483,14 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           <div className="flex flex-col md:flex-row gap-6">
             <div className="relative">
               <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                <AvatarImage src={creator.avatar || "/placeholder.svg"} alt={creator.name} />
+                <AvatarImage src={creator.profile?.avatarUrl || "/placeholder.svg"} alt={creator.name} />
                 <AvatarFallback className="text-2xl bg-gradient-to-r from-blue-500 to-purple-500 text-white">
                   {creator.name.split(" ").map((n) => n[0]).join("")}
                 </AvatarFallback>
               </Avatar>
-              {creator.isVerified && (
                 <div className="absolute -bottom-2 -right-2 bg-blue-500 rounded-full p-2">
                   <Crown className="w-6 h-6 text-white" />
                 </div>
-              )}
             </div>
 
             <div className="flex-1">
@@ -554,29 +498,29 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-3xl font-bold mb-2">
-                      {language === "en" ? creator.name : creator.nameHi}
+                      {creator.name}
                     </h1>
                     <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
-                      {language === "en" ? creator.badge : creator.badgeHi}
+                      Top Creator
                     </Badge>
                   </div>
                   <p className="text-xl text-gray-600 mb-4">
-                    {language === "en" ? creator.specialty : creator.specialtyHi}
+                    {t.creator} & Educator
                   </p>
                   <p className="text-gray-600 max-w-2xl mb-4">
-                    {language === "en" ? creator.bio : creator.bioHi}
+                    {creator.profile?.bio || t.defaultBio}
                   </p>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
-                      <span>{creator.location}</span>
+                      <span>India</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
-                      <span>{currentLang.joinedOn} {creator.joinedDate}</span>
+                      <span>{t.joinedOn} {new Date(creator.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'hi-IN', { month: 'long', year: 'numeric' })}</span>
                     </div>
-                    {creator.website && (
-                      <Link href={creator.website} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                    {creator.profile?.website && (
+                      <Link href={creator.profile.website} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
                         <Globe className="w-4 h-4" />
                         <span>Website</span>
                       </Link>
@@ -585,153 +529,144 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                 </div>
 
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/message/${creator.id}`}>
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      {currentLang.message}
-                    </Link>
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    onClick={handleFollow}
-                    disabled={isLoading}
-                    className={isFollowing ? "bg-gray-200 text-gray-800 hover:bg-gray-300" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"}
-                  >
-                    {isLoading ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Heart className={`w-4 h-4 mr-2 ${isFollowing ? "fill-current" : ""}`} />
-                    )}
-                    {isFollowing ? currentLang.unfollow : currentLang.follow}
+                  <Button variant="outline" size="sm" disabled>
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    {t.messagesSoon}
                   </Button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Stats */}
+          {/* Stats - Using real data from API */}
+          {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-200">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{creator.totalStudents.toLocaleString()}</div>
-              <div className="text-sm text-gray-600">{currentLang.students}</div>
+                <div className="text-2xl font-bold text-blue-600">{stats.totalStudents.toLocaleString()}</div>
+                <div className="text-sm text-gray-600">{t.students}</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{creator.totalCourses}</div>
-              <div className="text-sm text-gray-600">{currentLang.totalCourses}</div>
+                <div className="text-2xl font-bold text-purple-600">{stats.totalCourses}</div>
+                <div className="text-sm text-gray-600">{t.totalCourses}</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{creator.totalReviews.toLocaleString()}</div>
-              <div className="text-sm text-gray-600">{currentLang.reviews}</div>
+                <div className="text-2xl font-bold text-green-600">₹{stats.totalEarnings.toLocaleString()}</div>
+                <div className="text-sm text-gray-600">{t.totalEarnings}</div>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center gap-1">
                 <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                <span className="text-2xl font-bold text-yellow-600">{creator.averageRating}</span>
+                  <span className="text-2xl font-bold text-yellow-600">{stats.averageRating.toFixed(1)}</span>
+                </div>
+                <div className="text-sm text-gray-600">{t.averageRating}</div>
               </div>
-              <div className="text-sm text-gray-600">{currentLang.averageRating}</div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Content Tabs */}
         <Tabs defaultValue="courses" className="pb-6">
           <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm">
             <TabsTrigger value="courses" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-              {currentLang.courses}
+              {t.courses}
             </TabsTrigger>
             <TabsTrigger value="reviews" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-              {currentLang.reviews}
+              {t.reviews}
             </TabsTrigger>
             <TabsTrigger value="about" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-              {currentLang.about}
+              {t.about}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="courses" className="mt-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">{currentLang.courses} ({creator.totalCourses})</h2>
+              <h2 className="text-2xl font-bold">{t.courses} ({courses.length})</h2>
               <div className="flex gap-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
-                    placeholder={currentLang.searchCourses}
+                    placeholder={t.searchCourses}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 w-64 bg-white/80 backdrop-blur-sm border-0 shadow-sm"
+                    aria-label="Search courses"
                   />
                 </div>
-                                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                   <SelectTrigger className="w-40 bg-white/80 backdrop-blur-sm border-0 shadow-sm" suppressHydrationWarning>
-                     <SelectValue placeholder="Category" />
-                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="development">Development</SelectItem>
-                    <SelectItem value="design">Design</SelectItem>
-                    <SelectItem value="business">Business</SelectItem>
-                  </SelectContent>
-                </Select>
-                                 <Button
-                   variant="outline"
-                   onClick={() => setShowBookmarked(!showBookmarked)}
-                   className={showBookmarked ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-white/80 backdrop-blur-sm border-0 shadow-sm"}
-                   suppressHydrationWarning
-                 >
-                  <Bookmark className="w-4 h-4 mr-2" />
-                  Saved
-                </Button>
               </div>
             </div>
+            
+            {filteredCourses.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-gray-600 mb-2">
+                  {searchQuery ? t.noResults : t.noCoursesYet}
+                </p>
+                <p className="text-gray-500">
+                  {searchQuery ? t.tryDifferentSearch : t.checkBackLater}
+                </p>
+                {searchQuery && (
+                  <Button variant="outline" onClick={() => setSearchQuery('')} className="mt-4">
+                    {t.clearSearch}
+                  </Button>
+                )}
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCourses.map((course) => (
                 <CourseCard 
                   key={course.id} 
                   course={course} 
                   language={language}
-                  onBookmark={toggleBookmark}
-                  isBookmarked={bookmarkedCourses.includes(course.id)}
+                    t={t}
                 />
               ))}
             </div>
+            )}
           </TabsContent>
 
           <TabsContent value="reviews" className="mt-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">{currentLang.whatStudentsSay}</h2>
+              <h2 className="text-2xl font-bold">{t.whatStudentsSay}</h2>
+              {stats && (
               <div className="flex items-center gap-2">
                 <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                <span className="font-semibold">{creator.averageRating}</span>
-                <span className="text-gray-600">({creator.totalReviews.toLocaleString()} reviews)</span>
+                  <span className="font-semibold">{stats.averageRating.toFixed(1)}</span>
+                  <span className="text-gray-600">({reviews.length} {t.reviews})</span>
               </div>
+              )}
             </div>
+            
+            {reviews.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-gray-600 mb-2">{t.noReviewsYet}</p>
+                <p className="text-gray-500">{t.reviewsWillAppear}</p>
+              </div>
+            ) : (
             <div className="grid gap-4">
               {reviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
+                  <ReviewCard key={review.id} review={review} t={t} />
               ))}
             </div>
+            )}
           </TabsContent>
 
           <TabsContent value="about" className="mt-6">
             <div className="grid md:grid-cols-3 gap-8">
               <div className="md:col-span-2">
-                <h2 className="text-2xl font-bold mb-4">{currentLang.about} {creator.name}</h2>
+                <h2 className="text-2xl font-bold mb-4">{t.about} {creator.name}</h2>
                 <div className="prose max-w-none">
                   <p className="text-gray-600 leading-relaxed mb-4">
-                    {language === "en" ? creator.bio : creator.bioHi}
+                    {creator.profile?.bio || t.defaultBio}
                   </p>
                   <p className="text-gray-600 leading-relaxed mb-4">
-                    With over 8 years of experience in the tech industry, I've worked with startups and Fortune 500
-                    companies, building scalable web applications and designing user-centered experiences. My passion
-                    for teaching comes from my belief that technology should be accessible to everyone.
+                    With extensive experience in content creation and education, I specialize in creating comprehensive courses that help students achieve their learning goals. My teaching approach focuses on practical, hands-on learning that students can immediately apply.
                   </p>
                   <p className="text-gray-600 leading-relaxed">
-                    When I'm not coding or creating courses, you can find me contributing to open-source projects,
-                    speaking at tech conferences, or exploring the latest trends in web development and design.
+                    When I'm not creating courses, you can find me exploring new technologies, contributing to the community, and staying updated with the latest industry trends.
                   </p>
                 </div>
                 
                 <div className="mt-6">
-                  <h3 className="font-semibold text-lg mb-3">{currentLang.expertise}</h3>
+                  <h3 className="font-semibold text-lg mb-3">{t.expertise}</h3>
                   <div className="flex flex-wrap gap-2">
                     <Badge className="bg-blue-100 text-blue-800">JavaScript</Badge>
                     <Badge className="bg-green-100 text-green-800">React</Badge>
@@ -746,14 +681,14 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
               <div>
                 <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                   <CardHeader>
-                    <CardTitle>{currentLang.connect}</CardTitle>
+                    <CardTitle>{t.connect}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {creator.website && (
+                    {creator.profile?.website && (
                       <div className="flex items-center gap-3">
                         <Globe className="w-5 h-5 text-gray-500" />
                         <Link
-                          href={creator.website}
+                          href={creator.profile.website}
                           className="text-blue-600 hover:underline"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -763,11 +698,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       </div>
                     )}
 
-                    {creator.socialLinks.youtube && (
+                    {creator.profile?.youtube && (
                       <div className="flex items-center gap-3">
                         <ExternalLink className="w-5 h-5 text-red-600" />
                         <Link
-                          href={creator.socialLinks.youtube}
+                          href={creator.profile.youtube}
                           className="text-blue-600 hover:underline"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -777,11 +712,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       </div>
                     )}
 
-                    {creator.socialLinks.twitter && (
+                    {creator.profile?.twitter && (
                       <div className="flex items-center gap-3">
                         <ExternalLink className="w-5 h-5 text-blue-400" />
                         <Link
-                          href={creator.socialLinks.twitter}
+                          href={creator.profile.twitter}
                           className="text-blue-600 hover:underline"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -791,25 +726,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       </div>
                     )}
 
-                    {creator.socialLinks.linkedin && (
-                      <div className="flex items-center gap-3">
-                        <ExternalLink className="w-5 h-5 text-blue-700" />
-                        <Link
-                          href={creator.socialLinks.linkedin}
-                          className="text-blue-600 hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          LinkedIn
-                        </Link>
-                      </div>
-                    )}
-
-                    {creator.socialLinks.instagram && (
+                    {creator.profile?.instagram && (
                       <div className="flex items-center gap-3">
                         <ExternalLink className="w-5 h-5 text-pink-600" />
                         <Link
-                          href={creator.socialLinks.instagram}
+                          href={creator.profile.instagram}
                           className="text-blue-600 hover:underline"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -824,8 +745,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                     <div className="flex items-center gap-3 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        {currentLang.joinedOn}{" "}
-                        {new Date(creator.joinedDate).toLocaleDateString("en-US", {
+                        {t.joinedOn}{" "}
+                        {new Date(creator.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'hi-IN', {
                           year: "numeric",
                           month: "long",
                         })}
