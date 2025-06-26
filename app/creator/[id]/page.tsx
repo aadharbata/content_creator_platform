@@ -468,7 +468,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       {/* Cover Image */}
       <div className="relative h-64 md:h-80 overflow-hidden">
         <Image 
-          src="/placeholder.svg?height=400&width=1200" 
+          src="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80" 
           alt="Cover" 
           fill 
           className="object-cover" 
@@ -529,11 +529,9 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                 </div>
 
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/message/${creator.id}`}>
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      {t.message}
-                    </Link>
+                  <Button variant="outline" size="sm" disabled>
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    {t.messagesSoon}
                   </Button>
                 </div>
               </div>

@@ -128,5 +128,20 @@
   "contentCreator": "Content Creator",
   "new": "New",
   "topRated": "Top Rated",
-  "price": "Price"
+  "price": "Price",
+  "messagesSoon": "Messages coming soon...",
+  "conversations": "Conversations",
+  "noConversations": "No conversations yet",
+  "startConversation": "Start a conversation with your fans",
+  "searchConversations": "Search conversations...",
+  "typeMessage": "Type your message...",
+  "sendReply": "Send Reply",
+  "loadingMessages": "Loading messages...",
+  "errorLoadingMessages": "Error loading messages",
+  "messageSent": "Message sent",
+  "errorSendingMessage": "Error sending message",
+  "selectConversation": "Select a conversation to start messaging",
+  "unreadMessages": "unread messages",
+  "lastSeen": "Last seen",
+  "you": "You"
 } 

@@ -19,13 +19,14 @@ model User {
   updatedAt        DateTime       @updatedAt
   contents         Content[]
   courses          Course[]
-  receivedMessages Message[]      @relation("MessageReceiver")
-  sentMessages     Message[]      @relation("MessageSender")
   notifications    Notification[]
   payments         Payment[]
   reviews          Review[]
   subscriptions    Subscription[]
   profile          UserProfile?
+  creatorConversations Conversation[] @relation("CreatorConversations")
+  fanConversations     Conversation[] @relation("FanConversations")
+  sentMessages         Message[]
 }
 
 model UserProfile {
@@ -83,7 +84,6 @@ model Course {
   contents    Content[]
   author      User      @relation(fields: [authorId], references: [id])
   lessons     Lesson[]
-  messages    Message[]
   reviews     Review[]
 }
 
@@ -168,28 +168,7 @@ model Notification {
   user      User             @relation(fields: [userId], references: [id])
 }
 
-model Message {
-  id              String      @id @default(uuid())
-  subject         String
-  content         String
-  type            MessageType @default(GENERAL)
-  isRead          Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  senderId        String
-  receiverId      String
-  courseId        String?
-  parentMessageId String?
-  course          Course?     @relation(fields: [courseId], references: [id])
-  Message         Message?    @relation("MessageToMessage", fields: [parentMessageId], references: [id])
-  other_Message   Message[]   @relation("MessageToMessage")
-  receiver        User        @relation("MessageReceiver", fields: [receiverId], references: [id])
-  sender          User        @relation("MessageSender", fields: [senderId], references: [id])
 
-  @@index([courseId])
-  @@index([receiverId, isRead, createdAt])
-  @@index([senderId, createdAt])
-}
 
 enum Role {
   ADMIN
@@ -237,9 +216,35 @@ enum NotificationType {
   SUBSCRIPTION
 }
 
-enum MessageType {
-  QUESTION
-  FEEDBACK
-  SUPPORT
-  GENERAL
+model Conversation {
+  id            String    @id @default(uuid())
+  creatorId     String
+  fanId         String
+  lastMessageAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  creator       User      @relation("CreatorConversations", fields: [creatorId], references: [id])
+  fan           User      @relation("FanConversations", fields: [fanId], references: [id])
+  messages      Message[]
+  
+  @@unique([creatorId, fanId])
+  @@index([creatorId, lastMessageAt])
 }
+
+model Message {
+  id             String       @id @default(uuid())
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  
+  conversationId String
+  senderId       String
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+  
+  @@index([conversationId, createdAt])
+}
+
+
