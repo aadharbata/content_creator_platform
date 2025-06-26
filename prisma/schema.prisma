@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  name             String
+  passwordHash     String
+  role             Role           @default(CREATOR)
+  StripeCustomerId String?        @unique
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  contents         Content[]
+  courses          Course[]
+  notifications    Notification[]
+  payments         Payment[]
+  reviews          Review[]
+  subscriptions    Subscription[]
+  profile          UserProfile?
+  creatorConversations Conversation[] @relation("CreatorConversations")
+  fanConversations     Conversation[] @relation("FanConversations")
+  sentMessages         Message[]
+}
+
+model UserProfile {
+  id        String   @id @default(uuid())
+  bio       String?
+  avatarUrl String?
+  website   String?
+  twitter   String?
+  instagram String?
+  youtube   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Content {
+  id               String             @id @default(uuid())
+  title            String
+  description      String?
+  type             ContentType
+  url              String
+  status           ContentStatus      @default(DRAFT)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  authorId         String
+  courseId         String?
+  categoryId       String?
+  tagId            String?
+  demoLink         String?
+  language         String?
+  metadata         String?
+  notes            String?
+  price            Float?             @default(0)
+  tags             String?
+  author           User               @relation(fields: [authorId], references: [id])
+  Category         Category?          @relation(fields: [categoryId], references: [id])
+  course           Course?            @relation(fields: [courseId], references: [id])
+  Tag              Tag?               @relation(fields: [tagId], references: [id])
+  ContentAnalytics ContentAnalytics[]
+}
+
+model Course {
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  price       Float
+  duration    Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  authorId    String
+  salesCount  Int       @default(0)
+  imgURL      String
+  rating      Float
+  contents    Content[]
+  author      User      @relation(fields: [authorId], references: [id])
+  lessons     Lesson[]
+  reviews     Review[]
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  order       Int
+  contenturl  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+}
+
+model Subscription {
+  id        String             @id @default(uuid())
+  status    SubscriptionStatus
+  startdate DateTime
+  endDate   DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  userId    String
+  payments  Payment[]
+  user      User               @relation(fields: [userId], references: [id])
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  amount         Float
+  currency       String        @default("INR")
+  status         PaymentStatus
+  paymentvia     String
+  paymentId      String
+  createdAt      DateTime      @default(now())
+  subscriptionId String
+  userId         String
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  userId    String
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  contents Content[]
+}
+
+model Tag {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  contents Content[]
+}
+
+model ContentAnalytics {
+  id         String    @id @default(uuid())
+  views      Int       @default(0)
+  likes      Int       @default(0)
+  shares     Int       @default(0)
+  lastviewed DateTime?
+  contentId  String
+  content    Content   @relation(fields: [contentId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+}
+
+
+
+enum Role {
+  ADMIN
+  CREATOR
+  CONSUMER
+}
+
+enum ContentType {
+  VIDEO
+  ARTICLE
+  PODCAST
+  COURSE
+  TEMPLATE
+  SOFTWARE
+  EBOOK
+  AUDIO
+  IMAGE
+  OTHER
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAUSED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  SUCCEEDED
+  PENDING
+  FAILED
+  REFUNDED
+}
+
+enum NotificationType {
+  SYSTEM
+  PAYMENT
+  CONTENT
+  SUBSCRIPTION
+}
+
+model Conversation {
+  id            String    @id @default(uuid())
+  creatorId     String
+  fanId         String
+  lastMessageAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  creator       User      @relation("CreatorConversations", fields: [creatorId], references: [id])
+  fan           User      @relation("FanConversations", fields: [fanId], references: [id])
+  messages      Message[]
+  
+  @@unique([creatorId, fanId])
+  @@index([creatorId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  
+  conversationId String
+  senderId       String
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+  
+  @@index([conversationId, createdAt])
+}
+
+
