@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useDebounce } from "@/lib/hooks"
-import { getTranslations, type Language } from "@/lib/translations"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
+import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { 
   Search, 
   Star, 
@@ -198,50 +198,63 @@ function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
               Featured
             </Badge>
           </div>
-          
-          <div className="absolute bottom-3 left-3 right-3">
-            <div className="flex items-center justify-between text-white">
-              <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-semibold text-sm">{course.rating}</span>
-              </div>
-              <Badge className="bg-green-600 text-white font-bold text-sm">
-                <IndianRupee className="w-3 h-3 mr-1" />
-                {course.price.toLocaleString('en-IN')}
-              </Badge>
-            </div>
+
+          <div className="absolute top-3 right-3">
+            <Badge className="bg-green-600 hover:bg-green-700 text-white font-bold text-sm px-2 py-1">
+              <IndianRupee className="w-3 h-3 mr-1" />
+              {course.price.toLocaleString('en-IN')}
+            </Badge>
           </div>
         </div>
-        
-        <div className="p-4 sm:p-6 sm:w-1/2 flex flex-col justify-center">
-          <Badge variant="outline" className="w-fit mb-2 text-xs">
-            {course.category}
-          </Badge>
-          
-          <h2 className="text-xl sm:text-2xl font-bold mb-3 group-hover:text-blue-600 transition-colors line-clamp-2">
-            {course.title}
-          </h2>
-          
-          <p className="text-gray-600 mb-4 text-sm line-clamp-3">
-            {course.description}
-          </p>
-          
-          <div className="flex items-center gap-2 mb-4">
-            <Avatar className="w-6 h-6 sm:w-8 sm:h-8">
-              <AvatarImage src={course.author.avatarUrl} alt={course.author.name} />
-              <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
-                {course.author.name.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-semibold text-sm">{course.author.name}</p>
-              <p className="text-xs text-gray-500">{course.salesCount.toLocaleString('en-IN')} students</p>
+
+        <div className="sm:w-1/2 p-4 sm:p-6 flex flex-col justify-between">
+          <div>
+            <Badge variant="outline" className="w-fit mb-3 text-xs">
+              {course.category}
+            </Badge>
+            
+            <h3 className="font-bold text-lg sm:text-xl leading-tight mb-3 line-clamp-2 group-hover:text-blue-600 transition-colors">
+              {course.title}
+            </h3>
+            
+            <p className="text-sm text-gray-600 line-clamp-3 mb-4">
+              {course.description}
+            </p>
+            
+            <div className="flex items-center gap-2 mb-4">
+              <Avatar className="w-6 h-6">
+                <AvatarImage src={course.author.avatarUrl} alt={course.author.name} />
+                <AvatarFallback className="text-xs bg-blue-100 text-blue-600">
+                  {course.author.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm text-gray-600 font-medium">{course.author.name}</span>
             </div>
           </div>
-
-          <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 font-semibold">
-            Explore Course
-          </Button>
+          
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-4 text-sm text-gray-500">
+              <div className="flex items-center gap-1">
+                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                <span className="font-semibold text-gray-800">{course.rating}</span>
+                <span className="ml-1">({course.reviewCount})</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  <span>{course.salesCount.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatDuration(course.duration)}</span>
+                </div>
+              </div>
+            </div>
+            
+            <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 font-semibold">
+              Explore Course
+            </Button>
+          </div>
         </div>
       </div>
     </Card>
@@ -249,7 +262,7 @@ function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
 }
 
 export default function HomePage() {
-  const [language, setLanguage] = useState<Language>("en")
+  const { language, setLanguage, translations } = useLanguage()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
@@ -356,14 +369,12 @@ export default function HomePage() {
     }
   }
 
-  const currentLang = getTranslations(language)
-
   if (loading && !hasLoadedOnce) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">{currentLang.loadingCourses}</p>
+          <p className="text-lg text-gray-600">{translations.loadingCourses}</p>
         </div>
       </div>
     )
@@ -385,12 +396,12 @@ export default function HomePage() {
                 <BookOpen className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
               <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                {currentLang.courseHub}
+                {translations.courseHub}
               </h1>
             </div>
             
             {/* Language Switcher */}
-            <Select value={language} onValueChange={(value: Language) => setLanguage(value)}>
+            <Select value={language} onValueChange={(value: "en" | "hi") => setLanguage(value)}>
               <SelectTrigger className="w-16 sm:w-20 bg-white/80 backdrop-blur-sm border-0 shadow-sm">
                 <Languages className="w-4 h-4" />
               </SelectTrigger>
@@ -409,7 +420,7 @@ export default function HomePage() {
           <section className="mb-6 sm:mb-8">
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-              <h2 className="text-xl sm:text-2xl font-bold">{currentLang.featuredCourses}</h2>
+              <h2 className="text-xl sm:text-2xl font-bold">{translations.featuredCourses}</h2>
             </div>
             <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
               {featuredCourses.map((course) => (
@@ -428,7 +439,7 @@ export default function HomePage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
-                    placeholder={currentLang.searchPlaceholder}
+                    placeholder={translations.searchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-12 h-10 sm:h-12 text-sm sm:text-base bg-white border-0 shadow-sm"
@@ -440,10 +451,10 @@ export default function HomePage() {
               <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="bg-white border-0 shadow-sm text-xs sm:text-sm">
-                    <SelectValue placeholder={currentLang.category} />
+                    <SelectValue placeholder={translations.category} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{currentLang.allCategories}</SelectItem>
+                    <SelectItem value="all">{translations.allCategories}</SelectItem>
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.name}>
                         {category.name}
@@ -454,19 +465,19 @@ export default function HomePage() {
 
                 <Select value={sortBy} onValueChange={setSortBy}>
                   <SelectTrigger className="bg-white border-0 shadow-sm text-xs sm:text-sm">
-                    <SelectValue placeholder={currentLang.sortBy} />
+                    <SelectValue placeholder={translations.sortBy} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="newest">{currentLang.newest}</SelectItem>
-                    <SelectItem value="popular">{currentLang.popular}</SelectItem>
-                    <SelectItem value="rating">{currentLang.rating}</SelectItem>
-                    <SelectItem value="price_low">{currentLang.priceLow}</SelectItem>
-                    <SelectItem value="price_high">{currentLang.priceHigh}</SelectItem>
+                    <SelectItem value="newest">{translations.newest}</SelectItem>
+                    <SelectItem value="popular">{translations.popular}</SelectItem>
+                    <SelectItem value="rating">{translations.rating}</SelectItem>
+                    <SelectItem value="price_low">{translations.priceLow}</SelectItem>
+                    <SelectItem value="price_high">{translations.priceHigh}</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Input
-                  placeholder={currentLang.minPrice}
+                  placeholder={translations.minPrice}
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
                   className="bg-white border-0 shadow-sm text-xs sm:text-sm"
@@ -474,7 +485,7 @@ export default function HomePage() {
                 />
 
                 <Input
-                  placeholder={currentLang.maxPrice}
+                  placeholder={translations.maxPrice}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
                   className="bg-white border-0 shadow-sm text-xs sm:text-sm"
@@ -483,10 +494,10 @@ export default function HomePage() {
 
                 <Select value={minRating} onValueChange={setMinRating}>
                   <SelectTrigger className="bg-white border-0 shadow-sm text-xs sm:text-sm col-span-2 sm:col-span-1">
-                    <SelectValue placeholder={currentLang.minRating} />
+                    <SelectValue placeholder={translations.minRating} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="any">{currentLang.anyRating}</SelectItem>
+                    <SelectItem value="any">{translations.anyRating}</SelectItem>
                     <SelectItem value="4">4+ Stars</SelectItem>
                     <SelectItem value="4.5">4.5+ Stars</SelectItem>
                   </SelectContent>
@@ -501,7 +512,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <Grid3X3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             <h2 className="text-lg sm:text-xl font-bold">
-              {currentLang.allCourses} ({pagination.totalCount.toLocaleString('en-IN')})
+              {translations.allCourses} ({pagination.totalCount.toLocaleString('en-IN')})
             </h2>
           </div>
         </div>
@@ -509,17 +520,17 @@ export default function HomePage() {
         {/* Courses Grid - Responsive */}
         {error ? (
           <div className="text-center py-12">
-            <p className="text-red-500 text-lg mb-4">{currentLang.errorLoading}</p>
+            <p className="text-red-500 text-lg mb-4">{translations.errorLoading}</p>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={fetchCourses}>{currentLang.retry}</Button>
+            <Button onClick={fetchCourses}>{translations.retry}</Button>
           </div>
         ) : courses.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
               <Search className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-lg text-gray-600 mb-2">{currentLang.noCoursesFound}</p>
-            <p className="text-gray-500">{currentLang.tryAdjusting}</p>
+            <p className="text-lg text-gray-600 mb-2">{translations.noCoursesFound}</p>
+            <p className="text-gray-500">{translations.tryAdjusting}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
@@ -540,7 +551,7 @@ export default function HomePage() {
               className="bg-white/80 backdrop-blur-sm border-0 shadow-sm text-xs sm:text-sm"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">{currentLang.previous}</span>
+              <span className="hidden sm:inline">{translations.previous}</span>
             </Button>
             
             <div className="flex items-center gap-1">
@@ -584,7 +595,7 @@ export default function HomePage() {
               disabled={!pagination.hasNext}
               className="bg-white/80 backdrop-blur-sm border-0 shadow-sm text-xs sm:text-sm"
             >
-              <span className="hidden sm:inline">{currentLang.next}</span>
+              <span className="hidden sm:inline">{translations.next}</span>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>

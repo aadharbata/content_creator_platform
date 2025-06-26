@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, use, useRef } from "react"
+import { useLanguage } from "@/lib/contexts/LanguageContext"
 import Link from "next/link"
 import { 
   BookOpen, 
@@ -245,6 +246,7 @@ function CourseCard({ course, t }: { course: Course; t: any }) {
 
 export default function CreatorDashboard({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { language, setLanguage, translations } = useLanguage()
   
   // Validate UUID
   if (!validateUUID(id)) {
@@ -260,31 +262,29 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     )
   }
 
-  const [language, setLanguage] = useState<Language>("en")
-  const [activeTab, setActiveTab] = useState("overview")
-  
   // State for real data
   const [creator, setCreator] = useState<Creator | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
   const [stats, setStats] = useState<CreatorStats | null>(null)
-  const [recentActivity, setRecentActivity] = useState<Activity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  
-  // Messaging state
+  const [activities, setActivities] = useState<Activity[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([])
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
   const [conversationSearch, setConversationSearch] = useState("")
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("overview")
+
+  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const lastConversationUpdate = useRef<string | null>(null)
 
   // Get translations
-  const t = getTranslations(language)
+  const t = translations
 
   // Fetch all creator data
   useEffect(() => {
@@ -337,7 +337,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           setCreator(creatorData)
           setCourses(coursesData)
           setStats(statsData)
-          setRecentActivity(activityData)
+          setActivities(activityData)
         }
 
       } catch (err) {
@@ -384,8 +384,8 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           
           // If there's a new message in the selected conversation, show a subtle notification
           if (silent && selectedConversation) {
-            const selectedConv = data.find((conv: any) => conv.id === selectedConversation)
-            const currentConv = conversations.find(conv => conv.id === selectedConversation)
+            const selectedConv = data.find((conv: any) => conv.id === selectedConversation.id)
+            const currentConv = conversations.find(conv => conv.id === selectedConversation.id)
             
             if (selectedConv && currentConv && 
                 selectedConv.lastMessageAt !== currentConv.lastMessageAt &&
@@ -452,7 +452,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
 
     try {
       setSendingMessage(true)
-      const response = await fetch(`/api/creator/${id}/conversations/${selectedConversation}/messages`, {
+      const response = await fetch(`/api/creator/${id}/conversations/${selectedConversation.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -494,7 +494,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation) {
-      fetchMessages(selectedConversation)
+      fetchMessages(selectedConversation.id)
       // Reset message input when switching conversations
       setNewMessage("")
       // Immediately update the conversation list to remove unread badge
@@ -513,7 +513,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
         
         // If a conversation is selected, also poll its messages
         if (selectedConversation) {
-          fetchMessages(selectedConversation, true)
+          fetchMessages(selectedConversation.id, true)
         }
       }, 5000) // Poll every 5 seconds
 
@@ -794,8 +794,8 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {recentActivity.length > 0 ? (
-                        recentActivity.slice(0, 5).map((activity) => (
+                      {activities.length > 0 ? (
+                        activities.slice(0, 5).map((activity) => (
                           <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg bg-gray-50/50">
                             <div className="w-2 h-2 bg-blue-500 rounded-full" aria-hidden="true"></div>
                             <div className="flex-1">
@@ -854,10 +854,10 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                         filteredConversations.map((conversation) => (
                           <div
                             key={conversation.id}
-                            onClick={() => setSelectedConversation(conversation.id)}
+                            onClick={() => setSelectedConversation(conversation)}
                             className={cn(
                               "p-4 border-b border-gray-100 cursor-pointer hover:bg-blue-50 transition-all duration-200",
-                              selectedConversation === conversation.id ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                              selectedConversation === conversation ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
                             )}
                           >
                             <div className="flex items-start space-x-3">
@@ -904,7 +904,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                         {/* Chat Header */}
                         <div className="p-4 bg-white h-[73px] flex items-center border-b border-gray-200">
                           {(() => {
-                            const conversation = conversations.find(c => c.id === selectedConversation)
+                            const conversation = conversations.find(c => c.id === selectedConversation.id)
                             return conversation ? (
                               <div className="flex items-center space-x-3">
                                 <Avatar className="w-10 h-10">
@@ -958,7 +958,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                         <div className="p-4 bg-white h-[69px] flex items-center border-t border-gray-200">
                           <div className="flex space-x-3 w-full">
                             <Input
-                              key={selectedConversation}
+                              key={selectedConversation.id}
                               placeholder={t.typeMessage}
                               value={newMessage || ""}
                               onChange={(e) => setNewMessage(e.target.value || "")}

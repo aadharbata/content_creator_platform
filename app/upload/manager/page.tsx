@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { FileText, Download, Eye, Edit, Trash2, DollarSign, Tag } from 'lucide-react';
 
 interface ContentItem {
@@ -21,6 +22,7 @@ interface ContentItem {
 }
 
 export default function ContentManager() {
+  const { language } = useLanguage();
   const [contents, setContents] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +43,10 @@ export default function ContentManager() {
   };
 
   const handleDeleteContent = (content: ContentItem) => {
-    if (confirm('Are you sure you want to delete this content?')) {
+    if (confirm(language === 'hi' 
+      ? 'क्या आप वाकई इस सामग्री को हटाना चाहते हैं?' 
+      : 'Are you sure you want to delete this content?'
+    )) {
       console.log('Deleting content:', content);
       // TODO: Implement delete functionality
     }
@@ -60,8 +65,15 @@ export default function ContentManager() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Content Manager</h1>
-          <p className="text-gray-600">Manage your uploaded content and track performance</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {language === 'hi' ? 'सामग्री प्रबंधक' : 'Content Manager'}
+          </h1>
+          <p className="text-gray-600">
+            {language === 'hi' 
+              ? 'अपनी अपलोड की गई सामग्री का प्रबंधन करें और प्रदर्शन ट्रैक करें' 
+              : 'Manage your uploaded content and track performance'
+            }
+          </p>
         </div>
 
         {/* Stats */}
@@ -70,7 +82,9 @@ export default function ContentManager() {
             <div className="flex items-center">
               <FileText className="h-8 w-8 text-indigo-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Content</p>
+                <p className="text-sm font-medium text-gray-600">
+                  {language === 'hi' ? 'कुल सामग्री' : 'Total Content'}
+                </p>
                 <p className="text-2xl font-bold text-gray-900">{contents.length}</p>
               </div>
             </div>
@@ -80,7 +94,9 @@ export default function ContentManager() {
             <div className="flex items-center">
               <Eye className="h-8 w-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Published</p>
+                <p className="text-sm font-medium text-gray-600">
+                  {language === 'hi' ? 'प्रकाशित' : 'Published'}
+                </p>
                 <p className="text-2xl font-bold text-gray-900">
                   {contents.filter(c => c.status === 'PUBLISHED').length}
                 </p>
@@ -92,7 +108,9 @@ export default function ContentManager() {
             <div className="flex items-center">
               <DollarSign className="h-8 w-8 text-yellow-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                <p className="text-sm font-medium text-gray-600">
+                  {language === 'hi' ? 'कुल राजस्व' : 'Total Revenue'}
+                </p>
                 <p className="text-2xl font-bold text-gray-900">
                   ₹{contents.reduce((sum, c) => sum + c.price, 0).toFixed(2)}
                 </p>
@@ -104,7 +122,9 @@ export default function ContentManager() {
             <div className="flex items-center">
               <Tag className="h-8 w-8 text-purple-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Categories</p>
+                <p className="text-sm font-medium text-gray-600">
+                  {language === 'hi' ? 'श्रेणियां' : 'Categories'}
+                </p>
                 <p className="text-2xl font-bold text-gray-900">
                   {new Set(contents.map(c => c.contentType)).size}
                 </p>
@@ -116,19 +136,28 @@ export default function ContentManager() {
         {/* Content List */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-8 py-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Your Content</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {language === 'hi' ? 'आपकी सामग्री' : 'Your Content'}
+            </h2>
           </div>
           
           {contents.length === 0 ? (
             <div className="p-8 text-center">
               <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No content yet</h3>
-              <p className="text-gray-600 mb-4">Start by uploading your first piece of content</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {language === 'hi' ? 'अभी तक कोई सामग्री नहीं' : 'No content yet'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {language === 'hi' 
+                  ? 'अपनी पहली सामग्री अपलोड करके शुरू करें' 
+                  : 'Start by uploading your first piece of content'
+                }
+              </p>
               <a
                 href="/upload"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
               >
-                Upload Content
+                {language === 'hi' ? 'सामग्री अपलोड करें' : 'Upload Content'}
               </a>
             </div>
           ) : (
@@ -177,7 +206,7 @@ export default function ContentManager() {
                           ))}
                           {content.tags.length > 3 && (
                             <span className="text-xs text-gray-500">
-                              +{content.tags.length - 3} more
+                              +{content.tags.length - 3} {language === 'hi' ? 'और' : 'more'}
                             </span>
                           )}
                         </div>
@@ -188,7 +217,7 @@ export default function ContentManager() {
                       <button
                         onClick={() => handleViewContent(content)}
                         className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                        title="View content"
+                        title={language === 'hi' ? 'सामग्री देखें' : 'View content'}
                       >
                         <Eye className="h-5 w-5" />
                       </button>
@@ -196,7 +225,7 @@ export default function ContentManager() {
                       <button
                         onClick={() => handleEditContent(content)}
                         className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Edit content"
+                        title={language === 'hi' ? 'सामग्री संपादित करें' : 'Edit content'}
                       >
                         <Edit className="h-5 w-5" />
                       </button>
@@ -204,7 +233,7 @@ export default function ContentManager() {
                       <button
                         onClick={() => handleDeleteContent(content)}
                         className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Delete content"
+                        title={language === 'hi' ? 'सामग्री हटाएं' : 'Delete content'}
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>

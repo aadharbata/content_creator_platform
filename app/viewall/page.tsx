@@ -4,6 +4,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Header from "@/frontend/components/Header";
 import { translations } from "@/frontend/data/translations";
+import { useLanguage } from "@/lib/contexts/LanguageContext"
 import axios from "axios";
 import { Star } from "lucide-react";
 // import Image from "next/image";
@@ -26,7 +27,7 @@ interface CourseType {
 
 export default function ViewAll() {
   const [courses, setCourses] = useState<CourseType[]>([]);
-  const [language, setLanguage] = useState<"en" | "hi">("en");
+  const { language, setLanguage } = useLanguage();
 
   const fetchCourses = async () => {
     try {

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { useLanguage } from "@/lib/contexts/LanguageContext";
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -10,6 +11,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const router = useRouter();
+  const { language, translations } = useLanguage();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -35,7 +37,7 @@ const Login = () => {
       if (res.status===200 && data.token) {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        setSuccess("Login successful! Redirecting...");
+        setSuccess(language === 'hi' ? "लॉगिन सफल! पुनर्निर्देशित कर रहे हैं..." : "Login successful! Redirecting...");
         
         // Redirect based on user role
         setTimeout(() => {
@@ -46,10 +48,14 @@ const Login = () => {
           }
         }, 1500);
       } else {
-        setError(data.message || "Login failed.");
+        setError(data.message || (language === 'hi' ? "लॉगिन विफल।" : "Login failed."));
       }
-    } catch (err) {
-      setError("Server error.");
+    } catch (err: any) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError(language === 'hi' ? "सर्वर त्रुटि।" : "Server error.");
+      }
     }
     setLoading(false);
   };
@@ -63,35 +69,38 @@ const Login = () => {
           </span>
         </div>
         <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-blue-900 font-poppins">
-          Login
+          {language === 'hi' ? 'लॉगिन' : 'Login'}
         </h1>
         <p className="text-md text-gray-700 mb-6">
-          Welcome back! Please login to your account.
+          {language === 'hi' 
+            ? 'वापसी पर स्वागत है! कृपया अपने खाते में लॉगिन करें।' 
+            : 'Welcome back! Please login to your account.'
+          }
         </p>
         <form
           className="w-full flex flex-col gap-4 text-left"
           onSubmit={handleSubmit}
         >
           <label className="font-semibold text-gray-800">
-            Email
+            {language === 'hi' ? 'ईमेल' : 'Email'}
             <input
               name="email"
               type="email"
               value={form.email}
               onChange={handleChange}
-              placeholder="you@email.com"
+              placeholder={language === 'hi' ? 'आप@email.com' : 'you@email.com'}
               required
               className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
             />
           </label>
           <label className="font-semibold text-gray-800">
-            Password
+            {language === 'hi' ? 'पासवर्ड' : 'Password'}
             <input
               name="password"
               type="password"
               value={form.password}
               onChange={handleChange}
-              placeholder="Password"
+              placeholder={language === 'hi' ? 'पासवर्ड' : 'Password'}
               required
               className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
             />
@@ -101,7 +110,10 @@ const Login = () => {
             className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
             disabled={loading}
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading 
+              ? (language === 'hi' ? "लॉगिन हो रहा है..." : "Logging in...") 
+              : (language === 'hi' ? "लॉगिन" : "Login")
+            }
           </button>
         </form>
         {error && <p className="mt-4 text-red-600 font-semibold">{error}</p>}
@@ -109,12 +121,12 @@ const Login = () => {
           <p className="mt-4 text-green-600 font-semibold">{success}</p>
         )}
         <p className="mt-6 text-sm text-gray-600">
-          Don't have an account?{" "}
+          {language === 'hi' ? "खाता नहीं है?" : "Don't have an account?"}{" "}
           <a
             href="/signup"
             className="text-orange-500 font-semibold hover:underline"
           >
-            Sign up
+            {language === 'hi' ? "साइन अप करें" : "Sign up"}
           </a>
         </p>
       </main>

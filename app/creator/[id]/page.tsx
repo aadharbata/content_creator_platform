@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, use } from "react"
+import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { 
   Users, 
   Star, 
@@ -258,6 +259,7 @@ function ReviewCard({ review, t }: { review: Review; t: any }) {
 
 export default function CreatorProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { language, setLanguage, translations } = useLanguage()
   
   // Validate UUID
   if (!validateUUID(id)) {
@@ -273,7 +275,6 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
     )
   }
 
-  const [language, setLanguage] = useState<Language>("en")
   const [searchQuery, setSearchQuery] = useState("")
   
   // State for real data
@@ -288,7 +289,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   const debouncedSearchQuery = useDebounce(searchQuery, DEBOUNCE_DELAY)
 
   // Get translations
-  const t = getTranslations(language)
+  const t = translations
 
   // Fetch all creator data
   useEffect(() => {
