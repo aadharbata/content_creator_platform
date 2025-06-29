@@ -2,6 +2,14 @@
 
 import { useState, useEffect, use, useRef } from "react"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
+import { socketManager } from "@/lib/socket"
+import { getAuthToken } from "@/lib/auth"
+import { 
+  DashboardMessage, 
+  DashboardConversation, 
+  convertWebSocketToDashboard, 
+  isValidMessage 
+} from "@/lib/types/shared"
 import Link from "next/link"
 import { 
   BookOpen, 
@@ -93,34 +101,9 @@ interface Activity {
   amount?: number
 }
 
-interface Conversation {
-  id: string
-  fan: {
-    id: string
-    name: string
-    avatarUrl: string | null
-  }
-  lastMessage: {
-    content: string
-    createdAt: string
-    isFromFan: boolean
-  } | null
-  unreadCount: number
-  lastMessageAt: string
-}
-
-interface Message {
-  id: string
-  content: string
-  createdAt: string
-  isRead: boolean
-  sender: {
-    id: string
-    name: string
-    avatarUrl: string | null
-  }
-  isFromCreator: boolean
-}
+// Using shared types for consistency
+type Conversation = DashboardConversation
+type Message = DashboardMessage
 
 // Professional utility functions
 const formatNumber = (num: number): string => {
@@ -281,7 +264,6 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const lastConversationUpdate = useRef<string | null>(null)
 
   // Get translations
   const t = translations
@@ -362,111 +344,29 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     }
   }, [id])
 
-  // Fetch conversations with smart update detection
-  const fetchConversations = async (silent = false) => {
+  // Initial conversations fetch
+  const fetchConversations = async () => {
     try {
       const response = await fetch(`/api/creator/${id}/conversations`)
       if (response.ok) {
         const data = await response.json()
-        
-        // Create a hash of conversation data to detect changes
-        const conversationHash = JSON.stringify(data.map((conv: any) => ({
-          id: conv.id,
-          lastMessageAt: conv.lastMessageAt,
-          unreadCount: conv.unreadCount,
-          lastMessageContent: conv.lastMessage?.content
-        })))
-        
-        // Only update if data has actually changed
-        if (lastConversationUpdate.current !== conversationHash) {
-          setConversations(data)
-          lastConversationUpdate.current = conversationHash
-          
-          // If there's a new message in the selected conversation, show a subtle notification
-          if (silent && selectedConversation) {
-            const selectedConv = data.find((conv: any) => conv.id === selectedConversation.id)
-            const currentConv = conversations.find(conv => conv.id === selectedConversation.id)
-            
-            if (selectedConv && currentConv && 
-                selectedConv.lastMessageAt !== currentConv.lastMessageAt &&
-                selectedConv.lastMessage?.isFromFan) {
-              // New message from fan in current conversation - will be picked up by message polling
-              console.log('New message detected in current conversation')
-            }
-          }
-        }
+        setConversations(data)
       }
     } catch (error) {
-      if (!silent) {
-        console.error('Error fetching conversations:', error)
-      }
+      console.error('Error fetching conversations:', error)
     }
   }
 
-  // Fetch messages for selected conversation
-  const fetchMessages = async (conversationId: string, silent = false) => {
+  // Initial messages fetch for selected conversation
+  const fetchMessages = async (conversationId: string) => {
     try {
-      if (!silent) {
-        setMessagesLoading(true)
-      }
+      setMessagesLoading(true)
       const response = await fetch(`/api/creator/${id}/conversations/${conversationId}/messages`)
       if (response.ok) {
         const data = await response.json()
-        
-        // Check if user was at bottom before updating
-        const container = messagesContainerRef.current
-        const wasAtBottom = container ? 
-          Math.abs(container.scrollTop + container.clientHeight - container.scrollHeight) < 50 : true
-        
         setMessages(data)
         
-        // Update conversation list to reflect read status changes
-        if (!silent) {
-          fetchConversations(true)
-        }
-        
-        // Only scroll if user was already at bottom or it's the first load
-        if (wasAtBottom || !silent) {
-          setTimeout(() => {
-            if (container) {
-              container.scrollTo({
-                top: container.scrollHeight,
-                behavior: silent ? 'auto' : 'smooth'
-              })
-            }
-          }, 100)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error)
-    } finally {
-      if (!silent) {
-        setMessagesLoading(false)
-      }
-    }
-  }
-
-  // Send message
-  const sendMessage = async () => {
-    if (!selectedConversation || !newMessage.trim() || sendingMessage) return
-
-    try {
-      setSendingMessage(true)
-      const response = await fetch(`/api/creator/${id}/conversations/${selectedConversation.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: newMessage.trim() })
-      })
-
-      if (response.ok) {
-        const newMsg = await response.json()
-        setMessages(prev => [...prev, newMsg])
-        setNewMessage("")
-        // Update conversation list silently
-        fetchConversations(true)
-        // Scroll to bottom of messages container
+        // Scroll to bottom
         setTimeout(() => {
           const container = messagesContainerRef.current
           if (container) {
@@ -478,11 +378,146 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
         }, 100)
       }
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('Error fetching messages:', error)
     } finally {
+      setMessagesLoading(false)
+    }
+  }
+
+  // Send message via WebSocket
+  const sendMessage = async () => {
+    if (!selectedConversation || !newMessage.trim() || sendingMessage) return
+
+    try {
+      setSendingMessage(true)
+      socketManager.sendMessage(selectedConversation.id, newMessage.trim())
+      setNewMessage("")
+    } catch (error) {
+      console.error('Error sending message:', error)
       setSendingMessage(false)
     }
   }
+
+  // WebSocket connection and event handling
+  useEffect(() => {
+    if (!creator) return
+
+    const token = getAuthToken()
+    if (!token) {
+      console.error('No authentication token found')
+      return
+    }
+
+    const socket = socketManager.connect(token)
+
+    // Handle new messages
+    socketManager.onNewMessage((messageData) => {
+      try {
+        // Check if user was at bottom before updating
+        const container = messagesContainerRef.current
+        const wasAtBottom = container ? 
+          Math.abs(container.scrollTop + container.clientHeight - container.scrollHeight) < 50 : true
+
+        // Convert WebSocket message data using shared converter
+        const message = convertWebSocketToDashboard.message(messageData)
+        
+        // Validate the converted message
+        if (!isValidMessage(message)) {
+          console.error('Invalid message data received:', messageData)
+          return
+        }
+
+        setMessages(prev => [...prev, message])
+
+        // Only scroll if user was already at bottom
+        if (wasAtBottom) {
+          setTimeout(() => {
+            if (container) {
+              container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+              })
+            }
+          }, 100)
+        }
+      } catch (error) {
+        console.error('Error processing new message:', error, messageData)
+      }
+    })
+
+    // Handle message sent confirmation
+    socketManager.onMessageSent((messageData) => {
+      try {
+        setSendingMessage(false)
+        
+        // Optionally add the sent message to the list if not already there
+        const message = convertWebSocketToDashboard.message(messageData)
+        if (isValidMessage(message)) {
+          setMessages(prev => {
+            // Check if message already exists to avoid duplicates
+            const exists = prev.some(msg => msg.id === message.id)
+            return exists ? prev : [...prev, message]
+          })
+        }
+        
+        // Scroll to bottom after sending
+        setTimeout(() => {
+          const container = messagesContainerRef.current
+          if (container) {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: 'smooth'
+            })
+          }
+        }, 100)
+      } catch (error) {
+        console.error('Error processing message sent confirmation:', error, messageData)
+        setSendingMessage(false)
+      }
+    })
+
+    // Handle conversation updates
+    socketManager.onConversationUpdated((updateData) => {
+      try {
+        const convertedUpdate = convertWebSocketToDashboard.conversationUpdate(updateData)
+        
+        setConversations(prev => prev.map(conv => 
+          conv.id === updateData.conversationId 
+            ? { 
+                ...conv, 
+                ...convertedUpdate
+              }
+            : conv
+        ))
+      } catch (error) {
+        console.error('Error processing conversation update:', error, updateData)
+      }
+    })
+
+    // Handle messages read status updates
+    socketManager.onMessagesReadUpdate((readUpdate) => {
+      try {
+        // Update conversation unread count
+        setConversations(prev => prev.map(conv => 
+          conv.id === readUpdate.conversationId 
+            ? { ...conv, unreadCount: readUpdate.unreadCount }
+            : conv
+        ))
+      } catch (error) {
+        console.error('Error processing read status update:', error, readUpdate)
+      }
+    })
+
+    // Handle errors
+    socketManager.onError((error) => {
+      console.error('Socket error:', error)
+      setSendingMessage(false)
+    })
+
+    return () => {
+      socketManager.removeAllListeners()
+    }
+  }, [creator])
 
   // Load conversations when messages tab is active
   useEffect(() => {
@@ -495,31 +530,19 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation.id)
-      // Reset message input when switching conversations
       setNewMessage("")
-      // Immediately update the conversation list to remove unread badge
-      setTimeout(() => {
-        fetchConversations(true)
-      }, 500)
+      
+      // Join the conversation room (server auto-marks messages as read)
+      socketManager.joinConversation(selectedConversation.id)
+      
+      // Update local unread count immediately since server marks as read
+      setConversations(prev => prev.map(conv => 
+        conv.id === selectedConversation.id 
+          ? { ...conv, unreadCount: 0 }
+          : conv
+      ))
     }
   }, [selectedConversation, id])
-
-  // Polling for new messages and conversations
-  useEffect(() => {
-    if (activeTab === 'messages') {
-      const interval = setInterval(() => {
-        // Always poll conversations list for new messages from any fan
-        fetchConversations(true)
-        
-        // If a conversation is selected, also poll its messages
-        if (selectedConversation) {
-          fetchMessages(selectedConversation.id, true)
-        }
-      }, 5000) // Poll every 5 seconds
-
-      return () => clearInterval(interval)
-    }
-  }, [activeTab, selectedConversation, id])
 
   // Filter conversations based on search
   const filteredConversations = conversations.filter(conv =>
