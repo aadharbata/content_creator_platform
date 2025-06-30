@@ -37,17 +37,8 @@ export default function TopCoursesSection({ language, translations, topCourses }
   const router = useRouter();
 
   return (
-    <section className="py-20 relative">
-      {/* Curved Belt Design */}
-      <div
-        className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600"
-        style={{
-          borderRadius: "0 0 50% 50% / 0 0 100px 100px",
-          transform: "translateY(-50%)",
-        }}
-      ></div>
-
-      <div className="container mx-auto px-4 relative">
+    <section className="py-20">
+      <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
             {t.topCourses}
