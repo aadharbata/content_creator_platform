@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 // Disable Next.js body parser for file uploads
 export const config = {
@@ -16,6 +17,16 @@ interface UploadedFile {
   size: number;
   path: string;
 }
+
+// S3 configuration from environment variables
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+const S3_BUCKET = process.env.AWS_S3_BUCKET!;
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,39 +61,75 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check for required AWS S3 environment variables
+    if (!process.env.AWS_REGION || !process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_S3_BUCKET) {
+      console.log('[UPLOAD] AWS S3 credentials or bucket not configured. Skipping actual upload, but code is running.');
+      // Simulate S3 upload result for testing
+      const savedFiles: UploadedFile[] = files.map((file) => ({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        path: `/simulated-s3-url/${file.name}`
+      }));
+      console.log('[UPLOAD] Simulated file upload:', savedFiles);
+      // Prepare content metadata
+      const contentMetadata = {
+        title,
+        description,
+        contentType,
+        price,
+        contentFor,
+        language,
+        licensingType,
+        tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
+        demoLink,
+        notes,
+        files: savedFiles,
+        uploadedAt: new Date().toISOString(),
+        status: 'DRAFT'
+      };
+      console.log('[UPLOAD] Simulated content metadata:', contentMetadata);
+      return NextResponse.json({
+        success: true,
+        message: 'Simulated upload (no AWS credentials set)',
+        files: savedFiles.map(f => ({ name: f.name, size: f.size })),
+        metadata: contentMetadata
+      });
+    }
+
     // Create uploads directory if it doesn't exist
     const uploadsDir = join(process.cwd(), 'uploads');
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true });
     }
 
-    // Process and save files
+    // Process and upload files to S3
     const savedFiles: UploadedFile[] = [];
-    
     for (const file of files) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      
       // Generate unique filename
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 15);
       const fileExtension = file.name.split('.').pop();
       const fileName = `${timestamp}_${randomString}.${fileExtension}`;
-      const filePath = join(uploadsDir, fileName);
-      
-      // Save file to disk
-      await writeFile(filePath, buffer);
-      
+      // Upload to S3
+      const uploadParams = {
+        Bucket: S3_BUCKET,
+        Key: fileName,
+        Body: buffer,
+        ContentType: file.type,
+      };
+      await s3.send(new PutObjectCommand(uploadParams));
+      const s3Url = `https://${S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+      console.log(`[UPLOAD] Uploaded file to S3: ${s3Url}`);
       savedFiles.push({
         name: file.name,
         type: file.type,
         size: file.size,
-        path: `/uploads/${fileName}` // Store relative path for database
+        path: s3Url, // S3 URL for database
       });
     }
-
-    // TODO: In production, upload files to S3 or cloud storage instead of local disk
-    // For now, we'll store the local file paths
 
     // Prepare content metadata
     const contentMetadata = {
