@@ -96,7 +96,6 @@ interface Review {
 }
 
 interface CreatorStats {
-  totalEarnings: number
   totalStudents: number
   totalCourses: number
   averageRating: number
@@ -305,7 +304,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           fetch(`/api/creator/${id}`),
           fetch(`/api/creator/${id}/courses`),
           fetch(`/api/creator/${id}/reviews`),
-          fetch(`/api/creator/${id}/stats`)
+          fetch(`/api/creator/${id}/public-stats`)
         ])
 
         // Check if component is still mounted
@@ -328,7 +327,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
         }
         
         if (!statsResponse.ok) {
-          throw new ApiError('Failed to fetch stats', statsResponse.status, `/api/creator/${id}/stats`)
+          throw new ApiError('Failed to fetch stats', statsResponse.status, `/api/creator/${id}/public-stats`)
         }
 
         const [creatorData, coursesData, reviewsData, statsData] = await Promise.all([
@@ -541,7 +540,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
 
           {/* Stats - Using real data from API */}
           {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
             <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">{stats.totalStudents.toLocaleString()}</div>
                 <div className="text-sm text-gray-600">{t.students}</div>
@@ -549,10 +548,6 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
             <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">{stats.totalCourses}</div>
                 <div className="text-sm text-gray-600">{t.totalCourses}</div>
-            </div>
-            <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">₹{stats.totalEarnings.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">{t.totalEarnings}</div>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center gap-1">
