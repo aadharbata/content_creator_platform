@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { useDebounce } from "@/lib/hooks"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
@@ -293,6 +293,32 @@ export default function HomePage() {
   const debouncedMinPrice = useDebounce(minPrice, PRICE_DEBOUNCE_DELAY)
   const debouncedMaxPrice = useDebounce(maxPrice, PRICE_DEBOUNCE_DELAY)
   
+  // Check if user has any active filters
+  const hasActiveFilters = useMemo(() => Boolean(
+    debouncedSearch || 
+    selectedCategory !== "all" || 
+    debouncedMinPrice || 
+    debouncedMaxPrice || 
+    minRating !== "any"
+  ), [debouncedSearch, selectedCategory, debouncedMinPrice, debouncedMaxPrice, minRating])
+  
+  // Fetch featured courses (independent of search filters)
+  const fetchFeaturedCourses = async () => {
+    try {
+      const response = await fetch('/api/courses/topcourses')
+      if (response.ok) {
+        const data = await response.json()
+        const featured = data.courses
+          .filter((course: any) => course.rating >= FEATURED_COURSES_RATING_THRESHOLD)
+          .slice(0, MAX_FEATURED_COURSES)
+        setFeaturedCourses(featured)
+      }
+    } catch (error) {
+      console.error('Error fetching featured courses:', error)
+      setFeaturedCourses([])
+    }
+  }
+  
   // Fetch courses
   const fetchCourses = async () => {
     try {
@@ -338,16 +364,7 @@ export default function HomePage() {
       setCourses(coursesData.courses)
       setPagination(coursesData.pagination)
       setCategories(categoriesData)
-      setHasLoadedOnce(true);
-
-      // Set featured courses (top rated courses for featured section)
-      if (pagination.page === 1) {
-        const featured = coursesData.courses
-          .filter((course: Course) => course.rating >= FEATURED_COURSES_RATING_THRESHOLD)
-          .slice(0, MAX_FEATURED_COURSES)
-          .map((course: Course) => ({ ...course, isFeatured: true }))
-        setFeaturedCourses(featured)
-      }
+      setHasLoadedOnce(true)
 
     } catch (err) {
       if (err instanceof TypeError && err.message.includes('fetch')) {
@@ -363,6 +380,16 @@ export default function HomePage() {
   useEffect(() => {
     fetchCourses();
   }, [debouncedSearch, selectedCategory, sortBy, debouncedMinPrice, debouncedMaxPrice, minRating, pagination.page]);
+
+  // Fetch featured courses only when no filters are active and on page 1
+  useEffect(() => {
+    if (!hasActiveFilters && pagination.page === 1) {
+      fetchFeaturedCourses()
+    } else {
+      // Clear featured courses when filters are active
+      setFeaturedCourses([])
+    }
+  }, [hasActiveFilters, pagination.page])
 
   // Handle search from landing page - scroll to results when loaded with search params
   useEffect(() => {
@@ -437,8 +464,8 @@ export default function HomePage() {
       </header>
 
       <div className="container mx-auto px-4 py-4 sm:py-6">
-        {/* Featured Courses Section */}
-        {featuredCourses.length > 0 && pagination.page === 1 && (
+        {/* Featured Courses Section - Only show when no filters are active */}
+        {!hasActiveFilters && featuredCourses.length > 0 && pagination.page === 1 && (
           <section className="mb-6 sm:mb-8">
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
@@ -530,19 +557,41 @@ export default function HomePage() {
         </section>
 
         {/* Results Header */}
-        <div data-results-section className="flex items-center justify-between mb-4 sm:mb-6">
+        <div data-results-section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
           <div className="flex items-center gap-2 sm:gap-3">
             <Grid3X3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             <h2 className="text-lg sm:text-xl font-bold">
-              {searchParams.get('search') ? 
+              {hasActiveFilters ? 
                 `${translations.searchResults || 'Search Results'} (${pagination.totalCount.toLocaleString('en-IN')})` :
                 `${translations.allCourses} (${pagination.totalCount.toLocaleString('en-IN')})`
               }
             </h2>
           </div>
-          {searchParams.get('search') && (
-            <div className="text-sm text-gray-600">
-              {translations.searchingFor || 'Searching for'}: <span className="font-semibold text-blue-600">"{searchParams.get('search')}"</span>
+          
+          {/* Active filters indicator */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-600">{translations.activeFilters || 'Active filters'}:</span>
+              {debouncedSearch && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  "{debouncedSearch}"
+                </span>
+              )}
+              {selectedCategory !== "all" && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                  {selectedCategory}
+                </span>
+              )}
+              {minRating !== "any" && (
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                  {minRating}+ ⭐
+                </span>
+              )}
+              {(debouncedMinPrice || debouncedMaxPrice) && (
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                  ₹{debouncedMinPrice || '0'}-{debouncedMaxPrice || '∞'}
+                </span>
+              )}
             </div>
           )}
         </div>

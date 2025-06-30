@@ -145,5 +145,6 @@
   "lastSeen": "Last seen",
   "you": "You",
   "searchResults": "Search Results",
-  "searchingFor": "Searching for"
+  "searchingFor": "Searching for",
+  "activeFilters": "Active filters"
 } 

@@ -9,12 +9,21 @@ import { useRouter } from "next/navigation"
 interface TopCourses {
   id: string,
   title: string,
-  author: string,
+  description: string,
   price: number,
   rating: number,
-  students: number,
-  imgUrl: string,
-  category: string
+  reviewCount: number,
+  salesCount: number,
+  duration: number,
+  imgURL: string,
+  category: string,
+  author: {
+    id: string,
+    name: string,
+    avatarUrl: string
+  },
+  badge?: string | null,
+  isFeatured: boolean
 }
 
 interface TopCoursesSectionProps {
@@ -58,7 +67,7 @@ export default function TopCoursesSection({ language, translations, topCourses }
             >
               <CardHeader className="p-0">
                 <div className="relative overflow-hidden rounded-t-lg">
-                  <img src={course.imgUrl} alt={course.title} className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300" />
+                  <img src={course.imgURL || "/placeholder.svg"} alt={course.title} className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300" />
                   <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm rounded-full px-2 py-1">
                     <div className="flex items-center space-x-1">
                       <Star className="w-3 h-3 text-yellow-400 fill-current" />
@@ -76,17 +85,17 @@ export default function TopCoursesSection({ language, translations, topCourses }
                 <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
                   {course.title}
                 </h3>
-                <p className="text-gray-600 mb-3">{course.author}</p>
+                <p className="text-gray-600 mb-3">{course.author.name}</p>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
-                    <span className="text-2xl font-bold text-blue-600">${course.price}</span>
+                    <span className="text-2xl font-bold text-blue-600">₹{course.price.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-sm text-gray-600">
                   <div className="flex items-center space-x-1">
                     <Users className="w-4 h-4" />
                     <span>
-                      {(course.students ?? 0).toLocaleString()} {t.students}
+                      {(course.salesCount ?? 0).toLocaleString()} {t.students}
                     </span>
                   </div>
                 </div>

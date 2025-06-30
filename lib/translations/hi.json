@@ -145,5 +145,6 @@
   "lastSeen": "अंतिम बार देखा गया",
   "you": "आप",
   "searchResults": "खोज परिणाम",
-  "searchingFor": "खोज रहे हैं"
+  "searchingFor": "खोज रहे हैं",
+  "activeFilters": "सक्रिय फ़िल्टर"
 } 

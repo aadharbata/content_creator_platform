@@ -18,12 +18,21 @@ import axios from 'axios';
 interface TopCourses {
   id: string,
   title: string,
-  author: string,
+  description: string,
   price: number,
   rating: number,
-  students: number,
-  imgUrl: string,
-  category: string
+  reviewCount: number,
+  salesCount: number,
+  duration: number,
+  imgURL: string,
+  category: string,
+  author: {
+    id: string,
+    name: string,
+    avatarUrl: string
+  },
+  badge?: string | null,
+  isFeatured: boolean
 }
 
 export default function LandingPage() {
@@ -32,7 +41,7 @@ export default function LandingPage() {
 
   const fetchTopCourses = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/courses/topcourses");
+      const res = await axios.get("/api/courses/topcourses");
       console.log("Top courses: ", res.data.courses);
       setTopCourses(res.data.courses);
     } catch (error) {
