@@ -143,5 +143,8 @@
   "selectConversation": "मैसेजिंग शुरू करने के लिए एक बातचीत चुनें",
   "unreadMessages": "अपठित संदेश",
   "lastSeen": "अंतिम बार देखा गया",
-  "you": "आप"
+  "you": "आप",
+  "searchResults": "खोज परिणाम",
+  "searchingFor": "खोज रहे हैं",
+  "activeFilters": "सक्रिय फ़िल्टर"
 } 

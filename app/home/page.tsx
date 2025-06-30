@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import { useDebounce } from "@/lib/hooks"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
@@ -181,15 +182,15 @@ function CourseCard({ course }: { course: Course }) {
 function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
   return (
     <Card className="group cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-purple-50 overflow-hidden">
-      <div className="sm:flex">
-        <div className="relative sm:w-1/2">
-          <Image
-            src={course.imgURL || "/placeholder.svg"}
-            alt={course.title}
-            width={400}
-            height={250}
-            className="w-full h-48 sm:h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
+             <div className="sm:flex sm:h-80">
+         <div className="relative sm:w-1/2">
+           <Image
+             src={course.imgURL || "/placeholder.svg"}
+             alt={course.title}
+             width={400}
+             height={250}
+             className="w-full h-48 sm:h-80 object-cover group-hover:scale-105 transition-transform duration-300"
+           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
           
           <div className="absolute top-3 left-3">
@@ -263,6 +264,7 @@ function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
 
 export default function HomePage() {
   const { language, setLanguage, translations } = useLanguage()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
@@ -277,9 +279,9 @@ export default function HomePage() {
     hasPrev: false,
   })
   
-  // Filters
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
+  // Initialize filters from URL parameters
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || "")
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || "all")
   const [sortBy, setSortBy] = useState("newest")
   const [minPrice, setMinPrice] = useState("")
   const [maxPrice, setMaxPrice] = useState("")
@@ -290,6 +292,32 @@ export default function HomePage() {
   const debouncedSearch = useDebounce(searchQuery, SEARCH_DEBOUNCE_DELAY)
   const debouncedMinPrice = useDebounce(minPrice, PRICE_DEBOUNCE_DELAY)
   const debouncedMaxPrice = useDebounce(maxPrice, PRICE_DEBOUNCE_DELAY)
+  
+  // Check if user has any active filters
+  const hasActiveFilters = useMemo(() => Boolean(
+    debouncedSearch || 
+    selectedCategory !== "all" || 
+    debouncedMinPrice || 
+    debouncedMaxPrice || 
+    minRating !== "any"
+  ), [debouncedSearch, selectedCategory, debouncedMinPrice, debouncedMaxPrice, minRating])
+  
+  // Fetch featured courses (independent of search filters)
+  const fetchFeaturedCourses = async () => {
+    try {
+      const response = await fetch('/api/courses/topcourses')
+      if (response.ok) {
+        const data = await response.json()
+        const featured = data.courses
+          .filter((course: any) => course.rating >= FEATURED_COURSES_RATING_THRESHOLD)
+          .slice(0, MAX_FEATURED_COURSES)
+        setFeaturedCourses(featured)
+      }
+    } catch (error) {
+      console.error('Error fetching featured courses:', error)
+      setFeaturedCourses([])
+    }
+  }
   
   // Fetch courses
   const fetchCourses = async () => {
@@ -336,16 +364,7 @@ export default function HomePage() {
       setCourses(coursesData.courses)
       setPagination(coursesData.pagination)
       setCategories(categoriesData)
-      setHasLoadedOnce(true);
-
-      // Set featured courses (top rated courses for featured section)
-      if (pagination.page === 1) {
-        const featured = coursesData.courses
-          .filter((course: Course) => course.rating >= FEATURED_COURSES_RATING_THRESHOLD)
-          .slice(0, MAX_FEATURED_COURSES)
-          .map((course: Course) => ({ ...course, isFeatured: true }))
-        setFeaturedCourses(featured)
-      }
+      setHasLoadedOnce(true)
 
     } catch (err) {
       if (err instanceof TypeError && err.message.includes('fetch')) {
@@ -361,6 +380,36 @@ export default function HomePage() {
   useEffect(() => {
     fetchCourses();
   }, [debouncedSearch, selectedCategory, sortBy, debouncedMinPrice, debouncedMaxPrice, minRating, pagination.page]);
+
+  // Fetch featured courses only when no filters are active and on page 1
+  useEffect(() => {
+    if (!hasActiveFilters && pagination.page === 1) {
+      fetchFeaturedCourses()
+    } else {
+      // Clear featured courses when filters are active
+      setFeaturedCourses([])
+    }
+  }, [hasActiveFilters, pagination.page])
+
+  // Handle search from landing page - scroll to results when loaded with search params
+  useEffect(() => {
+    const searchFromLanding = searchParams.get('search')
+    const categoryFromLanding = searchParams.get('category')
+    
+    if (searchFromLanding || categoryFromLanding) {
+      // Small delay to ensure components are mounted
+      setTimeout(() => {
+        // Scroll to search results section smoothly
+        const resultsSection = document.querySelector('[data-results-section]')
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          })
+        }
+      }, 500)
+    }
+  }, [searchParams])
 
   const handlePageChange = (newPage: number) => {
     if (newPage !== pagination.page) {
@@ -415,8 +464,8 @@ export default function HomePage() {
       </header>
 
       <div className="container mx-auto px-4 py-4 sm:py-6">
-        {/* Featured Courses Section */}
-        {featuredCourses.length > 0 && pagination.page === 1 && (
+        {/* Featured Courses Section - Only show when no filters are active */}
+        {!hasActiveFilters && featuredCourses.length > 0 && pagination.page === 1 && (
           <section className="mb-6 sm:mb-8">
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
@@ -508,13 +557,43 @@ export default function HomePage() {
         </section>
 
         {/* Results Header */}
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <div data-results-section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
           <div className="flex items-center gap-2 sm:gap-3">
             <Grid3X3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             <h2 className="text-lg sm:text-xl font-bold">
-              {translations.allCourses} ({pagination.totalCount.toLocaleString('en-IN')})
+              {hasActiveFilters ? 
+                `${translations.searchResults || 'Search Results'} (${pagination.totalCount.toLocaleString('en-IN')})` :
+                `${translations.allCourses} (${pagination.totalCount.toLocaleString('en-IN')})`
+              }
             </h2>
           </div>
+          
+          {/* Active filters indicator */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-600">{translations.activeFilters || 'Active filters'}:</span>
+              {debouncedSearch && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  "{debouncedSearch}"
+                </span>
+              )}
+              {selectedCategory !== "all" && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                  {selectedCategory}
+                </span>
+              )}
+              {minRating !== "any" && (
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                  {minRating}+ ⭐
+                </span>
+              )}
+              {(debouncedMinPrice || debouncedMaxPrice) && (
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                  ₹{debouncedMinPrice || '0'}-{debouncedMaxPrice || '∞'}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Courses Grid - Responsive */}

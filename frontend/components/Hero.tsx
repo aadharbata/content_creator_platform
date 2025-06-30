@@ -2,6 +2,7 @@
 
 import { Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 interface HeroProps {
   language: "en" | "hi"
@@ -10,6 +11,7 @@ interface HeroProps {
 
 export default function Hero({ language, translations }: HeroProps) {
   const t = translations[language]
+  const router = useRouter()
 
   return (
     <section className="relative overflow-hidden py-20 lg:py-32">
@@ -33,12 +35,18 @@ export default function Hero({ language, translations }: HeroProps) {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Button
               size="lg"
+              onClick={() => router.push('/home')}
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-4 h-auto"
             >
               <Play className="w-5 h-5 mr-2" />
               {t.startLearning}
             </Button>
-            <Button size="lg" variant="outline" className="text-lg px-8 py-4 h-auto border-2 hover:bg-gray-50">
+            <Button 
+              size="lg" 
+              variant="outline" 
+              onClick={() => router.push('/home')}
+              className="text-lg px-8 py-4 h-auto border-2 hover:bg-gray-50"
+            >
               {t.viewAll}
             </Button>
           </div>

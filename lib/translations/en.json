@@ -143,5 +143,8 @@
   "selectConversation": "Select a conversation to start messaging",
   "unreadMessages": "unread messages",
   "lastSeen": "Last seen",
-  "you": "You"
+  "you": "You",
+  "searchResults": "Search Results",
+  "searchingFor": "Searching for",
+  "activeFilters": "Active filters"
 } 
