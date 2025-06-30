@@ -13,6 +13,8 @@ model User {
   email            String         @unique
   name             String
   passwordHash     String
+  phone            String?        @unique  // For WhatsApp delivery
+  phoneVerified    Boolean        @default(false)  // OTP verification status
   role             Role           @default(CREATOR)
   StripeCustomerId String?        @unique
   createdAt        DateTime       @default(now())
@@ -27,6 +29,8 @@ model User {
   creatorConversations Conversation[] @relation("CreatorConversations")
   fanConversations     Conversation[] @relation("FanConversations")
   sentMessages         Message[]
+  purchasedCourses     CourseAccess[]  // New relation for course access
+  contentDeliveries    ContentDelivery[]
 }
 
 model UserProfile {
@@ -85,6 +89,8 @@ model Course {
   author      User      @relation(fields: [authorId], references: [id])
   lessons     Lesson[]
   reviews     Review[]
+  courseAccess CourseAccess[]
+  contentDeliveries ContentDelivery[]
 }
 
 model Lesson {
@@ -168,8 +174,6 @@ model Notification {
   user      User             @relation(fields: [userId], references: [id])
 }
 
-
-
 enum Role {
   ADMIN
   CREATOR
@@ -245,6 +249,56 @@ model Message {
   sender         User         @relation(fields: [senderId], references: [id])
   
   @@index([conversationId, createdAt])
+}
+
+model CourseAccess {
+  id            String   @id @default(uuid())
+  userId        String
+  courseId      String
+  purchaseDate  DateTime @default(now())
+  deliveryMethod String? // 'WHATSAPP', 'EMAIL', 'APP_ONLY'
+  deliveryStatus String @default("PENDING") // 'PENDING', 'SENT', 'DELIVERED', 'FAILED'
+  accessExpiryDate DateTime?
+  createdAt     DateTime @default(now())
+  
+  user          User     @relation(fields: [userId], references: [id])
+  course        Course   @relation(fields: [courseId], references: [id])
+  
+  @@unique([userId, courseId])
+  @@index([userId])
+}
+
+model OTPVerification {
+  id          String   @id @default(uuid())
+  phone       String
+  otp         String
+  purpose     String   // 'PHONE_VERIFICATION', 'COURSE_DELIVERY'
+  expiresAt   DateTime
+  verified    Boolean  @default(false)
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  
+  @@index([phone, purpose])
+}
+
+model ContentDelivery {
+  id            String   @id @default(uuid())
+  courseId      String
+  userId        String
+  contentType   String
+  deliveryMethod String  // 'WHATSAPP', 'EMAIL'
+  recipientContact String // Phone or email
+  status        String   @default("PENDING") // 'PENDING', 'SENT', 'DELIVERED', 'FAILED'
+  deliveredAt   DateTime?
+  errorMessage  String?
+  retryCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  course        Course   @relation(fields: [courseId], references: [id])
+  user          User     @relation(fields: [userId], references: [id])
+  
+  @@index([status, createdAt])
 }
 
 

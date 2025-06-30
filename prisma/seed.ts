@@ -447,15 +447,334 @@ async function main() {
     ]
   })
 
+  // ==========================================
+  // CONTENT DELIVERY SYSTEM TEST DATA
+  // ==========================================
+
+  console.log('🚚 Setting up Content Delivery System test data...')
+
+  // Create test users with phone numbers for content delivery testing
+  const testConsumer = await prisma.user.create({
+    data: {
+      email: 'test@example.com',
+      name: 'Test User',
+      passwordHash: 'hashed_password_test',
+      role: 'CONSUMER',
+      phone: '+919876543210',
+      phoneVerified: true
+    }
+  })
+
+  const testCreator = await prisma.user.create({
+    data: {
+      email: 'testcreator@example.com',
+      name: 'Test Creator',
+      passwordHash: 'hashed_password_creator',
+      role: 'CREATOR',
+      phone: '+919876543211',
+      phoneVerified: true,
+      profile: {
+        create: {
+          bio: 'Test creator for content delivery system',
+          avatarUrl: 'https://via.placeholder.com/400x400'
+        }
+      }
+    },
+    include: {
+      profile: true
+    }
+  })
+
+  // Create comprehensive test course with mixed content types
+  const testCourse = await prisma.course.create({
+    data: {
+      title: 'Complete Digital Creator Masterclass',
+      description: 'A comprehensive course with all types of content - perfect for testing content delivery system',
+      price: 4999,
+      duration: 480, // 8 hours
+      authorId: testCreator.id,
+      salesCount: 25,
+      imgURL: 'https://via.placeholder.com/800x400',
+      rating: 4.9
+    }
+  })
+
+  // Create mixed content types for comprehensive testing
+  const testContents = await Promise.all([
+    // PROTECTED CONTENT (highly shareable - app only)
+    prisma.content.create({
+      data: {
+        title: 'Complete eBook: Digital Creator Guide',
+        description: 'Comprehensive 200-page guide with templates and strategies',
+        type: 'EBOOK',
+        url: 'https://example.com/creator-guide.pdf',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: webDevCategory.id,
+        price: 0
+      }
+    }),
+
+    prisma.content.create({
+      data: {
+        title: 'Premium Design Templates Pack',
+        description: 'Professional Figma templates for creators',
+        type: 'TEMPLATE',
+        url: 'https://example.com/design-templates.zip',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: designCategory.id,
+        price: 0
+      }
+    }),
+
+    prisma.content.create({
+      data: {
+        title: 'Content Creation Software License',
+        description: 'Premium software license and tools',
+        type: 'SOFTWARE',
+        url: 'https://example.com/creator-tools.exe',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: webDevCategory.id,
+        price: 0
+      }
+    }),
+
+    // DELIVERABLE CONTENT (can be sent via WhatsApp/Email)
+    prisma.content.create({
+      data: {
+        title: 'Course Introduction Video',
+        description: 'Welcome video and course overview (45 minutes)',
+        type: 'VIDEO',
+        url: 'https://example.com/intro-video.mp4',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: webDevCategory.id,
+        price: 0
+      }
+    }),
+
+    prisma.content.create({
+      data: {
+        title: 'Bonus Podcast: Creator Interviews',
+        description: 'Exclusive interviews with successful creators',
+        type: 'PODCAST',
+        url: 'https://example.com/creator-interviews.mp3',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: marketingCategory.id,
+        price: 0
+      }
+    }),
+
+    prisma.content.create({
+      data: {
+        title: 'Creator Workflow Audio Guide',
+        description: 'Audio guide for daily creator workflows',
+        type: 'AUDIO',
+        url: 'https://example.com/workflow-guide.mp3',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: marketingCategory.id,
+        price: 0
+      }
+    }),
+
+    prisma.content.create({
+      data: {
+        title: 'Visual Brand Guidelines',
+        description: 'Infographics and visual brand assets',
+        type: 'IMAGE',
+        url: 'https://example.com/brand-guidelines.zip',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: designCategory.id,
+        price: 0
+      }
+    }),
+
+    prisma.content.create({
+      data: {
+        title: 'Content Strategy Article',
+        description: 'In-depth article on content strategy',
+        type: 'ARTICLE',
+        url: 'https://example.com/content-strategy.pdf',
+        status: 'PUBLISHED',
+        authorId: testCreator.id,
+        courseId: testCourse.id,
+        categoryId: marketingCategory.id,
+        price: 0
+      }
+    })
+  ])
+
+  // Create course access records for different delivery methods
+  const courseAccess1 = await prisma.courseAccess.create({
+    data: {
+      userId: testConsumer.id,
+      courseId: testCourse.id,
+      deliveryMethod: 'WHATSAPP',
+      deliveryStatus: 'DELIVERED',
+      purchaseDate: new Date()
+    }
+  })
+
+  const courseAccess2 = await prisma.courseAccess.create({
+    data: {
+      userId: consumer1.id,
+      courseId: testCourse.id,
+      deliveryMethod: 'EMAIL',
+      deliveryStatus: 'SENT',
+      purchaseDate: new Date()
+    }
+  })
+
+  const courseAccess3 = await prisma.courseAccess.create({
+    data: {
+      userId: consumer2.id,
+      courseId: testCourse.id,
+      deliveryMethod: 'APP_ONLY',
+      deliveryStatus: 'DELIVERED',
+      purchaseDate: new Date()
+    }
+  })
+
+  // Create OTP verification records for testing
+  await prisma.oTPVerification.createMany({
+    data: [
+      {
+        phone: '+919876543210',
+        otp: '123456',
+        purpose: 'COURSE_DELIVERY',
+        expiresAt: new Date(Date.now() + 10 * 60000), // 10 minutes from now
+        verified: false,
+        attempts: 0
+      },
+      {
+        phone: '+919876543211',
+        otp: '654321',
+        purpose: 'PHONE_VERIFICATION',
+        expiresAt: new Date(Date.now() + 10 * 60000),
+        verified: true,
+        attempts: 1
+      }
+    ]
+  })
+
+  // Create content delivery records
+  await prisma.contentDelivery.createMany({
+    data: [
+      // WhatsApp deliveries
+      {
+        courseId: testCourse.id,
+        userId: testConsumer.id,
+        contentType: 'VIDEO',
+        deliveryMethod: 'WHATSAPP',
+        recipientContact: '+919876543210',
+        status: 'DELIVERED',
+        deliveredAt: new Date()
+      },
+      {
+        courseId: testCourse.id,
+        userId: testConsumer.id,
+        contentType: 'AUDIO',
+        deliveryMethod: 'WHATSAPP',
+        recipientContact: '+919876543210',
+        status: 'DELIVERED',
+        deliveredAt: new Date()
+      },
+      {
+        courseId: testCourse.id,
+        userId: testConsumer.id,
+        contentType: 'IMAGE',
+        deliveryMethod: 'WHATSAPP',
+        recipientContact: '+919876543210',
+        status: 'SENT'
+      },
+
+      // Email deliveries
+      {
+        courseId: testCourse.id,
+        userId: consumer1.id,
+        contentType: 'VIDEO',
+        deliveryMethod: 'EMAIL',
+        recipientContact: 'alice.student@example.com',
+        status: 'SENT'
+      },
+      {
+        courseId: testCourse.id,
+        userId: consumer1.id,
+        contentType: 'PODCAST',
+        deliveryMethod: 'EMAIL',
+        recipientContact: 'alice.student@example.com',
+        status: 'DELIVERED',
+        deliveredAt: new Date()
+      }
+    ]
+  })
+
+  // Add some more test users for comprehensive testing
+  const moreTestUsers = await Promise.all([
+    prisma.user.create({
+      data: {
+        email: 'whatsapp.user@example.com',
+        name: 'WhatsApp User',
+        passwordHash: 'hashed_password_whatsapp',
+        role: 'CONSUMER',
+        phone: '+919123456789',
+        phoneVerified: true
+      }
+    }),
+
+    prisma.user.create({
+      data: {
+        email: 'email.user@example.com',
+        name: 'Email User',
+        passwordHash: 'hashed_password_email',
+        role: 'CONSUMER'
+      }
+    }),
+
+    prisma.user.create({
+      data: {
+        email: 'app.only.user@example.com',
+        name: 'App Only User',
+        passwordHash: 'hashed_password_app',
+        role: 'CONSUMER'
+      }
+    })
+  ])
+
+  console.log('✅ Content Delivery System test data created!')
+  console.log(`📱 Test phone numbers: +919876543210, +919876543211, +919123456789`)
+  console.log(`📧 Test emails: test@example.com, whatsapp.user@example.com, email.user@example.com`)
+  console.log(`🆔 Test IDs for API testing:`)
+  console.log(`   Test User ID: ${testConsumer.id}`)
+  console.log(`   Test Course ID: ${testCourse.id}`)
+  console.log(`   Test Creator ID: ${testCreator.id}`)
+  console.log(`   Protected Content IDs: ${testContents.slice(0, 3).map(c => c.id).join(', ')}`)
+  console.log(`   Deliverable Content IDs: ${testContents.slice(3).map(c => c.id).join(', ')}`)
+
   console.log('✅ Seed completed successfully!')
-  console.log(`👤 Created ${2} creators`)
-  console.log(`👥 Created ${6} consumers`)
-  console.log(`📚 Created ${5} courses`)
+  console.log(`👤 Created ${4} creators`) // Updated count
+  console.log(`👥 Created ${9} consumers`) // Updated count  
+  console.log(`📚 Created ${6} courses`) // Updated count
   console.log(`💬 Created ${4} reviews`)
-  console.log(`📄 Created ${2} content items`)
+  console.log(`📄 Created ${10} content items`) // Updated count
   console.log(`🔔 Created ${3} notifications`)
   console.log(`💬 Created ${3} conversations`)
   console.log(`💬 Created ${9} messages`)
+  console.log(`🚚 Created ${3} course access records`)
+  console.log(`📲 Created ${2} OTP verification records`)
+  console.log(`📦 Created ${5} content delivery records`)
   console.log('')
   console.log('🎯 Sample creator IDs for testing:')
   console.log(`   John Doe: ${creator1.id}`)
