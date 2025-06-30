@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { useDebounce } from "@/lib/hooks"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
@@ -263,6 +264,7 @@ function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
 
 export default function HomePage() {
   const { language, setLanguage, translations } = useLanguage()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
@@ -277,9 +279,9 @@ export default function HomePage() {
     hasPrev: false,
   })
   
-  // Filters
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
+  // Initialize filters from URL parameters
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || "")
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || "all")
   const [sortBy, setSortBy] = useState("newest")
   const [minPrice, setMinPrice] = useState("")
   const [maxPrice, setMaxPrice] = useState("")
@@ -361,6 +363,26 @@ export default function HomePage() {
   useEffect(() => {
     fetchCourses();
   }, [debouncedSearch, selectedCategory, sortBy, debouncedMinPrice, debouncedMaxPrice, minRating, pagination.page]);
+
+  // Handle search from landing page - scroll to results when loaded with search params
+  useEffect(() => {
+    const searchFromLanding = searchParams.get('search')
+    const categoryFromLanding = searchParams.get('category')
+    
+    if (searchFromLanding || categoryFromLanding) {
+      // Small delay to ensure components are mounted
+      setTimeout(() => {
+        // Scroll to search results section smoothly
+        const resultsSection = document.querySelector('[data-results-section]')
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          })
+        }
+      }, 500)
+    }
+  }, [searchParams])
 
   const handlePageChange = (newPage: number) => {
     if (newPage !== pagination.page) {
@@ -508,13 +530,21 @@ export default function HomePage() {
         </section>
 
         {/* Results Header */}
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <div data-results-section className="flex items-center justify-between mb-4 sm:mb-6">
           <div className="flex items-center gap-2 sm:gap-3">
             <Grid3X3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             <h2 className="text-lg sm:text-xl font-bold">
-              {translations.allCourses} ({pagination.totalCount.toLocaleString('en-IN')})
+              {searchParams.get('search') ? 
+                `${translations.searchResults || 'Search Results'} (${pagination.totalCount.toLocaleString('en-IN')})` :
+                `${translations.allCourses} (${pagination.totalCount.toLocaleString('en-IN')})`
+              }
             </h2>
           </div>
+          {searchParams.get('search') && (
+            <div className="text-sm text-gray-600">
+              {translations.searchingFor || 'Searching for'}: <span className="font-semibold text-blue-600">"{searchParams.get('search')}"</span>
+            </div>
+          )}
         </div>
 
         {/* Courses Grid - Responsive */}

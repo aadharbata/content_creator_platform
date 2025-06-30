@@ -75,52 +75,47 @@ export async function GET(request: NextRequest) {
         break
     }
 
-    // Fetch courses with pagination
-    const [courses, totalCount] = await Promise.all([
-      prisma.course.findMany({
-        where,
-        include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-              profile: {
-                select: {
-                  avatarUrl: true
-                }
+    // First fetch ALL courses that match filters (except rating) to properly handle rating-based pagination
+    const allMatchingCourses = await prisma.course.findMany({
+      where,
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            profile: {
+              select: {
+                avatarUrl: true
               }
-            }
-          },
-          contents: {
-            include: {
-              Category: {
-                select: {
-                  name: true
-                }
-              }
-            },
-            take: 1
-          },
-          reviews: {
-            select: {
-              rating: true
-            }
-          },
-          _count: {
-            select: {
-              reviews: true
             }
           }
         },
-        orderBy,
-        skip: offset,
-        take: limit
-      }),
-      prisma.course.count({ where })
-    ])
+        contents: {
+          include: {
+            Category: {
+              select: {
+                name: true
+              }
+            }
+          },
+          take: 1
+        },
+        reviews: {
+          select: {
+            rating: true
+          }
+        },
+        _count: {
+          select: {
+            reviews: true
+          }
+        }
+      },
+      orderBy
+    })
 
-    // Transform courses data and apply rating filter after calculating actual ratings
-    const transformedCourses = courses
+    // Transform and filter by rating FIRST
+    const allTransformedCourses = allMatchingCourses
       .map(course => {
         const avgRating = course.reviews.length > 0
           ? course.reviews.reduce((sum, review) => sum + review.rating, 0) / course.reviews.length
@@ -151,10 +146,13 @@ export async function GET(request: NextRequest) {
                  course._count.reviews > 20 ? 'Top Rated' : null
         }
       })
-      .filter(course => course.rating >= minRating) // Apply rating filter after calculating actual ratings
+      .filter(course => course.rating >= minRating)
 
-    // Update total count after rating filter
-    const filteredCount = transformedCourses.length
+    // Apply pagination AFTER rating filter
+    const transformedCourses = allTransformedCourses.slice(offset, offset + limit)
+    
+    // Calculate correct totals
+    const filteredCount = allTransformedCourses.length
     const totalPages = Math.ceil(filteredCount / limit)
 
     return NextResponse.json({

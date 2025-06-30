@@ -31,6 +31,8 @@ model User {
   sentMessages         Message[]
   purchasedCourses     CourseAccess[]  // New relation for course access
   contentDeliveries    ContentDelivery[]
+
+  @@index([name])
 }
 
 model UserProfile {
@@ -91,6 +93,10 @@ model Course {
   reviews     Review[]
   courseAccess CourseAccess[]
   contentDeliveries ContentDelivery[]
+
+  @@index([title])
+  @@index([description])
+  @@index([authorId])
 }
 
 model Lesson {
