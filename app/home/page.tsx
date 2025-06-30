@@ -182,15 +182,15 @@ function CourseCard({ course }: { course: Course }) {
 function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
   return (
     <Card className="group cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-purple-50 overflow-hidden">
-      <div className="sm:flex">
-        <div className="relative sm:w-1/2">
-          <Image
-            src={course.imgURL || "/placeholder.svg"}
-            alt={course.title}
-            width={400}
-            height={250}
-            className="w-full h-48 sm:h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
+             <div className="sm:flex sm:h-80">
+         <div className="relative sm:w-1/2">
+           <Image
+             src={course.imgURL || "/placeholder.svg"}
+             alt={course.title}
+             width={400}
+             height={250}
+             className="w-full h-48 sm:h-80 object-cover group-hover:scale-105 transition-transform duration-300"
+           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
           
           <div className="absolute top-3 left-3">
