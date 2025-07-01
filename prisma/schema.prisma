@@ -9,28 +9,29 @@ datasource db {
 }
 
 model User {
-  id               String         @id @default(uuid())
-  email            String         @unique
-  name             String
-  passwordHash     String
-  phone            String?        @unique  // For WhatsApp delivery
-  phoneVerified    Boolean        @default(false)  // OTP verification status
-  role             Role           @default(CREATOR)
-  StripeCustomerId String?        @unique
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  contents         Content[]
-  courses          Course[]
-  notifications    Notification[]
-  payments         Payment[]
-  reviews          Review[]
-  subscriptions    Subscription[]
-  profile          UserProfile?
-  creatorConversations Conversation[] @relation("CreatorConversations")
-  fanConversations     Conversation[] @relation("FanConversations")
+  id                   String            @id @default(uuid())
+  email                String            @unique
+  name                 String
+  passwordHash         String
+  phone                String?           @unique // For WhatsApp delivery
+  phoneVerified        Boolean           @default(false) // OTP verification status
+  role                 Role              @default(CREATOR)
+  StripeCustomerId     String?           @unique
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  contents             Content[]
+  courses              Course[]
+  notifications        Notification[]
+  payments             Payment[]
+  reviews              Review[]
+  subscriptions        Subscription[]
+  profile              UserProfile?
+  creatorConversations Conversation[]    @relation("CreatorConversations")
+  fanConversations     Conversation[]    @relation("FanConversations")
   sentMessages         Message[]
-  purchasedCourses     CourseAccess[]  // New relation for course access
+  purchasedCourses     CourseAccess[] // New relation for course access
   contentDeliveries    ContentDelivery[]
+  creatorProfile       CreatorProfile? // Added for relation to CreatorProfile
 
   @@index([name])
 }
@@ -76,22 +77,22 @@ model Content {
 }
 
 model Course {
-  id          String    @id @default(uuid())
-  title       String
-  description String
-  price       Float
-  duration    Int
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  authorId    String
-  salesCount  Int       @default(0)
-  imgURL      String
-  rating      Float
-  contents    Content[]
-  author      User      @relation(fields: [authorId], references: [id])
-  lessons     Lesson[]
-  reviews     Review[]
-  courseAccess CourseAccess[]
+  id                String            @id @default(uuid())
+  title             String
+  description       String
+  price             Float
+  duration          Int
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  authorId          String
+  salesCount        Int               @default(0)
+  imgURL            String
+  rating            Float
+  contents          Content[]
+  author            User              @relation(fields: [authorId], references: [id])
+  lessons           Lesson[]
+  reviews           Review[]
+  courseAccess      CourseAccess[]
   contentDeliveries ContentDelivery[]
 
   @@index([title])
@@ -112,15 +113,15 @@ model Lesson {
 }
 
 model Subscription {
-  id        String             @id @default(uuid())
-  status    SubscriptionStatus
-  startdate DateTime
-  endDate   DateTime?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id        String         @id @default(uuid())
+  user      User           @relation(fields: [userId], references: [id])
   userId    String
-  payments  Payment[]
-  user      User               @relation(fields: [userId], references: [id])
+  creator   CreatorProfile @relation(fields: [creatorId], references: [id])
+  creatorId String
+  createdAt DateTime       @default(now())
+  payments  Payment[] // Added for relation to Payment
+
+  @@unique([userId, creatorId]) // Prevent duplicate subscriptions
 }
 
 model Payment {
@@ -227,84 +228,104 @@ enum NotificationType {
 }
 
 model Conversation {
-  id            String    @id @default(uuid())
+  id            String   @id @default(uuid())
   creatorId     String
   fanId         String
-  lastMessageAt DateTime  @default(now())
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  creator       User      @relation("CreatorConversations", fields: [creatorId], references: [id])
-  fan           User      @relation("FanConversations", fields: [fanId], references: [id])
-  messages      Message[]
-  
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  creator  User      @relation("CreatorConversations", fields: [creatorId], references: [id])
+  fan      User      @relation("FanConversations", fields: [fanId], references: [id])
+  messages Message[]
+
   @@unique([creatorId, fanId])
   @@index([creatorId, lastMessageAt])
 }
 
 model Message {
-  id             String       @id @default(uuid())
-  content        String
-  isRead         Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  
+  id        String   @id @default(uuid())
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
   conversationId String
   senderId       String
-  
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation(fields: [senderId], references: [id])
-  
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
   @@index([conversationId, createdAt])
 }
 
 model CourseAccess {
-  id            String   @id @default(uuid())
-  userId        String
-  courseId      String
-  purchaseDate  DateTime @default(now())
-  deliveryMethod String? // 'WHATSAPP', 'EMAIL', 'APP_ONLY'
-  deliveryStatus String @default("PENDING") // 'PENDING', 'SENT', 'DELIVERED', 'FAILED'
+  id               String    @id @default(uuid())
+  userId           String
+  courseId         String
+  purchaseDate     DateTime  @default(now())
+  deliveryMethod   String? // 'WHATSAPP', 'EMAIL', 'APP_ONLY'
+  deliveryStatus   String    @default("PENDING") // 'PENDING', 'SENT', 'DELIVERED', 'FAILED'
   accessExpiryDate DateTime?
-  createdAt     DateTime @default(now())
-  
-  user          User     @relation(fields: [userId], references: [id])
-  course        Course   @relation(fields: [courseId], references: [id])
-  
+  createdAt        DateTime  @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
   @@unique([userId, courseId])
   @@index([userId])
 }
 
 model OTPVerification {
-  id          String   @id @default(uuid())
-  phone       String
-  otp         String
-  purpose     String   // 'PHONE_VERIFICATION', 'COURSE_DELIVERY'
-  expiresAt   DateTime
-  verified    Boolean  @default(false)
-  attempts    Int      @default(0)
-  createdAt   DateTime @default(now())
-  
+  id        String   @id @default(uuid())
+  phone     String
+  otp       String
+  purpose   String // 'PHONE_VERIFICATION', 'COURSE_DELIVERY'
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
   @@index([phone, purpose])
 }
 
 model ContentDelivery {
-  id            String   @id @default(uuid())
-  courseId      String
-  userId        String
-  contentType   String
-  deliveryMethod String  // 'WHATSAPP', 'EMAIL'
+  id               String    @id @default(uuid())
+  courseId         String
+  userId           String
+  contentType      String
+  deliveryMethod   String // 'WHATSAPP', 'EMAIL'
   recipientContact String // Phone or email
-  status        String   @default("PENDING") // 'PENDING', 'SENT', 'DELIVERED', 'FAILED'
-  deliveredAt   DateTime?
-  errorMessage  String?
-  retryCount    Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  course        Course   @relation(fields: [courseId], references: [id])
-  user          User     @relation(fields: [userId], references: [id])
-  
+  status           String    @default("PENDING") // 'PENDING', 'SENT', 'DELIVERED', 'FAILED'
+  deliveredAt      DateTime?
+  errorMessage     String?
+  retryCount       Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
   @@index([status, createdAt])
 }
 
+// --- Membership & Subscription Models Start ---
+model CreatorProfile {
+  id                String         @id @default(uuid())
+  user              User           @relation(fields: [userId], references: [id])
+  userId            String         @unique
+  isPaid            Boolean        @default(false)
+  subscriptionPrice Int?
+  posts             Post[]
+  subscribers       Subscription[]
+}
 
+model Post {
+  id         String         @id @default(uuid())
+  creator    CreatorProfile @relation(fields: [creatorId], references: [id])
+  creatorId  String
+  title      String
+  content    String
+  isPaidOnly Boolean        @default(false)
+}
+
+// --- Membership & Subscription Models End ---

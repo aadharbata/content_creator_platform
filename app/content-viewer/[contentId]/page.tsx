@@ -149,6 +149,13 @@ export default function ContentViewer() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Membership Buttons */}
+              <Button className="bg-gradient-to-r from-green-400 to-blue-500 text-white font-semibold shadow-md hover:from-green-500 hover:to-blue-600 transition-colors">
+                Free
+              </Button>
+              <Button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold shadow-md hover:from-yellow-500 hover:to-orange-600 transition-colors">
+                Paid Membership
+              </Button>
               <Badge className="bg-purple-100 text-purple-800">
                 <Shield className="w-3 h-3 mr-1" />
                 Protected Content

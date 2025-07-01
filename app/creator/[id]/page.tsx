@@ -31,6 +31,8 @@ import { useDebounce } from "@/lib/hooks"
 import { cn } from "@/lib/utils"
 import { getTranslations, type Language } from "@/lib/translations"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
+import { dummyCourses } from "./dummy-courses"
+import { getAuthUser } from "@/lib/auth"
 
 // Constants
 const COURSE_LEVELS = {
@@ -290,6 +292,35 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   // Get translations
   const t = translations
 
+  // --- Backend subscription logic start ---
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [loadingSubscription, setLoadingSubscription] = useState(true)
+  useEffect(() => {
+    const checkSubscription = async () => {
+      setLoadingSubscription(true)
+      const user = getAuthUser()
+      if (!user) {
+        setIsSubscribed(false)
+        setLoadingSubscription(false)
+        return
+      }
+      try {
+        const res = await fetch("/api/subscribe/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ creatorId: id })
+        })
+        const data = await res.json()
+        setIsSubscribed(data.subscribed === true)
+      } catch {
+        setIsSubscribed(false)
+      }
+      setLoadingSubscription(false)
+    }
+    checkSubscription()
+  }, [id])
+  // --- Backend subscription logic end ---
+
   // Fetch all creator data
   useEffect(() => {
     let isMounted = true
@@ -366,13 +397,15 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
     }
   }, [id])
 
-  // Filter courses based on debounced search
-  const filteredCourses = courses.filter(course => {
+  // --- Post visibility logic start ---
+  const visibleCourses = (courses.length === 0 ? dummyCourses : courses)
+  const filteredCourses = (isSubscribed ? visibleCourses : visibleCourses.slice(0, 1)).filter(course => {
     if (!debouncedSearchQuery) return true
     const query = debouncedSearchQuery.toLowerCase()
     return course.title.toLowerCase().includes(query) ||
            course.description.toLowerCase().includes(query)
   })
+  // --- Post visibility logic end ---
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -503,6 +536,9 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                     <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
                       Top Creator
                     </Badge>
+                    {isSubscribed && !loadingSubscription && (
+                      <Badge className="bg-green-500 text-white ml-2">Subscribed</Badge>
+                    )}
                   </div>
                   <p className="text-xl text-gray-600 mb-4">
                     {t.creator} & Educator
@@ -528,12 +564,40 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled>
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    {t.messagesSoon}
-                  </Button>
-                </div>
+                {!isSubscribed && !loadingSubscription && (
+                  <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
+                    <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
+                      <div className="text-xl font-bold">Premium Membership</div>
+                      <div className="text-sm opacity-80">Unlock exclusive content & benefits</div>
+                    </div>
+                    <div className="text-4xl font-extrabold text-gray-900 mb-2">$120<span className="text-lg font-medium text-gray-700">/month</span></div>
+                    <ul className="text-gray-700 text-base mb-6 w-full">
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Access to all premium courses</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Weekly live Q&A sessions</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Exclusive community access</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
+                    </ul>
+                    <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
+                      await fetch("/api/subscribe", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ creatorId: id })
+                      })
+                      setIsSubscribed(true)
+                    }}>
+                      Join Now
+                    </Button>
+                    <div className="text-xs text-gray-500 mt-2 text-center">Cancel anytime. No hidden fees.</div>
+                  </div>
+                )}
+
+                {isSubscribed && !loadingSubscription && (
+                  <div className="flex items-center md:justify-end w-full md:w-auto">
+                    <Button className="ml-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold shadow-lg px-8 py-4 text-lg rounded-xl h-16">
+                      Create a Post
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
