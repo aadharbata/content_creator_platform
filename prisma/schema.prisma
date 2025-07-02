@@ -320,12 +320,35 @@ model CreatorProfile {
 }
 
 model Post {
-  id         String         @id @default(uuid())
-  creator    CreatorProfile @relation(fields: [creatorId], references: [id])
-  creatorId  String
-  title      String
-  content    String
-  isPaidOnly Boolean        @default(false)
+  id            String    @id @default(uuid())
+  title         String
+  content       String
+  isPaidOnly    Boolean   @default(false)
+  creator       CreatorProfile @relation(fields: [creatorId], references: [id])
+  creatorId     String
+  createdAt     DateTime  @default(now())
+  likes         Like[]
+  comments      Comment[]
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+
+  @@unique([userId, postId]) // one like per user per post
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  createdAt DateTime @default(now())
 }
 
 // --- Membership & Subscription Models End ---
