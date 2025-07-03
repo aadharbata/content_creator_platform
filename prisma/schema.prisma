@@ -331,6 +331,16 @@ model Post {
   createdAt  DateTime       @default(now())
   likes      Like[]
   comments   Comment[]
+  media      PostMedia[]
+}
+
+model PostMedia {
+  id        String   @id @default(uuid())
+  url       String
+  type      String   // "photo" or "video"
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  createdAt DateTime @default(now())
 }
 
 model Like {
