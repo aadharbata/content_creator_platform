@@ -625,6 +625,15 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   {t.uploadNew}
                 </Link>
               </Button>
+              <Button
+                asChild
+                className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+              >
+                <Link href={`/creator/${id}/post`}>
+                  <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
+                  {t.uploadContent}
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
