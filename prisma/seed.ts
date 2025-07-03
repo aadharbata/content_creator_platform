@@ -779,10 +779,48 @@ async function main() {
   console.log('🎯 Sample creator IDs for testing:')
   console.log(`   John Doe: ${creator1.id}`)
   console.log(`   Sarah Wilson: ${creator2.id}`)
-  console.log('')
-  console.log('🌐 Test URLs:')
-  console.log(`   http://localhost:3000/creator/${creator1.id}/dashboard`)
-  console.log(`   http://localhost:3000/creator/${creator2.id}/dashboard`)
+
+  // --- Ensure test user and CreatorProfile for development ---
+  const testUser = await prisma.user.upsert({
+    where: { id: 'test-user-id' },
+    update: {},
+    create: {
+      id: 'test-user-id',
+      email: 'testuser@example.com',
+      name: 'Test User',
+      passwordHash: 'testpassword',
+      role: 'CREATOR',
+    },
+  });
+  await prisma.creatorProfile.upsert({
+    where: { userId: 'test-user-id' },
+    update: {},
+    create: {
+      userId: 'test-user-id',
+      isPaid: false,
+    },
+  });
+
+  // --- Ensure CreatorProfile for UUID user (from URL) ---
+  const uuidUser = await prisma.user.upsert({
+    where: { id: '5b161dc6-9093-4b9e-a331-f558eba8fcad' },
+    update: {},
+    create: {
+      id: '5b161dc6-9093-4b9e-a331-f558eba8fcad',
+      email: 'uuiduser@example.com',
+      name: 'UUID User',
+      passwordHash: 'uuidpassword',
+      role: 'CREATOR',
+    },
+  });
+  await prisma.creatorProfile.upsert({
+    where: { userId: '5b161dc6-9093-4b9e-a331-f558eba8fcad' },
+    update: {},
+    create: {
+      userId: '5b161dc6-9093-4b9e-a331-f558eba8fcad',
+      isPaid: false,
+    },
+  });
 }
 
 main()

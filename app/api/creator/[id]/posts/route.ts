@@ -2,12 +2,13 @@ import prisma from '@/lib/prisma'
 // For now, use a hardcoded user for development
 const defaultUserId = 'test-user-id'
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   // Simulate authentication (replace with real auth in production)
   const user = { id: defaultUserId }
 
   const creator = await prisma.creatorProfile.findUnique({
-    where: { id: params.id },
+    where: { id: id },
     include: {
       subscribers: true,
     },
@@ -17,7 +18,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const posts = await prisma.post.findMany({
     where: {
-      creatorId: params.id,
+      creatorId: id,
       isPaidOnly: isSubscribed ? undefined : false,
     },
     orderBy: { createdAt: 'desc' },

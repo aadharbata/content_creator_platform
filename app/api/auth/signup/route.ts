@@ -45,6 +45,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Automatically create CreatorProfile if user is a CREATOR
+    if (user.role === 'CREATOR') {
+      await prisma.creatorProfile.create({
+        data: {
+          userId: user.id,
+          isPaid: false,
+        },
+      });
+    }
+
     console.log("Registered User: ", user);
     return NextResponse.json(
       { 
