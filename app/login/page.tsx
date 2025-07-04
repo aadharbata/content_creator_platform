@@ -44,8 +44,10 @@ const Login = () => {
         setTimeout(() => {
           if (data.user.role === 'CREATOR') {
             router.push(`/creator/${data.user.id}/dashboard`);
+          } else if (data.user.role === 'CONSUMER') {
+            router.push('/consumer-channel');
           } else {
-            router.push("/home"); // Redirect consumers to /home
+            router.push('/home');
           }
         }, 1500);
       } else {
