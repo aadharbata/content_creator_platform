@@ -261,6 +261,10 @@ function ReviewCard({ review, t }: { review: Review; t: any }) {
 export default function CreatorProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { language, setLanguage, translations } = useLanguage()
+
+  // Get the logged-in user ID synchronously
+  const user = getAuthUser();
+  const userId = user?.id;
   
   // Validate UUID
   if (!validateUUID(id)) {
@@ -298,26 +302,24 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
-      const user = getAuthUser()
+      const user = getAuthUser();
       if (!user) {
-        setIsSubscribed(false)
-        setLoadingSubscription(false)
-        return
+        setIsSubscribed(false);
+        setLoadingSubscription(false);
+        return;
       }
+      // Debug: log userId and creatorId for subscription check
+      console.log('Check subscription:', { userId: user.id, creatorId: id });
       try {
-        const res = await fetch("/api/subscribe/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ creatorId: id })
-        })
-        const data = await res.json()
-        setIsSubscribed(data.subscribed === true)
+        const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${user.id}`);
+        const data = await res.json();
+        setIsSubscribed(data.subscribed === true);
       } catch {
-        setIsSubscribed(false)
+        setIsSubscribed(false);
       }
-      setLoadingSubscription(false)
+      setLoadingSubscription(false);
     }
-    checkSubscription()
+    checkSubscription();
   }, [id])
   // --- Backend subscription logic end ---
 
@@ -578,12 +580,15 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
                     </ul>
                     <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
+                      const user = getAuthUser();
+                      // Debug: log userId and creatorId for subscription POST
+                      console.log('Subscribe POST:', { userId: user?.id, creatorId: id });
                       await fetch("/api/subscribe", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ creatorId: id })
-                      })
-                      setIsSubscribed(true)
+                        body: JSON.stringify({ creatorId: id, userId: user?.id })
+                      });
+                      setIsSubscribed(true);
                     }}>
                       Join Now
                     </Button>
@@ -591,10 +596,10 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                   </div>
                 )}
 
-                {isSubscribed && !loadingSubscription && (
+                {userId && userId !== id && isSubscribed && (
                   <div className="flex items-center md:justify-end w-full md:w-auto">
                     <Button className="ml-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold shadow-lg px-8 py-4 text-lg rounded-xl h-16">
-                      Create a Post
+                      Join the community
                     </Button>
                   </div>
                 )}

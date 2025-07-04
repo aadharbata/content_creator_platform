@@ -89,6 +89,11 @@ export default function ViewAll() {
                   <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
                     {course.title}
                   </h3>
+                  <p className="text-gray-600 mb-3">
+                    <a href={`/creator/${course.authorId}`} className="text-blue-600 hover:underline">
+                      View Creator Profile
+                    </a>
+                  </p>
                   <p className="text-gray-600 mb-3">{course.author}</p>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">

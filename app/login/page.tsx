@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
+import { signIn } from "next-auth/react";
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -44,7 +45,7 @@ const Login = () => {
           if (data.user.role === 'CREATOR') {
             router.push(`/creator/${data.user.id}/dashboard`);
           } else {
-            router.push("/"); // Default redirect for consumers
+            router.push("/home"); // Redirect consumers to /home
           }
         }, 1500);
       } else {
@@ -116,6 +117,15 @@ const Login = () => {
             }
           </button>
         </form>
+        {/* Google Login Button */}
+        <button
+          onClick={() => signIn('google', { callbackUrl: '/home' })}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-2xl py-3 shadow hover:bg-gray-100 transition-colors text-gray-800 font-semibold"
+          type="button"
+        >
+          <img src="/google.svg" alt="Google" className="w-5 h-5" />
+          {language === 'hi' ? 'Google से लॉगिन करें' : 'Login with Google'}
+        </button>
         {error && <p className="mt-4 text-red-600 font-semibold">{error}</p>}
         {success && (
           <p className="mt-4 text-green-600 font-semibold">{success}</p>
