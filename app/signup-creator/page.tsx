@@ -13,7 +13,7 @@ const countryCodes = [
   // Add more as needed
 ];
 
-const SignUp = () => {
+const SignUpCreator = () => {
   const [signupMethod, setSignupMethod] = useState<"email" | "phone">("email");
   const [form, setForm] = useState({
     name: "",
@@ -91,13 +91,12 @@ const SignUp = () => {
           name: form.name,
           email: form.email,
           password: form.password,
-          role: form.role
+          role: 'CREATOR',
         }),
       });
       const data = await res.json();
       if (res.ok) {
         setSuccess(language === 'hi' ? "साइन अप सफल! पुनर्निर्देशित कर रहे हैं..." : "Sign up successful! Redirecting...");
-        // Always redirect to login after signup
         setTimeout(() => {
           router.push('/login');
         }, 1500);
@@ -119,13 +118,12 @@ const SignUp = () => {
           </span>
         </div>
         <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-blue-900 font-poppins">
-          {language === 'hi' ? 'साइन अप' : 'Sign Up'}
+          {language === 'hi' ? 'साइन अप' : 'Sign Up as Creator'}
         </h1>
         <p className="text-md text-gray-700 mb-6">
           {language === 'hi' 
             ? 'हमारे प्लेटफॉर्म में शामिल हों और अपनी यात्रा शुरू करें!' 
-            : 'Join our platform and start your journey!'
-          }
+            : 'Join our platform and start your journey as a creator!'}
         </p>
         <form
           className="w-full flex flex-col gap-4 text-left"
@@ -143,38 +141,6 @@ const SignUp = () => {
               placeholder={language === 'hi' ? 'नाम' : 'Name'}
             />
           </label>
-
-          {/* Role Selection */}
-          <div className="mb-4">
-            <label className="font-semibold text-gray-800 mb-2 block">
-              {language === 'hi' ? 'मैं इस रूप में शामिल होना चाहता हूं:' : 'I want to join as:'}
-            </label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="role"
-                  value="CREATOR"
-                  checked={form.role === "CREATOR"}
-                  onChange={handleChange}
-                  className="accent-blue-600"
-                />
-                <span className="text-gray-800">{language === 'hi' ? 'क्रिएटर' : 'Creator'}</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="role"
-                  value="CONSUMER"
-                  checked={form.role === "CONSUMER"}
-                  onChange={handleChange}
-                  className="accent-orange-500"
-                />
-                <span className="text-gray-800">{language === 'hi' ? 'उपभोक्ता' : 'Consumer'}</span>
-              </label>
-            </div>
-          </div>
-
           <div className="flex gap-4 items-center mb-2">
             <label className="flex items-center gap-1">
               <input
@@ -203,68 +169,62 @@ const SignUp = () => {
             <label className="font-semibold text-gray-800">
               {language === 'hi' ? 'ईमेल' : 'Email'}
               <input
-                type="email"
                 name="email"
+                type="email"
                 value={form.email}
                 onChange={handleChange}
+                placeholder={language === 'hi' ? 'आप@email.com' : 'you@email.com'}
                 required
                 className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-                placeholder={language === 'hi' ? 'ईमेल' : 'Email'}
               />
             </label>
           ) : (
-            <label className="font-semibold text-gray-800">
-              {language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
-              <div className="flex gap-2 mt-1">
-                <select
-                  name="countryCode"
-                  value={form.countryCode}
-                  onChange={handleChange}
-                  className="px-2 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white"
-                >
-                  {countryCodes.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.code} ({c.name})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-                  placeholder={language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
-                />
-              </div>
-            </label>
+            <div className="flex gap-2">
+              <select
+                name="countryCode"
+                value={form.countryCode}
+                onChange={handleChange}
+                className="mt-1 px-2 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
+              >
+                {countryCodes.map((c) => (
+                  <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                ))}
+              </select>
+              <input
+                name="phone"
+                type="tel"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder={language === 'hi' ? 'फोन नंबर' : 'Phone number'}
+                required
+                className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
+              />
+            </div>
           )}
           <label className="font-semibold text-gray-800">
             {language === 'hi' ? 'पासवर्ड' : 'Password'}
             <input
-              type="password"
               name="password"
+              type="password"
               value={form.password}
               onChange={handleChange}
+              placeholder={language === 'hi' ? 'पासवर्ड' : 'Password'}
               required
               className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-              placeholder={language === 'hi' ? 'पासवर्ड' : 'Password'}
             />
           </label>
           <label className="font-semibold text-gray-800">
             {language === 'hi' ? 'पासवर्ड की पुष्टि करें' : 'Confirm Password'}
             <input
-              type="password"
               name="confirm_password"
+              type="password"
               value={form.confirm_password}
               onChange={handleChange}
+              placeholder={language === 'hi' ? 'पासवर्ड की पुष्टि करें' : 'Confirm Password'}
               required
               className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-              placeholder={language === 'hi' ? 'पासवर्ड की पुष्टि करें' : 'Confirm Password'}
             />
           </label>
-
           <button
             type="submit"
             className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
@@ -272,7 +232,7 @@ const SignUp = () => {
           >
             {loading 
               ? (language === 'hi' ? "साइन अप हो रहा है..." : "Signing up...") 
-              : (language === 'hi' ? "साइन अप" : "Sign Up")
+              : (language === 'hi' ? "साइन अप करें" : "Sign Up")
             }
           </button>
         </form>
@@ -281,12 +241,12 @@ const SignUp = () => {
           <p className="mt-4 text-green-600 font-semibold">{success}</p>
         )}
         <p className="mt-6 text-sm text-gray-600">
-          {language === 'hi' ? "पहले से ही खाता है?" : "Already have an account?"}{" "}
+          {language === 'hi' ? "पहले से ही खाता है?" : "Already have an account?"} {" "}
           <a
             href="/login"
             className="text-orange-500 font-semibold hover:underline"
           >
-            {language === 'hi' ? "साइन इन करें" : "Sign in"}
+            {language === 'hi' ? "लॉगिन करें" : "Login"}
           </a>
         </p>
       </main>
@@ -310,4 +270,4 @@ const SignUp = () => {
   );
 };
 
-export default SignUp; 
+export default SignUpCreator; 

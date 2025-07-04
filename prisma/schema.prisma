@@ -24,7 +24,8 @@ model User {
   notifications        Notification[]
   payments             Payment[]
   reviews              Review[]
-  subscriptions        Subscription[]
+  subscriptions        Subscription[] @relation("UserSubscriptions")
+  subscribers          Subscription[] @relation("CreatorSubscriptions")
   profile              UserProfile?
   creatorConversations Conversation[]    @relation("CreatorConversations")
   fanConversations     Conversation[]    @relation("FanConversations")
@@ -115,13 +116,14 @@ model Lesson {
 }
 
 model Subscription {
-  id        String         @id @default(uuid())
-  user      User           @relation(fields: [userId], references: [id])
+  id        String   @id @default(uuid())
   userId    String
-  creator   CreatorProfile @relation(fields: [creatorId], references: [id])
   creatorId String
-  createdAt DateTime       @default(now())
+  createdAt DateTime @default(now())
   payments  Payment[] // Added for relation to Payment
+
+  user    User @relation("UserSubscriptions", fields: [userId], references: [id])
+  creator User @relation("CreatorSubscriptions", fields: [creatorId], references: [id])
 
   @@unique([userId, creatorId]) // Prevent duplicate subscriptions
 }
@@ -318,7 +320,6 @@ model CreatorProfile {
   isPaid            Boolean        @default(false)
   subscriptionPrice Int?
   posts             Post[]
-  subscribers       Subscription[]
 }
 
 model Post {

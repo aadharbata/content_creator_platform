@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Image from "next/image"
 import Link from "next/link"
+import { useSession, signOut } from "next-auth/react";
 
 // Constants
 const FEATURED_COURSES_RATING_THRESHOLD = 4.5
@@ -140,7 +141,7 @@ function CourseCard({ course }: { course: Course }) {
               {course.author.name.charAt(0)}
             </AvatarFallback>
           </Avatar>
-          <span className="text-xs sm:text-sm text-gray-600 font-medium truncate">{course.author.name}</span>
+          <a href={`/creator/${course.author.id}`} className="text-xs sm:text-sm text-blue-600 font-medium truncate hover:underline cursor-pointer">{course.author.name}</a>
         </div>
 
         {/* Description */}
@@ -229,7 +230,7 @@ function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
                   {course.author.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm text-gray-600 font-medium">{course.author.name}</span>
+              <a href={`/creator/${course.author.id}`} className="text-sm text-gray-600 font-medium truncate hover:underline cursor-pointer">{course.author.name}</a>
             </div>
           </div>
           
@@ -264,6 +265,17 @@ function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
 
 export default function HomePage() {
   const { language, setLanguage, translations } = useLanguage()
+  const { data: session } = useSession();
+  const [userName, setUserName] = useState<string | undefined>(session?.user?.name);
+  let userId = session?.user && (session.user as any).id;
+  if (!userId && typeof window !== 'undefined') {
+    const localUser = localStorage.getItem('user');
+    if (localUser) {
+      try {
+        userId = JSON.parse(localUser).id;
+      } catch {}
+    }
+  }
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -411,6 +423,19 @@ export default function HomePage() {
     }
   }, [searchParams])
 
+  useEffect(() => {
+    if (!session?.user?.name && typeof window !== 'undefined') {
+      const localUser = localStorage.getItem('user');
+      if (localUser) {
+        try {
+          setUserName(JSON.parse(localUser).name);
+        } catch {}
+      }
+    } else if (session?.user?.name) {
+      setUserName(session.user.name);
+    }
+  }, [session]);
+
   const handlePageChange = (newPage: number) => {
     if (newPage !== pagination.page) {
       setPagination(prev => ({ ...prev, page: newPage }))
@@ -448,7 +473,8 @@ export default function HomePage() {
                 {translations.courseHub}
               </h1>
             </div>
-            
+            {/* User Profile & Settings */}
+            <UserProfileMenu />
             {/* Language Switcher */}
             <Select value={language} onValueChange={(value: "en" | "hi") => setLanguage(value)}>
               <SelectTrigger className="w-16 sm:w-20 bg-white/80 backdrop-blur-sm border-0 shadow-sm">
@@ -462,6 +488,14 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+      {/* Personalized Greeting */}
+      <div className="container mx-auto px-4 mt-6">
+        {userName && (
+          <h2 className="text-2xl font-bold mb-4">
+            Hey, {userName}!
+          </h2>
+        )}
+      </div>
 
       <div className="container mx-auto px-4 py-4 sm:py-6">
         {/* Featured Courses Section - Only show when no filters are active */}
@@ -691,4 +725,133 @@ export default function HomePage() {
       )}
     </div>
   )
+}
+
+// UserProfileMenu component
+function UserProfileMenu() {
+  const { data: session, update } = useSession();
+  const user = session?.user;
+  const [open, setOpen] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [showPicModal, setShowPicModal] = useState(false);
+  const [newName, setNewName] = useState(user?.name || "");
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!user) return null;
+
+  const handleNameSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/user/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: (user as any).id, name: newName })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await update({ name: data.user.name });
+      }
+    } finally {
+      setSaving(false);
+      setShowNameModal(false);
+    }
+  };
+
+  const handlePicSave = async () => {
+    setSaving(true);
+    const file = fileInputRef.current?.files?.[0];
+    if (file) {
+      // Upload image to server or cloud storage (for now, just convert to base64)
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result;
+        const res = await fetch('/api/user/update', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: (user as any).id, image: base64 })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          await update({ image: data.user.image });
+        }
+        setSaving(false);
+        setShowPicModal(false);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setSaving(false);
+      setShowPicModal(false);
+    }
+  };
+
+  return (
+    <div className="relative ml-4">
+      <button
+        className="flex items-center gap-2 focus:outline-none"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Avatar className="w-8 h-8">
+          <AvatarImage src={user.image || undefined} alt={user.name || "User"} />
+          <AvatarFallback>{user.name?.charAt(0) || "U"}</AvatarFallback>
+        </Avatar>
+        <span className="font-medium text-gray-800 max-w-[100px] truncate">{user.name}</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border">
+          <div className="px-4 py-2 text-sm text-gray-700 border-b">{user.email}</div>
+          <button
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+            onClick={() => { setShowNameModal(true); setOpen(false); }}
+          >Change Name</button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+            onClick={() => { setShowPicModal(true); setOpen(false); }}
+          >Change Profile Picture</button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+          >Logout</button>
+        </div>
+      )}
+      {/* Change Name Modal */}
+      {showNameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+            <h2 className="text-lg font-bold mb-4">Change Name</h2>
+            <input
+              type="text"
+              className="w-full border rounded px-3 py-2 mb-4"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              disabled={saving}
+            />
+            <div className="flex justify-end gap-2">
+              <button className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowNameModal(false)} disabled={saving}>Cancel</button>
+              <button className="px-4 py-2 rounded bg-blue-600 text-white" onClick={handleNameSave} disabled={saving || !newName.trim()}>{saving ? "Saving..." : "Save"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Change Profile Picture Modal */}
+      {showPicModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+            <h2 className="text-lg font-bold mb-4">Change Profile Picture</h2>
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              className="mb-4"
+              disabled={saving}
+            />
+            <div className="flex justify-end gap-2">
+              <button className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowPicModal(false)} disabled={saving}>Cancel</button>
+              <button className="px-4 py-2 rounded bg-blue-600 text-white" onClick={handlePicSave} disabled={saving}>{saving ? "Saving..." : "Save"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
