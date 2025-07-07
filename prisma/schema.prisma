@@ -36,6 +36,11 @@ model User {
   like                 Like[]
   Comment              Comment[]
   
+  // Community relations
+  ownedCommunities     Community[]        @relation("CreatorCommunities")
+  communityMemberships CommunityMember[]
+  communityMessages    CommunityMessage[] @relation("CommunityMessages")
+  
   @@index([name])
 }
 
@@ -77,6 +82,7 @@ model Content {
   course           Course?            @relation(fields: [courseId], references: [id])
   Tag              Tag?               @relation(fields: [tagId], references: [id])
   ContentAnalytics ContentAnalytics[]
+  community        Community?         // Content-based community
 }
 
 model Course {
@@ -229,8 +235,58 @@ enum NotificationType {
   PAYMENT
   CONTENT
   SUBSCRIPTION
+  COMMUNITY
 }
 
+
+
+
+
+model Community {
+  id          String @id @default(uuid())
+  name        String
+  description String?
+  type        String // "CONTENT_COMMUNITY" or "SUBSCRIPTION_COMMUNITY"
+  maxMembers  Int    @default(1000)
+  
+  // References
+  contentId   String?           // For content-based communities
+  creatorId   String            // Creator who owns this community
+  
+  // Metadata
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  // Relations
+  creator      User                   @relation("CreatorCommunities", fields: [creatorId], references: [id])
+  content      Content?               @relation(fields: [contentId], references: [id])
+  members      CommunityMember[]
+  conversation CommunityConversation?
+  
+  @@unique([contentId]) // One community per content
+  @@unique([creatorId, type]) // One subscription community per creator
+  @@index([creatorId, type])
+}
+
+model CommunityMember {
+  id          String   @id @default(uuid())
+  joinedAt    DateTime @default(now())
+  lastActive  DateTime?
+  
+  // References
+  userId      String
+  communityId String
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id])
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, communityId]) // One membership per user per community
+  @@index([communityId])
+  @@index([userId])
+}
+
+// Direct conversations (1-on-1) - keeping the original name for compatibility
 model Conversation {
   id            String   @id @default(uuid())
   creatorId     String
@@ -247,19 +303,55 @@ model Conversation {
   @@index([creatorId, lastMessageAt])
 }
 
+// Community conversations (group chat)
+model CommunityConversation {
+  id            String   @id @default(uuid())
+  communityId   String   @unique
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  community Community        @relation(fields: [communityId], references: [id])
+  messages  CommunityMessage[]
+}
+
+// Direct messages (1-on-1) - keeping the original name for compatibility
 model Message {
   id        String   @id @default(uuid())
   content   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  // References
   conversationId String
   senderId       String
 
+  // Relations
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id])
 
   @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+// Community messages (group chat)
+model CommunityMessage {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // References
+  conversationId String
+  senderId       String
+
+  // Relations
+  conversation CommunityConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                  @relation("CommunityMessages", fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }
 
 model CourseAccess {

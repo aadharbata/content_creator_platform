@@ -31,6 +31,14 @@ export interface Conversation {
   updatedAt: Date
 }
 
+export interface CommunityConversation {
+  id: string
+  communityId: string
+  lastMessageAt: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
 export interface ConversationWithDetails extends Conversation {
   fan: {
     id: string
@@ -52,12 +60,18 @@ export interface ConversationWithDetails extends Conversation {
 
 // Client to Server Events
 export interface ClientToServerEvents {
+  // Direct conversation events
   join_conversation: (data: { conversationId: string }) => void
   leave_conversation: (data: { conversationId: string }) => void
   send_message: (data: { conversationId: string; content: string }) => void
   typing_start: (data: { conversationId: string }) => void
   typing_stop: (data: { conversationId: string }) => void
   mark_as_read: (data: { conversationId: string; messageIds: string[] }) => void
+  
+  // Community events  
+  send_community_message: (data: { communityId: string; content: string }) => void
+  community_typing_start: (data: { communityId: string }) => void
+  community_typing_stop: (data: { communityId: string }) => void
 }
 
 // Server to Client Events
@@ -77,6 +91,12 @@ export interface ServerToClientEvents {
   // Typing events
   user_typing: (data: { conversationId: string; userId: string; userName: string }) => void
   user_stopped_typing: (data: { conversationId: string; userId: string }) => void
+  
+  // Community events
+  community_message_sent: (data: CommunityMessageSentData) => void
+  community_new_message: (data: CommunityNewMessageData) => void
+  community_user_typing: (data: { communityId: string; userId: string; userName: string }) => void
+  community_user_stopped_typing: (data: { communityId: string; userId: string }) => void
   
   // Connection events
   connected: (data: { userId: string; timestamp: Date }) => void
@@ -156,4 +176,62 @@ export interface AuthPayload {
   role: 'CREATOR' | 'CONSUMER' | 'ADMIN'
   iat: number
   exp: number
+}
+
+// Community-specific data interfaces
+export interface Community {
+  id: string
+  name: string
+  description?: string
+  type: string // 'CONTENT_COMMUNITY' | 'SUBSCRIPTION_COMMUNITY'
+  maxMembers: number
+  contentId?: string
+  creatorId: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface CommunityMember {
+  id: string
+  userId: string
+  communityId: string
+  joinedAt: Date
+  lastActive?: Date
+  user: {
+    id: string
+    name: string
+    avatarUrl: string | null
+  }
+}
+
+export interface CommunityMessageSentData {
+  id: string
+  content: string
+  createdAt: Date
+  conversationId: string
+  communityId: string
+  sender: {
+    id: string
+    name: string
+    avatarUrl: string | null
+  }
+}
+
+export interface CommunityNewMessageData {
+  id: string
+  content: string
+  createdAt: Date
+  conversationId: string
+  communityId: string
+  sender: {
+    id: string
+    name: string
+    avatarUrl: string | null
+  }
+}
+
+// Community-specific request interfaces
+export interface SendCommunityMessageRequest {
+  communityId: string
+  content: string
 } 
