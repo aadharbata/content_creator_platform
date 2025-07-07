@@ -100,9 +100,12 @@ export type Conversation = PrismaConversation & {
 export type Community = PrismaCommunity & {
   lastMessage?: MessageWithSender;
   unreadCount: number;
+  imageUrl?: string | null;
   _count: {
     members: number;
   };
 };
 
-export type ChatListItem = (Conversation | Community) & { type: 'conversation' | 'community' }; 
+export type ChatListItem =
+  | (Conversation & { type: 'conversation' })
+  | (Community & { type: 'community' }); 

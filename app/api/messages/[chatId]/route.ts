@@ -17,10 +17,11 @@ export async function GET(request: NextRequest, { params }: { params: { chatId: 
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const awaitedParams = await params;
   const { searchParams } = new URL(request.url);
   const parseResult = querySchema.safeParse({
     type: searchParams.get('type'),
-    id: params.chatId,
+    id: awaitedParams.chatId,
   });
 
   if (!parseResult.success) {

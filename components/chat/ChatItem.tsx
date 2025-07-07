@@ -3,7 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChatListItem } from '@/lib/types/shared';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid } from 'date-fns';
 
 interface ChatItemProps {
   chat: ChatListItem;
@@ -48,9 +48,14 @@ export const ChatItem = ({ chat, isActive, onSelectChat, currentUserId }: ChatIt
         <div className="flex justify-between items-center">
           <h3 className="font-semibold truncate">{name}</h3>
           {lastMessage && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {formatDistanceToNow(new Date(lastMessage.createdAt), { addSuffix: true })}
-            </p>
+            (() => {
+              const date = new Date(lastMessage.createdAt);
+              return isValid(date) ? (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {formatDistanceToNow(date, { addSuffix: true })}
+                </p>
+              ) : null;
+            })()
           )}
         </div>
         <div className="flex justify-between items-start">

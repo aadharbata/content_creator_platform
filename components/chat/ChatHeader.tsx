@@ -24,7 +24,7 @@ function getAvatarUrl(chat: ChatListItem): string | undefined {
 
 function getSubTitle(chat: ChatListItem): string {
     if (chat.type === 'community') {
-        return `${chat._count.members} members`;
+        return `${chat._count?.members || 0} members`;
     }
     // Placeholder for presence status
     return 'Online'; 
