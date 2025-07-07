@@ -17,7 +17,7 @@ import {
 } from './types/events'
 
 // Environment variables validation
-const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET']
+const requiredEnvVars = ['DATABASE_URL', 'NEXTAUTH_SECRET']
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     logger.error(`Missing required environment variable: ${envVar}`)
@@ -137,6 +137,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     socket.join(`consumers`)
   }
 
+  // Auto-join user to their community rooms
+  messageHandler.handleAutoJoinCommunities(socket)
+
   // Send connection confirmation
   socket.emit('connected', {
     userId,
@@ -166,6 +169,19 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
   socket.on('mark_as_read', (data) => {
     messageHandler.handleMarkAsRead(socket, data)
+  })
+
+  // Community message handlers
+  socket.on('send_community_message', (data) => {
+    messageHandler.handleSendCommunityMessage(socket, data)
+  })
+
+  socket.on('community_typing_start', (data) => {
+    messageHandler.handleCommunityTypingStart(socket, data)
+  })
+
+  socket.on('community_typing_stop', (data) => {
+    messageHandler.handleCommunityTypingStop(socket, data)
   })
 
   // Handle client errors

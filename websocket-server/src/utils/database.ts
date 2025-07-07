@@ -211,5 +211,73 @@ export const databaseUtils = {
       }
     })
     return count
+  },
+
+  // Community-related methods
+  async getUserCommunityMemberships(userId: string) {
+    return await prisma.communityMember.findMany({
+      where: { userId },
+      select: {
+        communityId: true
+      }
+    })
+  },
+
+  async getCommunityMembership(communityId: string, userId: string) {
+    return await prisma.communityMember.findUnique({
+      where: {
+        userId_communityId: {
+          communityId,
+          userId
+        }
+      }
+    })
+  },
+
+  async getCommunityWithConversation(communityId: string) {
+    return await prisma.community.findUnique({
+      where: { id: communityId },
+      include: {
+        conversation: true
+      }
+    })
+  },
+
+  async createCommunityMessage(data: {
+    content: string
+    conversationId: string
+    senderId: string
+  }) {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Create the community message
+      const message = await tx.communityMessage.create({
+        data: {
+          content: data.content.trim(),
+          conversationId: data.conversationId,
+          senderId: data.senderId
+        },
+        include: {
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              profile: {
+                select: {
+                  avatarUrl: true
+                }
+              }
+            }
+          }
+        }
+      })
+
+      // Update conversation timestamp
+      await tx.communityConversation.update({
+        where: { id: data.conversationId },
+        data: { lastMessageAt: new Date() }
+      })
+
+      return message
+    })
   }
 } 

@@ -1,14 +1,14 @@
 import { Server } from 'socket.io'
 import { z } from 'zod'
-import { AuthenticatedSocket, checkConversationAccess, checkRateLimit, isValidUUID } from '../middleware/auth'
+import { AuthenticatedSocket, checkConversationAccess, checkRateLimit } from '../middleware/auth'
 import { databaseUtils } from '../utils/database'
 import { messageLogger } from '../utils/logger'
-import { 
-  SendMessageRequest, 
-  JoinConversationRequest, 
-  MessageSentData, 
-  NewMessageData, 
-  ConversationUpdatedData 
+import {
+  MessageSentData,
+  NewMessageData,
+  ConversationUpdatedData,
+  CommunityMessageSentData,
+  CommunityNewMessageData
 } from '../types/events'
 
 // Validation schemas
@@ -29,8 +29,45 @@ const markAsReadSchema = z.object({
   messageIds: z.array(z.string().uuid()).optional()
 })
 
+// Community validation schemas
+const sendCommunityMessageSchema = z.object({
+  communityId: z.string().uuid('Invalid community ID format'),
+  content: z.string()
+    .min(1, 'Message cannot be empty')
+    .max(2000, 'Message too long (max 2000 characters)')
+    .transform(str => str.trim())
+})
+
+const communityTypingSchema = z.object({
+  communityId: z.string().uuid('Invalid community ID format')
+})
+
 export class MessageHandler {
   constructor(private io: Server) {}
+
+  // Auto-join user to their community rooms on connection
+  async handleAutoJoinCommunities(socket: AuthenticatedSocket): Promise<void> {
+    try {
+      const memberships = await databaseUtils.getUserCommunityMemberships(socket.data.userId)
+      
+      for (const membership of memberships) {
+        await socket.join(`community:${membership.communityId}`)
+      }
+
+      messageLogger.info('User auto-joined communities', {
+        socketId: socket.id,
+        userId: socket.data.userId,
+        communitiesJoined: memberships.length
+      })
+
+    } catch (error) {
+      messageLogger.error('Error auto-joining communities', {
+        socketId: socket.id,
+        userId: socket.data.userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
 
   // Handle sending a new message
   async handleSendMessage(socket: AuthenticatedSocket, data: unknown): Promise<void> {
@@ -350,4 +387,148 @@ export class MessageHandler {
       })
     }
   }
+
+  // Community message handling methods
+  async handleSendCommunityMessage(socket: AuthenticatedSocket, data: unknown): Promise<void> {
+    try {
+      // Rate limiting for community messages
+      if (!checkRateLimit(`${socket.id}:community`, 20, 60000)) { // 20 messages per minute
+        socket.emit('error', { 
+          message: 'Rate limit exceeded for community messages.',
+          code: 'COMMUNITY_RATE_LIMIT_EXCEEDED'
+        })
+        return
+      }
+
+      const validatedData = sendCommunityMessageSchema.parse(data)
+      const { communityId, content } = validatedData
+
+      // Check if user is a member of the community
+      const membership = await databaseUtils.getCommunityMembership(communityId, socket.data.userId)
+      if (!membership) {
+        socket.emit('error', { 
+          message: 'You are not a member of this community',
+          code: 'COMMUNITY_ACCESS_DENIED'
+        })
+        return
+      }
+
+      // Get community conversation
+      const community = await databaseUtils.getCommunityWithConversation(communityId)
+      if (!community?.conversation) {
+        socket.emit('error', { 
+          message: 'Community conversation not found',
+          code: 'COMMUNITY_CONVERSATION_NOT_FOUND'
+        })
+        return
+      }
+
+      // Create message in database
+      const message = await databaseUtils.createCommunityMessage({
+        content,
+        conversationId: community.conversation.id,
+        senderId: socket.data.userId
+      })
+
+      // Format message data
+      const messageData: CommunityMessageSentData = {
+        id: message.id,
+        content: message.content,
+        createdAt: message.createdAt,
+        conversationId: message.conversationId,
+        communityId,
+        sender: {
+          id: message.sender.id,
+          name: message.sender.name,
+          avatarUrl: message.sender.profile?.avatarUrl || null
+        }
+      }
+
+      // Send confirmation to sender
+      socket.emit('community_message_sent', messageData)
+
+      // Broadcast to all community members (except sender)
+      const communityNewMessageData: CommunityNewMessageData = {
+        ...messageData
+      }
+      
+      socket.to(`community:${communityId}`).emit('community_new_message', communityNewMessageData)
+
+      messageLogger.info('Community message sent', {
+        messageId: message.id,
+        senderId: socket.data.userId,
+        communityId
+      })
+
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errorMessage = error.errors.map(e => e.message).join(', ')
+        socket.emit('error', { 
+          message: errorMessage,
+          code: 'VALIDATION_ERROR'
+        })
+      } else {
+        socket.emit('error', { 
+          message: 'Failed to send community message',
+          code: 'COMMUNITY_MESSAGE_SEND_FAILED'
+        })
+        messageLogger.error('Error sending community message', {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        })
+      }
+    }
+  }
+
+  async handleCommunityTypingStart(socket: AuthenticatedSocket, data: unknown): Promise<void> {
+    try {
+      const validatedData = communityTypingSchema.parse(data)
+      const { communityId } = validatedData
+
+      // Rate limiting for typing events
+      if (!checkRateLimit(`${socket.id}:community:typing`, 30, 60000)) {
+        return
+      }
+
+      const membership = await databaseUtils.getCommunityMembership(communityId, socket.data.userId)
+      if (!membership) return
+
+      // Broadcast typing to other community members
+      socket.to(`community:${communityId}`).emit('community_user_typing', {
+        communityId,
+        userId: socket.data.userId,
+        userName: socket.data.userName
+      })
+
+    } catch (error) {
+      messageLogger.debug('Community typing start error', {
+        socketId: socket.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
+
+  async handleCommunityTypingStop(socket: AuthenticatedSocket, data: unknown): Promise<void> {
+    try {
+      const validatedData = communityTypingSchema.parse(data)
+      const { communityId } = validatedData
+
+      const membership = await databaseUtils.getCommunityMembership(communityId, socket.data.userId)
+      if (!membership) return
+
+      // Broadcast stop typing to other community members
+      socket.to(`community:${communityId}`).emit('community_user_stopped_typing', {
+        communityId,
+        userId: socket.data.userId
+      })
+
+    } catch (error) {
+      messageLogger.debug('Community typing stop error', {
+        socketId: socket.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
+
 } 
