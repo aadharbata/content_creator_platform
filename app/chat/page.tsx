@@ -132,6 +132,11 @@ export default function ChatPage() {
     }
   };
 
+  const handleResolveChatId = (oldId: string, newId: string) => {
+    setChats(prev => prev.map(c => c.id === oldId ? { ...c, id: newId, placeholder: false } : c));
+    setActiveChat(prev => (prev && prev.id === oldId ? { ...prev, id: newId, placeholder:false } : prev));
+  };
+
   if (loading && chats.length === 0) {
     return <div>Loading chats...</div>;
   }
@@ -149,6 +154,7 @@ export default function ChatPage() {
         currentUserId={currentUserId}
         messages={messages}
         setMessages={setMessages}
+        onResolveChatId={handleResolveChatId}
       />
     </div>
   );

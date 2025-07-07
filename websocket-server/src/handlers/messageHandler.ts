@@ -131,6 +131,12 @@ export class MessageHandler {
       // Send confirmation to sender
       socket.emit('message_sent', messageData)
 
+      // Also send the same new_message event to the sender for immediate UI update
+      const senderNewMessage: NewMessageData = {
+        ...messageData,
+      };
+      socket.emit('new_message', senderNewMessage);
+
       // Get the new unread count for the recipient
       const unreadCount = await databaseUtils.getUnreadCount(
         conversationId,

@@ -12,14 +12,19 @@ export interface ChatWindowProps {
   currentUserId?: string;
   messages: MessageWithSender[];
   setMessages: Dispatch<SetStateAction<MessageWithSender[]>>;
+  onResolveChatId: (oldId: string, newId: string) => void;
 }
 
-export function ChatWindow({ chat, currentUserId, messages, setMessages }: ChatWindowProps) {
+export function ChatWindow({ chat, currentUserId, messages, setMessages, onResolveChatId }: ChatWindowProps) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchMessages = async () => {
       if (!chat) return;
+      if (chat.type === 'conversation' && (chat as any).placeholder) {
+        setMessages([]);
+        return;
+      }
       setLoading(true);
       try {
         const res = await fetch(`/api/messages/${chat.id}?type=${chat.type}`);
@@ -39,16 +44,33 @@ export function ChatWindow({ chat, currentUserId, messages, setMessages }: ChatW
     fetchMessages();
   }, [chat, setMessages]);
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = async (content: string) => {
     if (!chat || !currentUserId || !content.trim()) return;
+
+    let conversationId = chat.id;
+    if (chat.type === 'conversation' && (chat as any).placeholder) {
+      // request real conversation id
+      const res = await fetch('/api/conversations/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otherUserId: chat.otherUser.id }),
+      });
+      if (res.ok) {
+        const { id: newId } = await res.json();
+        onResolveChatId(chat.id, newId);
+        conversationId = newId;
+      } else {
+        console.error('Failed to start conversation');
+        return;
+      }
+    }
 
     const socket = getSocket();
     const eventName = chat.type === 'conversation' ? 'send_message' : 'send_community_message';
-    const payload = {
-      content,
-      [chat.type === 'conversation' ? 'conversationId' : 'communityId']: chat.id,
-    };
-    
+    const payload = chat.type === 'conversation'
+      ? { conversationId, content }
+      : { communityId: chat.id, content };
+
     socket.emit(eventName, payload);
   };
   

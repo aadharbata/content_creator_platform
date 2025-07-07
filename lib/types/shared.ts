@@ -95,6 +95,7 @@ export type Conversation = PrismaConversation & {
   lastMessage?: MessageWithSender;
   otherUser: { id: string; name: string; image?: string | null };
   unreadCount: number;
+  placeholder?: boolean;
 };
 
 export type Community = PrismaCommunity & {

@@ -38,7 +38,8 @@ export async function GET(request: NextRequest, { params }: { params: { chatId: 
         where: { id, OR: [{ creatorId: userId }, { fanId: userId }] },
       });
       if (!conversation) {
-        return NextResponse.json({ error: 'Conversation not found or access denied' }, { status: 404 });
+        // No conversation yet – return empty history instead of an error
+        return NextResponse.json([]);
       }
 
       messages = await prisma.message.findMany({
