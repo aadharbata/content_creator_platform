@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
+import { signIn } from "next-auth/react";
 
 const countryCodes = [
   { code: "+1", name: "US/Canada", flag: "🇺🇸" },
@@ -96,11 +97,25 @@ const SignUp = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccess(language === 'hi' ? "साइन अप सफल! पुनर्निर्देशित कर रहे हैं..." : "Sign up successful! Redirecting...");
-        // Always redirect to login after signup
-        setTimeout(() => {
-          router.push('/login');
-        }, 1500);
+        setSuccess(language === 'hi' ? "साइन अप सफल! अब आपको लॉगिन किया जा रहा है..." : "Sign up successful! Logging you in...");
+        
+        // Automatically sign in the user after successful registration
+        const signInResult = await signIn('credentials', {
+          redirect: false,
+          email: form.email,
+          password: form.password,
+        });
+
+        if (signInResult?.ok) {
+          // Redirect to home or dashboard
+          router.push('/home');
+        } else {
+          // If auto-login fails, redirect to login page as a fallback
+          setError(language === 'hi' ? "स्वतः लॉगिन विफल। कृपया मैन्युअल रूप से लॉगिन करें।" : "Auto-login failed. Please log in manually.");
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+        }
       } else {
         setError(data.message || (language === 'hi' ? "साइन अप विफल।" : "Sign up failed."));
       }

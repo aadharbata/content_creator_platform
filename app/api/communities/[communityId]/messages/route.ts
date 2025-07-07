@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 
 // GET /api/communities/[communityId]/messages - Get community messages
@@ -11,7 +11,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = (session?.user as any)?.id;
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -26,7 +27,7 @@ export async function GET(
     const userMembership = await prisma.communityMember.findUnique({
       where: {
         userId_communityId: {
-          userId: session.user.id,
+          userId: userId,
           communityId
         }
       }
@@ -123,7 +124,8 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = (session?.user as any)?.id;
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -150,7 +152,7 @@ export async function POST(
     const userMembership = await prisma.communityMember.findUnique({
       where: {
         userId_communityId: {
-          userId: session.user.id,
+          userId: userId,
           communityId
         }
       }
@@ -182,13 +184,15 @@ export async function POST(
       )
     }
 
+    const conversationId = community.conversation.id;
+
     // Create message
     const message = await prisma.$transaction(async (tx) => {
       const newMessage = await tx.communityMessage.create({
         data: {
           content: content.trim(),
-          conversationId: community.conversation.id,
-          senderId: session.user.id
+          conversationId: conversationId,
+          senderId: userId
         },
         include: {
           sender: {
@@ -206,7 +210,7 @@ export async function POST(
 
       // Update conversation last message time
       await tx.communityConversation.update({
-        where: { id: community.conversation.id },
+        where: { id: conversationId },
         data: { lastMessageAt: new Date() }
       })
 
@@ -214,7 +218,7 @@ export async function POST(
       await tx.communityMember.update({
         where: {
           userId_communityId: {
-            userId: session.user.id,
+            userId: userId,
             communityId
           }
         },

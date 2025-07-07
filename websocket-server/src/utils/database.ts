@@ -226,7 +226,7 @@ export const databaseUtils = {
   async getCommunityMembership(communityId: string, userId: string) {
     return await prisma.communityMember.findUnique({
       where: {
-        communityId_userId: {
+        userId_communityId: {
           communityId,
           userId
         }

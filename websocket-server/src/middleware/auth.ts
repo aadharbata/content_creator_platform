@@ -1,13 +1,25 @@
-import jwt from 'jsonwebtoken'
+import { decode } from 'next-auth/jwt'
 import { Socket } from 'socket.io'
 import { ExtendedError } from 'socket.io/dist/namespace'
 import { databaseUtils } from '../utils/database'
 import { authLogger } from '../utils/logger'
-import { AuthPayload, SocketData } from '../types/events'
+import { SocketData } from '../types/events'
 
 // Extend Socket interface to include user data
 export interface AuthenticatedSocket extends Socket {
   data: SocketData
+}
+
+type UserRole = 'CREATOR' | 'CONSUMER' | 'ADMIN'
+interface TokenPayload {
+  id?: string
+  sub?: string
+  name?: string
+  role?: UserRole
+  userId?: string // legacy field from old tokens
+  userName?: string
+  iat?: number
+  exp?: number
 }
 
 // JWT authentication middleware for Socket.io
@@ -27,27 +39,29 @@ export const authenticateSocket = async (
       return next(new Error('Authentication token required'))
     }
 
-    // Verify JWT token
-    const jwtSecret = process.env.JWT_SECRET
+    // Verify JWT token via next-auth/jwt
+    const jwtSecret = process.env.NEXTAUTH_SECRET
     if (!jwtSecret) {
-      authLogger.error('JWT_SECRET not configured')
+      authLogger.error('NEXTAUTH_SECRET not configured')
       return next(new Error('Server configuration error'))
     }
 
-    let decoded: AuthPayload
-    try {
-      decoded = jwt.verify(token, jwtSecret) as AuthPayload
-    } catch (jwtError) {
+    const decoded = (await decode({ token, secret: jwtSecret })) as TokenPayload | null
+
+    if (!decoded) {
       authLogger.warn('Invalid JWT token', {
         socketId: socket.id,
-        ip: socket.handshake.address,
-        error: jwtError instanceof Error ? jwtError.message : 'Unknown error'
+        ip: socket.handshake.address
       })
       return next(new Error('Invalid authentication token'))
     }
 
+    const userId = decoded.userId ?? decoded.id ?? decoded.sub
+    const userRole = decoded.role
+    const userName = decoded.userName ?? decoded.name ?? ''
+
     // Validate token payload
-    if (!decoded.userId || !decoded.role) {
+    if (!userId || !userRole) {
       authLogger.warn('Invalid token payload', {
         socketId: socket.id,
         payload: decoded
@@ -56,21 +70,21 @@ export const authenticateSocket = async (
     }
 
     // Check if user exists in database
-    const user = await databaseUtils.getUserById(decoded.userId);
+    const user = await databaseUtils.getUserById(userId);
     if (!user) {
       authLogger.warn('User not found for valid token', {
         socketId: socket.id,
-        userId: decoded.userId
+        userId
       })
       return next(new Error('User not found'))
     }
 
     // Verify role matches
-    if (user.role !== decoded.role) {
+    if (user.role !== userRole) {
       authLogger.warn('Role mismatch in token', {
         socketId: socket.id,
         userId: user.id,
-        tokenRole: decoded.role,
+        tokenRole: userRole,
         userRole: user.role
       })
       return next(new Error('Invalid user role'))
@@ -80,7 +94,7 @@ export const authenticateSocket = async (
     const socketData: SocketData = {
       userId: user.id,
       userRole: user.role as 'CREATOR' | 'CONSUMER' | 'ADMIN',
-      userName: user.name
+      userName: userName || user.name
     }
 
     // Type assertion to add data property

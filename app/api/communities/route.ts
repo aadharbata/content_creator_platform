@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 
 // GET /api/communities - Get user's communities
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       // Get communities owned by the user
       communities = await prisma.community.findMany({
         where: {
-          creatorId: session.user.id,
+          creatorId: (session.user as any).id,
           ...(type && { type })
         },
         include: {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         where: {
           members: {
             some: {
-              userId: session.user.id
+              userId: (session.user as any).id
             }
           },
           ...(type && { type })
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
             }
           },
           members: {
-            where: { userId: session.user.id },
+            where: { userId: (session.user as any).id },
             select: { joinedAt: true }
           }
         },
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       const content = await prisma.content.findFirst({
         where: {
           id: contentId,
-          authorId: session.user.id
+          authorId: (session.user as any).id
         }
       })
 
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       const existingCommunity = await prisma.community.findUnique({
         where: {
           creatorId_type: {
-            creatorId: session.user.id,
+            creatorId: (session.user as any).id,
             type: 'SUBSCRIPTION_COMMUNITY'
           }
         }
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
           description,
           type,
           contentId: type === 'CONTENT_COMMUNITY' ? contentId : null,
-          creatorId: session.user.id,
+          creatorId: (session.user as any).id,
           maxMembers
         }
       })
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
       // Add creator as member
       await tx.communityMember.create({
         data: {
-          userId: session.user.id,
+          userId: (session.user as any).id,
           communityId: community.id
         }
       })

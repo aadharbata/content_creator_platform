@@ -17,7 +17,7 @@ import {
 } from './types/events'
 
 // Environment variables validation
-const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET']
+const requiredEnvVars = ['DATABASE_URL', 'NEXTAUTH_SECRET']
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     logger.error(`Missing required environment variable: ${envVar}`)

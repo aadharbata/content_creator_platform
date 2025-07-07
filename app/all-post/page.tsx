@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 
 export default function AllPostsPage() {
   const searchParams = useSearchParams();
-  const creatorId = searchParams.get("creatorId");
+  const creatorId = searchParams?.get("creatorId");
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

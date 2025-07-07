@@ -1,49 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '../../../auth/[...nextauth]/route'
 
-
-// GET /api/communities/[communityId]/members - Get community members
+// GET /api/communities/[communityId]/members - Get all members of a community
 export async function GET(
   request: NextRequest,
   { params }: { params: { communityId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = (session?.user as any)?.id
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { communityId } = params
-    const { searchParams } = new URL(request.url)
 
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const skip = (page - 1) * limit
-
-    // Check if user is a member of the community
-    const userMembership = await prisma.communityMember.findUnique({
-      where: {
-        userId_communityId: {
-          userId: session.user.id,
-          communityId
+    // Optional: Check if the user is a member of the community before allowing them to see the member list
+    const isMember = await prisma.communityMember.findFirst({
+        where: {
+            userId: userId,
+            communityId: communityId,
         }
-      }
-    })
+    });
 
-    if (!userMembership) {
-      return NextResponse.json(
-        { error: 'Not a member of this community' },
-        { status: 403 }
-      )
+    if (!isMember) {
+        return NextResponse.json({ error: 'You are not a member of this community.'}, { status: 403});
     }
 
-    // Get members with pagination
     const members = await prisma.communityMember.findMany({
-      where: {
-        communityId
-      },
+      where: { communityId },
       include: {
         user: {
           select: {
@@ -51,189 +38,130 @@ export async function GET(
             name: true,
             email: true,
             profile: {
-              select: { avatarUrl: true }
-            }
-          }
-        }
+              select: { avatarUrl: true },
+            },
+          },
+        },
       },
-      orderBy: { joinedAt: 'asc' },
-      skip,
-      take: limit
     })
-
-    // Get total count for pagination
-    const totalMembers = await prisma.communityMember.count({
-      where: {
-        communityId
-      }
-    })
-
-    return NextResponse.json({
-      members,
-      pagination: {
-        page,
-        limit,
-        total: totalMembers,
-        totalPages: Math.ceil(totalMembers / limit)
-      }
-    })
-
+    return NextResponse.json(members)
   } catch (error) {
     console.error('Error fetching community members:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch community members' },
+      { error: 'Internal Server Error' },
       { status: 500 }
     )
   }
 }
 
-// POST /api/communities/[communityId]/members - Join community
+// POST /api/communities/[communityId]/members - Add a member to a community
 export async function POST(
   request: NextRequest,
   { params }: { params: { communityId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const currentUserId = (session?.user as any)?.id
+    if (!currentUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { communityId } = params
+    const body = await request.json()
+    const { userId: userIdToAdd } = body
 
-    // Check if community exists
+    if (!userIdToAdd) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
+    }
+
+    // Find the community and verify the current user is the owner
     const community = await prisma.community.findFirst({
       where: {
-        id: communityId
+        id: communityId,
+        creatorId: currentUserId,
       },
-      include: {
-        _count: {
-          select: { members: true }
-        }
-      }
     })
 
     if (!community) {
       return NextResponse.json(
-        { error: 'Community not found' },
+        { error: 'Community not found or you are not the owner' },
         { status: 404 }
       )
     }
 
-    // Check if community is at max capacity
-    if (community._count.members >= community.maxMembers) {
-      return NextResponse.json(
-        { error: 'Community is at maximum capacity' },
-        { status: 409 }
-      )
+    // Check if user to add exists
+    const userToAdd = await prisma.user.findUnique({
+      where: { id: userIdToAdd },
+    });
+
+    if (!userToAdd) {
+        return NextResponse.json({ error: 'User to add not found'}, { status: 404 });
     }
 
-    // Check if user is already a member
-    const existingMembership = await prisma.communityMember.findUnique({
-      where: {
-        userId_communityId: {
-          userId: session.user.id,
-          communityId
-        }
-      }
-    })
-
-    if (existingMembership) {
-      return NextResponse.json(
-        { error: 'Already a member of this community' },
-        { status: 409 }
-      )
-    }
-
-    // Add user as member
-    const membership = await prisma.communityMember.create({
+    // Add the user to the community
+    const member = await prisma.communityMember.create({
       data: {
-        userId: session.user.id,
-        communityId
+        communityId: communityId,
+        userId: userIdToAdd,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            profile: {
-              select: { avatarUrl: true }
-            }
-          }
-        }
-      }
     })
 
-    return NextResponse.json({ membership }, { status: 201 })
-
+    return NextResponse.json(member, { status: 201 })
   } catch (error) {
-    console.error('Error joining community:', error)
+    console.error('Error adding community member:', error)
     return NextResponse.json(
-      { error: 'Failed to join community' },
+      { error: 'Internal Server Error' },
       { status: 500 }
     )
   }
 }
 
-// DELETE /api/communities/[communityId]/members - Leave community
+// DELETE /api/communities/[communityId]/members - Remove a member
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { communityId: string } }
+    request: NextRequest,
+    { params }: { params: { communityId: string } }
 ) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { communityId } = params
-    const { searchParams } = new URL(request.url)
-    const targetUserId = searchParams.get('userId') // For removing other users
-
-    const userIdToRemove = targetUserId || session.user.id
-
-    // Get user's membership
-    const userMembership = await prisma.communityMember.findUnique({
-      where: {
-        userId_communityId: {
-          userId: session.user.id,
-          communityId
+    try {
+        const session = await getServerSession(authOptions);
+        const currentUserId = (session?.user as any)?.id;
+        if (!currentUserId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-      }
-    })
 
-    if (!userMembership) {
-      return NextResponse.json(
-        { error: 'Not a member of this community' },
-        { status: 403 }
-      )
-    }
+        const { communityId } = params;
+        const { searchParams } = new URL(request.url);
+        const userIdToRemove = searchParams.get('userId'); // ID of member to remove
 
-    // For now, only allow users to remove themselves
-    if (targetUserId && targetUserId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'You can only remove yourself from the community' },
-        { status: 403 }
-      )
-    }
-
-    // Remove membership
-    await prisma.communityMember.delete({
-      where: {
-        userId_communityId: {
-          userId: userIdToRemove,
-          communityId
+        if (!userIdToRemove) {
+            return NextResponse.json({ error: 'userId of member to remove is required' }, { status: 400 });
         }
-      }
-    })
 
-    return NextResponse.json({ success: true })
+        const community = await prisma.community.findUnique({
+            where: { id: communityId },
+        });
 
-  } catch (error) {
-    console.error('Error leaving community:', error)
-    return NextResponse.json(
-      { error: 'Failed to leave community' },
-      { status: 500 }
-    )
-  }
+        if (!community) {
+            return NextResponse.json({ error: 'Community not found' }, { status: 404 });
+        }
+
+        // Only the creator can remove others. Members can only remove themselves.
+        if (currentUserId !== userIdToRemove && community.creatorId !== currentUserId) {
+            return NextResponse.json({ error: 'Forbidden: You can only remove yourself or be removed by the creator.' }, { status: 403 });
+        }
+
+        const deletedMembership = await prisma.communityMember.delete({
+            where: {
+                userId_communityId: {
+                    userId: userIdToRemove,
+                    communityId: communityId,
+                },
+            },
+        });
+
+        return NextResponse.json(deletedMembership);
+
+    } catch (error) {
+        console.error('Error removing community member:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
 } 

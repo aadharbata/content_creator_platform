@@ -1,15 +1,12 @@
 import { Server } from 'socket.io'
 import { z } from 'zod'
-import { AuthenticatedSocket, checkConversationAccess, checkRateLimit, isValidUUID } from '../middleware/auth'
+import { AuthenticatedSocket, checkConversationAccess, checkRateLimit } from '../middleware/auth'
 import { databaseUtils } from '../utils/database'
 import { messageLogger } from '../utils/logger'
-import { 
-  SendMessageRequest, 
-  JoinConversationRequest, 
-  MessageSentData, 
+import {
+  MessageSentData,
   NewMessageData,
   ConversationUpdatedData,
-  SendCommunityMessageRequest,
   CommunityMessageSentData,
   CommunityNewMessageData
 } from '../types/events'

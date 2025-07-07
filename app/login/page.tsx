@@ -23,43 +23,28 @@ const Login = () => {
     setLoading(true);
     setError("");
     setSuccess("");
+
     try {
-      console.log("Request sent with the data: ", form);
-      const res = await axios.post("/api/auth/login", {
+      const result = await signIn("credentials", {
+        redirect: false,
         email: form.email,
         password: form.password,
-      }, {
-        headers: {
-          "Content-Type": "application/json",
-        }
-      })
-      console.log("Response login: ", res);
-      const data = await res.data;
-      if (res.status===200 && data.token) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+      });
+
+      if (result?.error) {
+        setError(result.error);
+      } else if (result?.ok) {
         setSuccess(language === 'hi' ? "लॉगिन सफल! पुनर्निर्देशित कर रहे हैं..." : "Login successful! Redirecting...");
-        
-        // Redirect based on user role
-        setTimeout(() => {
-          if (data.user.role === 'CREATOR') {
-            router.push(`/creator/${data.user.id}/dashboard`);
-          } else if (data.user.role === 'CONSUMER') {
-            router.push('/consumer-channel');
-          } else {
-            router.push('/home');
-          }
-        }, 1500);
-      } else {
-        setError(data.message || (language === 'hi' ? "लॉगिन विफल।" : "Login failed."));
+        // The session is now handled by NextAuth, redirecting...
+        // We can get user data from a session hook or redirect and let the destination page handle it.
+        // For simplicity, we'll just redirect to a generic home page.
+        // The actual user role should be checked on the server or on the destination page.
+        router.push("/home");
       }
-    } catch (err: any) {
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError(language === 'hi' ? "सर्वर त्रुटि।" : "Server error.");
-      }
+    } catch (err) {
+      setError(language === 'hi' ? "एक अनपेक्षित त्रुटि हुई।" : "An unexpected error occurred.");
     }
+
     setLoading(false);
   };
 

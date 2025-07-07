@@ -55,7 +55,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log("Registered User: ", user);
+    // After successful user creation, automatically sign them in
+    // Note: This does not work directly in a route handler post-v4.
+    // The client should call the signin flow after a successful signup.
+    // However, we return the user data for the client to decide the next step.
+    
     return NextResponse.json(
       { 
         message: "User registered successfully.",
