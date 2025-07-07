@@ -1,0 +1,87 @@
+2025-07-07 20:29:26 [ERROR]: unhandledRejection: Cannot read properties of undefined (reading 'parse')
+TypeError: Cannot read properties of undefined (reading 'parse')
+    at Array.authenticateSocket (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\src\middleware\auth.ts:36:26)
+    at run (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\node_modules\socket.io\dist\namespace.js:130:19)
+    at Namespace.run (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\node_modules\socket.io\dist\namespace.js:141:9)
+    at Namespace._add (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\node_modules\socket.io\dist\namespace.js:218:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+TypeError: Cannot read properties of undefined (reading 'parse')
+    at Array.authenticateSocket (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\src\middleware\auth.ts:36:26)
+    at run (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\node_modules\socket.io\dist\namespace.js:130:19)
+    at Namespace.run (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\node_modules\socket.io\dist\namespace.js:141:9)
+    at Namespace._add (C:\Users\sarth\OneDrive - iitkgp.ac.in\Desktop\content_creator_platform\websocket-server\node_modules\socket.io\dist\namespace.js:218:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+{
+  "error": {},
+  "rejection": true,
+  "date": "Mon Jul 07 2025 20:29:26 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 30904,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\sarth\\OneDrive - iitkgp.ac.in\\Desktop\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.14.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\sarth\\OneDrive - iitkgp.ac.in\\Desktop\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 87801856,
+      "heapTotal": 19140608,
+      "heapUsed": 16639240,
+      "external": 3545192,
+      "arrayBuffers": 54085
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 5157027.578
+  },
+  "trace": [
+    {
+      "column": 26,
+      "file": "C:\\Users\\sarth\\OneDrive - iitkgp.ac.in\\Desktop\\content_creator_platform\\websocket-server\\src\\middleware\\auth.ts",
+      "function": "Array.authenticateSocket",
+      "line": 36,
+      "method": "authenticateSocket",
+      "native": false
+    },
+    {
+      "column": 19,
+      "file": "C:\\Users\\sarth\\OneDrive - iitkgp.ac.in\\Desktop\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\namespace.js",
+      "function": "run",
+      "line": 130,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 9,
+      "file": "C:\\Users\\sarth\\OneDrive - iitkgp.ac.in\\Desktop\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\namespace.js",
+      "function": "Namespace.run",
+      "line": 141,
+      "method": "run",
+      "native": false
+    },
+    {
+      "column": 14,
+      "file": "C:\\Users\\sarth\\OneDrive - iitkgp.ac.in\\Desktop\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\namespace.js",
+      "function": "Namespace._add",
+      "line": 218,
+      "method": "_add",
+      "native": false
+    },
+    {
+      "column": 5,
+      "file": "node:internal/process/task_queues",
+      "function": "process.processTicksAndRejections",
+      "line": 105,
+      "method": "processTicksAndRejections",
+      "native": false
+    }
+  ]
+}

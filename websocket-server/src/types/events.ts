@@ -66,7 +66,7 @@ export interface ClientToServerEvents {
   send_message: (data: { conversationId: string; content: string }) => void
   typing_start: (data: { conversationId: string }) => void
   typing_stop: (data: { conversationId: string }) => void
-  mark_as_read: (data: { conversationId: string; messageIds: string[] }) => void
+  mark_as_read: (data: { type: 'conversation' | 'community', id: string }) => void
   
   // Community events  
   send_community_message: (data: { communityId: string; content: string }) => void
@@ -82,11 +82,11 @@ export interface ServerToClientEvents {
   message_error: (data: { error: string; originalContent?: string }) => void
   
   // Conversation events
-  conversation_updated: (data: ConversationUpdatedData) => void
+  conversation_updated: (data: ConversationUpdateData) => void
   conversations_list: (data: { conversations: ConversationWithDetails[] }) => void
   
   // Read status events
-  messages_read_update: (data: MessagesReadUpdateData) => void
+  messages_read_update: (data: { type: 'conversation' | 'community', id: string }) => void
   
   // Typing events
   user_typing: (data: { conversationId: string; userId: string; userName: string }) => void
@@ -234,4 +234,14 @@ export interface CommunityNewMessageData {
 export interface SendCommunityMessageRequest {
   communityId: string
   content: string
+}
+
+// A unified event for real-time updates to the conversation/community list
+export interface ConversationUpdateData {
+  type: 'conversation' | 'community';
+  id: string; // ID of the conversation or community
+  lastMessage: string;
+  lastMessageSender?: string; // For community chats, to show "Name: message"
+  lastMessageTime: string; // ISO string
+  unreadCount: number;
 } 

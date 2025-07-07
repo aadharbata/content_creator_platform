@@ -272,6 +272,7 @@ model CommunityMember {
   id          String   @id @default(uuid())
   joinedAt    DateTime @default(now())
   lastActive  DateTime?
+  lastReadAt  DateTime @default(now())
   
   // References
   userId      String

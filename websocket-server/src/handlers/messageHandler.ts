@@ -8,7 +8,8 @@ import {
   NewMessageData,
   ConversationUpdatedData,
   CommunityMessageSentData,
-  CommunityNewMessageData
+  CommunityNewMessageData,
+  ConversationUpdateData
 } from '../types/events'
 
 // Validation schemas
@@ -25,8 +26,8 @@ const joinConversationSchema = z.object({
 })
 
 const markAsReadSchema = z.object({
-  conversationId: z.string().uuid('Invalid conversation ID format'),
-  messageIds: z.array(z.string().uuid()).optional()
+  type: z.enum(['conversation', 'community']),
+  id: z.string().uuid('Invalid ID format'),
 })
 
 // Community validation schemas
@@ -132,6 +133,22 @@ export class MessageHandler {
 
       // Send confirmation to sender
       socket.emit('message_sent', messageData)
+
+      // Get the new unread count for the recipient
+      const unreadCount = await databaseUtils.getUnreadCount(
+        conversationId,
+        recipientId
+      );
+
+      // Emit a conversation_updated event to the recipient
+      const updateData: ConversationUpdateData = {
+        type: 'conversation',
+        id: conversationId,
+        lastMessage: message.content,
+        lastMessageTime: message.createdAt.toISOString(),
+        unreadCount,
+      };
+      this.io.to(`user:${recipientId}`).emit('conversation_updated', updateData);
 
       // Send message to recipient if they're online
       const recipientSockets = await this.io.in(`user:${recipientId}`).fetchSockets()
@@ -330,61 +347,43 @@ export class MessageHandler {
   // Handle marking messages as read
   async handleMarkAsRead(socket: AuthenticatedSocket, data: unknown): Promise<void> {
     try {
-      const validatedData = markAsReadSchema.parse(data)
-      const { conversationId } = validatedData
+      const validatedData = markAsReadSchema.parse(data);
+      const { type, id } = validatedData;
+      const { userId } = socket.data;
 
-      const hasAccess = await checkConversationAccess(socket, conversationId)
-      if (!hasAccess) {
-        socket.emit('error', { 
-          message: 'You do not have access to this conversation',
-          code: 'CONVERSATION_ACCESS_DENIED'
-        })
-        return
+      if (type === 'conversation') {
+        await databaseUtils.markConversationAsRead(id, userId);
+      } else { // type === 'community'
+        await databaseUtils.markCommunityAsRead(id, userId);
       }
-
-      // Mark messages as read and get the conversation details
-      const updateResult = await databaseUtils.markMessagesAsRead(conversationId, socket.data.userId)
       
-      // Get updated conversation for unread count
-      const conversation = await databaseUtils.getConversationWithAccess(conversationId, socket.data.userId)
-      if (conversation) {
-        // Get unread count for creator
-        const creatorUnreadCount = await databaseUtils.getUnreadCount(conversationId, conversation.creatorId)
-        // Get unread count for fan  
-        const fanUnreadCount = await databaseUtils.getUnreadCount(conversationId, conversation.fanId)
-        
-        // Send read status update to creator
-        const creatorReadUpdate = {
-          conversationId,
-          readByUserId: socket.data.userId,
-          unreadCount: creatorUnreadCount,
-          timestamp: new Date()
-        }
-        this.io.to(`user:${conversation.creatorId}`).emit('messages_read_update', creatorReadUpdate)
-        
-        // Send read status update to fan
-        const fanReadUpdate = {
-          conversationId,
-          readByUserId: socket.data.userId,
-          unreadCount: fanUnreadCount,
-          timestamp: new Date()
-        }
-        this.io.to(`user:${conversation.fanId}`).emit('messages_read_update', fanReadUpdate)
-      }
+      // Confirm back to the user that the action was successful
+      socket.emit('messages_read_update', { type, id });
 
-      messageLogger.debug('Messages marked as read', {
+      messageLogger.info(`'${type}' marked as read`, {
         socketId: socket.id,
-        userId: socket.data.userId,
-        conversationId,
-        messagesUpdated: updateResult.count
-      })
+        userId,
+        id,
+      });
 
     } catch (error) {
-      messageLogger.error('Error marking messages as read', {
-        socketId: socket.id,
-        userId: socket.data.userId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
+      if (error instanceof z.ZodError) {
+        const errorMessage = error.errors.map(e => e.message).join(', ')
+        socket.emit('error', { 
+          message: errorMessage,
+          code: 'VALIDATION_ERROR'
+        })
+      } else {
+        socket.emit('error', { 
+          message: 'Failed to mark messages as read',
+          code: 'MARK_MESSAGES_READ_FAILED'
+        })
+        messageLogger.error('Error marking messages as read', {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        })
+      }
     }
   }
 
@@ -454,7 +453,29 @@ export class MessageHandler {
       
       socket.to(`community:${communityId}`).emit('community_new_message', communityNewMessageData)
 
-      messageLogger.info('Community message sent', {
+      // Emit a conversation_updated event to all other members
+      const members = await databaseUtils.getCommunityMembers(communityId);
+      for (const member of members) {
+        if (member.userId !== socket.data.userId) {
+          const unreadCount = await databaseUtils.getCommunityUnreadCount(
+            communityId,
+            member.userId
+          );
+          
+          const updateData: ConversationUpdateData = {
+            type: 'community',
+            id: communityId,
+            lastMessage: message.content,
+            lastMessageSender: socket.data.userName,
+            lastMessageTime: message.createdAt.toISOString(),
+            unreadCount,
+          };
+
+          this.io.to(`user:${member.userId}`).emit('conversation_updated', updateData);
+        }
+      }
+
+      messageLogger.info('Broadcasted conversation_updated for community message', {
         messageId: message.id,
         senderId: socket.data.userId,
         communityId

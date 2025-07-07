@@ -243,6 +243,34 @@ export const databaseUtils = {
     })
   },
 
+  async getCommunityMembers(communityId: string) {
+    return await prisma.communityMember.findMany({
+      where: { communityId },
+      select: { userId: true },
+    });
+  },
+
+  async getCommunityUnreadCount(communityId: string, userId: string) {
+    // Find the user's membership to get their lastReadAt timestamp
+    const membership = await this.getCommunityMembership(communityId, userId);
+    if (!membership) return 0;
+
+    // Count messages created after the user's lastReadAt time
+    return await prisma.communityMessage.count({
+      where: {
+        conversation: {
+          communityId,
+        },
+        createdAt: {
+          gt: membership.lastReadAt,
+        },
+        NOT: {
+          senderId: userId,
+        },
+      },
+    });
+  },
+
   async createCommunityMessage(data: {
     content: string
     conversationId: string
@@ -279,5 +307,28 @@ export const databaseUtils = {
 
       return message
     })
+  },
+
+  async markConversationAsRead(conversationId: string, userId: string) {
+    return await prisma.message.updateMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+  },
+
+  async markCommunityAsRead(communityId: string, userId: string) {
+    return await prisma.communityMember.update({
+      where: {
+        userId_communityId: {
+          userId,
+          communityId,
+        },
+      },
+      data: { lastReadAt: new Date() },
+    });
   }
 } 
