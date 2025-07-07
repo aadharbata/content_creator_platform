@@ -43,7 +43,7 @@ const Login = () => {
       }
     } catch (err) {
       setError(language === 'hi' ? "एक अनपेक्षित त्रुटि हुई।" : "An unexpected error occurred.");
-    }
+      }
 
     setLoading(false);
   };

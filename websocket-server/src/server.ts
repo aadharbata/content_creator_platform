@@ -159,16 +159,16 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     messageHandler.handleLeaveConversation(socket, data)
   })
 
+  socket.on('mark_as_read', (data) => {
+    messageHandler.handleMarkAsRead(socket, data)
+  })
+
   socket.on('typing_start', (data) => {
     messageHandler.handleTypingStart(socket, data)
   })
 
   socket.on('typing_stop', (data) => {
     messageHandler.handleTypingStop(socket, data)
-  })
-
-  socket.on('mark_as_read', (data) => {
-    messageHandler.handleMarkAsRead(socket, data)
   })
 
   // Community message handlers

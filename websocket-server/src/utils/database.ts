@@ -243,41 +243,114 @@ export const databaseUtils = {
     })
   },
 
-  async createCommunityMessage(data: {
-    content: string
-    conversationId: string
-    senderId: string
+  async getCommunityMembers(communityId: string) {
+    return await prisma.communityMember.findMany({
+      where: { communityId },
+      select: { userId: true },
+    });
+  },
+
+  async getCommunityUnreadCount(communityId: string, userId: string) {
+    // Find the user's membership to get their lastReadAt timestamp
+    const membership = await this.getCommunityMembership(communityId, userId);
+    if (!membership) return 0;
+
+    // Count messages created after the user's lastReadAt time
+    return await prisma.communityMessage.count({
+      where: {
+        conversation: {
+          communityId,
+        },
+        createdAt: {
+          gt: membership.lastReadAt,
+        },
+        NOT: {
+          senderId: userId,
+        },
+      },
+    });
+  },
+
+  async createCommunityMessage({
+    content,
+    communityId,
+    senderId,
+  }: {
+    content: string;
+    communityId: string;
+    senderId: string;
   }) {
-    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Create the community message
+    return await prisma.$transaction(async (tx) => {
+      // Step 1: Find the correct CommunityConversation associated with the Community
+      const conversation = await tx.communityConversation.findUnique({
+        where: { communityId },
+        select: { id: true },
+      });
+
+      if (!conversation) {
+        throw new Error(`Could not find conversation for community ID: ${communityId}`);
+      }
+      
+      const conversationId = conversation.id;
+
+      // Step 2: Create the message within that conversation
       const message = await tx.communityMessage.create({
         data: {
-          content: data.content.trim(),
-          conversationId: data.conversationId,
-          senderId: data.senderId
+          content,
+          conversationId,
+          senderId,
         },
         include: {
           sender: {
-            select: {
-              id: true,
-              name: true,
-              profile: {
-                select: {
-                  avatarUrl: true
-                }
-              }
-            }
-          }
-        }
-      })
-
-      // Update conversation timestamp
+            select: { id: true, name: true, profile: { select: { avatarUrl: true } } },
+          },
+        },
+      });
+      
+      // Step 3: Update the conversation's last message timestamp
       await tx.communityConversation.update({
-        where: { id: data.conversationId },
-        data: { lastMessageAt: new Date() }
-      })
+          where: { id: conversationId },
+          data: { lastMessageAt: message.createdAt },
+      });
 
-      return message
-    })
+      // Step 4: Format the payload for the client, ensuring communityId is present
+      const flattenedSender = {
+          ...message.sender,
+          image: message.sender.profile?.avatarUrl,
+      };
+      
+      const payload = {
+          ...message,
+          sender: flattenedSender,
+          communityId: communityId,
+      };
+
+      delete (payload.sender as any).profile;
+      
+      return payload;
+    });
+  },
+
+  async markConversationAsRead(conversationId: string, userId: string) {
+    return await prisma.message.updateMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+  },
+
+  async markCommunityAsRead(communityId: string, userId: string) {
+    return await prisma.communityMember.update({
+      where: {
+        userId_communityId: {
+          userId,
+          communityId,
+        },
+      },
+      data: { lastReadAt: new Date() },
+    });
   }
 } 

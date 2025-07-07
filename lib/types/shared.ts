@@ -1,5 +1,7 @@
 // Shared types for consistent data structures across dashboard and WebSocket
 
+import { Community as PrismaCommunity, Conversation as PrismaConversation, Message, User } from '@/lib/generated/prisma';
+
 export interface DashboardMessage {
   id: string
   content: string
@@ -81,4 +83,30 @@ export const isValidConversation = (obj: any): obj is DashboardConversation => {
     typeof obj.fan.name === 'string' &&
     typeof obj.unreadCount === 'number' &&
     typeof obj.lastMessageAt === 'string'
-} 
+}
+
+export type MessageWithSender = Message & {
+  sender: { id: string; name: string; image?: string | null };
+  conversationId?: string;
+  communityId?: string;
+};
+
+export type Conversation = PrismaConversation & {
+  lastMessage?: MessageWithSender;
+  otherUser: { id: string; name: string; image?: string | null };
+  unreadCount: number;
+  placeholder?: boolean;
+};
+
+export type Community = PrismaCommunity & {
+  lastMessage?: MessageWithSender;
+  unreadCount: number;
+  imageUrl?: string | null;
+  _count: {
+    members: number;
+  };
+};
+
+export type ChatListItem =
+  | (Conversation & { type: 'conversation' })
+  | (Community & { type: 'community' }); 

@@ -4,6 +4,8 @@ import { ExtendedError } from 'socket.io/dist/namespace'
 import { databaseUtils } from '../utils/database'
 import { authLogger } from '../utils/logger'
 import { SocketData } from '../types/events'
+import * as cookie from 'cookie'
+import { socketLogger } from '../utils/logger'
 
 // Extend Socket interface to include user data
 export interface AuthenticatedSocket extends Socket {
@@ -23,98 +25,65 @@ interface TokenPayload {
 }
 
 // JWT authentication middleware for Socket.io
-export const authenticateSocket = async (
-  socket: Socket,
-  next: (err?: ExtendedError) => void
-): Promise<void> => {
+export async function authenticateSocket(socket: Socket, next: (err?: Error) => void) {
+  const cookieString = socket.handshake.headers.cookie;
+
+  if (!cookieString) {
+    socketLogger.warn('Authentication error: No cookie provided', { socketId: socket.id });
+    return next(new Error('Authentication credentials required'));
+  }
+  
+  const cookies = cookie.parse(cookieString);
+  // NextAuth.js uses a secure prefix in production, so we check for both names
+  const token = cookies['next-auth.session-token'] || cookies['__Secure-next-auth.session-token'];
+
+
+  if (!token) {
+    socketLogger.warn('Authentication error: No session token found in cookie', { socketId: socket.id });
+    return next(new Error('Authentication token required'));
+  }
+
   try {
-    // Extract token from handshake auth
-    const token = socket.handshake.auth?.token
+    const decodedToken = await decode({
+      token,
+      secret: process.env.NEXTAUTH_SECRET!,
+    });
 
-    if (!token) {
-      authLogger.warn('Connection attempt without token', {
+    if (!decodedToken || !decodedToken.id || !decodedToken.name || !decodedToken.role) {
+      socketLogger.warn('Authentication error: Invalid or incomplete token', {
         socketId: socket.id,
-        ip: socket.handshake.address
-      })
-      return next(new Error('Authentication token required'))
+      });
+      return next(new Error('Invalid authentication token'));
     }
 
-    // Verify JWT token via next-auth/jwt
-    const jwtSecret = process.env.NEXTAUTH_SECRET
-    if (!jwtSecret) {
-      authLogger.error('NEXTAUTH_SECRET not configured')
-      return next(new Error('Server configuration error'))
+    const userRole = decodedToken.role as string;
+    if (userRole !== 'CREATOR' && userRole !== 'CONSUMER' && userRole !== 'ADMIN') {
+        socketLogger.warn('Authentication error: Invalid user role in token', {
+            socketId: socket.id,
+            role: userRole,
+        });
+        return next(new Error('Invalid user role'));
     }
 
-    const decoded = (await decode({ token, secret: jwtSecret })) as TokenPayload | null
+    // Attach user data to the socket object
+    (socket as AuthenticatedSocket).data = {
+      userId: decodedToken.id as string,
+      userName: decodedToken.name,
+      userRole: userRole,
+    };
 
-    if (!decoded) {
-      authLogger.warn('Invalid JWT token', {
-        socketId: socket.id,
-        ip: socket.handshake.address
-      })
-      return next(new Error('Invalid authentication token'))
-    }
-
-    const userId = decoded.userId ?? decoded.id ?? decoded.sub
-    const userRole = decoded.role
-    const userName = decoded.userName ?? decoded.name ?? ''
-
-    // Validate token payload
-    if (!userId || !userRole) {
-      authLogger.warn('Invalid token payload', {
-        socketId: socket.id,
-        payload: decoded
-      })
-      return next(new Error('Invalid token payload'))
-    }
-
-    // Check if user exists in database
-    const user = await databaseUtils.getUserById(userId);
-    if (!user) {
-      authLogger.warn('User not found for valid token', {
-        socketId: socket.id,
-        userId
-      })
-      return next(new Error('User not found'))
-    }
-
-    // Verify role matches
-    if (user.role !== userRole) {
-      authLogger.warn('Role mismatch in token', {
-        socketId: socket.id,
-        userId: user.id,
-        tokenRole: userRole,
-        userRole: user.role
-      })
-      return next(new Error('Invalid user role'))
-    }
-
-    // Attach user data to socket
-    const socketData: SocketData = {
-      userId: user.id,
-      userRole: user.role as 'CREATOR' | 'CONSUMER' | 'ADMIN',
-      userName: userName || user.name
-    }
-
-    // Type assertion to add data property
-    ;(socket as AuthenticatedSocket).data = socketData
-
-    authLogger.info('User authenticated successfully', {
+    socketLogger.info('User authenticated successfully via cookie', {
       socketId: socket.id,
-      userId: user.id,
-      userName: user.name,
-      role: user.role
-    })
+      userId: decodedToken.id,
+    });
 
-    next()
+    return next();
   } catch (error) {
-    authLogger.error('Authentication error', {
+    socketLogger.error('Authentication error: Token decoding failed', {
       socketId: socket.id,
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    })
-    next(new Error('Authentication failed'))
+    });
+    return next(new Error('Authentication error'));
   }
 }
 
