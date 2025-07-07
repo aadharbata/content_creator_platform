@@ -33,10 +33,7 @@ const markAsReadSchema = z.object({
 // Community validation schemas
 const sendCommunityMessageSchema = z.object({
   communityId: z.string().uuid('Invalid community ID format'),
-  content: z.string()
-    .min(1, 'Message cannot be empty')
-    .max(2000, 'Message too long (max 2000 characters)')
-    .transform(str => str.trim())
+  content: z.string().min(1, 'Message content cannot be empty').max(500, 'Message is too long'),
 })
 
 const communityTypingSchema = z.object({
@@ -390,114 +387,61 @@ export class MessageHandler {
   // Community message handling methods
   async handleSendCommunityMessage(socket: AuthenticatedSocket, data: unknown): Promise<void> {
     try {
-      // Rate limiting for community messages
       if (!checkRateLimit(`${socket.id}:community`, 20, 60000)) { // 20 messages per minute
         socket.emit('error', { 
           message: 'Rate limit exceeded for community messages.',
           code: 'COMMUNITY_RATE_LIMIT_EXCEEDED'
-        })
-        return
+        });
+        return;
       }
 
-      const validatedData = sendCommunityMessageSchema.parse(data)
-      const { communityId, content } = validatedData
+      const validatedData = sendCommunityMessageSchema.parse(data);
+      const { communityId, content } = validatedData;
+      const { userId } = socket.data;
 
-      // Check if user is a member of the community
-      const membership = await databaseUtils.getCommunityMembership(communityId, socket.data.userId)
-      if (!membership) {
-        socket.emit('error', { 
+      // Security check: ensure user is a member of the community
+      const member = await databaseUtils.getCommunityMembership(communityId, userId);
+      if (!member) {
+        socket.emit('error', {
           message: 'You are not a member of this community',
-          code: 'COMMUNITY_ACCESS_DENIED'
-        })
-        return
+          code: 'COMMUNITY_ACCESS_DENIED',
+        });
+        return;
       }
 
-      // Get community conversation
-      const community = await databaseUtils.getCommunityWithConversation(communityId)
-      if (!community?.conversation) {
-        socket.emit('error', { 
-          message: 'Community conversation not found',
-          code: 'COMMUNITY_CONVERSATION_NOT_FOUND'
-        })
-        return
-      }
-
-      // Create message in database
+      // Create the message in the database
       const message = await databaseUtils.createCommunityMessage({
         content,
-        conversationId: community.conversation.id,
-        senderId: socket.data.userId
-      })
-
-      // Format message data
-      const messageData: CommunityMessageSentData = {
-        id: message.id,
-        content: message.content,
-        createdAt: message.createdAt,
-        conversationId: message.conversationId,
         communityId,
-        sender: {
-          id: message.sender.id,
-          name: message.sender.name,
-          avatarUrl: message.sender.profile?.avatarUrl || null
-        }
-      }
+        senderId: userId,
+      });
 
-      // Send confirmation to sender
-      socket.emit('community_message_sent', messageData)
+      // Broadcast the new message to all members of the community room
+      this.io.to(`community:${communityId}`).emit('new_message', message);
 
-      // Broadcast to all community members (except sender)
-      const communityNewMessageData: CommunityNewMessageData = {
-        ...messageData
-      }
-      
-      socket.to(`community:${communityId}`).emit('community_new_message', communityNewMessageData)
+      // Trigger a conversation update for all members for sorting/unread counts
+      this.io.to(`community:${communityId}`).emit('conversation_updated', {
+        id: communityId,
+        type: 'community',
+        lastMessage: message,
+      });
 
-      // Emit a conversation_updated event to all other members
-      const members = await databaseUtils.getCommunityMembers(communityId);
-      for (const member of members) {
-        if (member.userId !== socket.data.userId) {
-          const unreadCount = await databaseUtils.getCommunityUnreadCount(
-            communityId,
-            member.userId
-          );
-          
-          const updateData: ConversationUpdateData = {
-            type: 'community',
-            id: communityId,
-            lastMessage: message.content,
-            lastMessageSender: socket.data.userName,
-            lastMessageTime: message.createdAt.toISOString(),
-            unreadCount,
-          };
-
-          this.io.to(`user:${member.userId}`).emit('conversation_updated', updateData);
-        }
-      }
-
-      messageLogger.info('Broadcasted conversation_updated for community message', {
+      messageLogger.info('Community message sent', {
+        socketId: socket.id,
+        userId,
+        communityId,
         messageId: message.id,
-        senderId: socket.data.userId,
-        communityId
-      })
-
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessage = error.errors.map(e => e.message).join(', ')
-        socket.emit('error', { 
-          message: errorMessage,
-          code: 'VALIDATION_ERROR'
-        })
+        socket.emit('error', { message: 'Invalid message data', code: 'VALIDATION_ERROR', details: error.errors });
       } else {
-        socket.emit('error', { 
-          message: 'Failed to send community message',
-          code: 'COMMUNITY_MESSAGE_SEND_FAILED'
-        })
         messageLogger.error('Error sending community message', {
           socketId: socket.id,
           userId: socket.data.userId,
           error: error instanceof Error ? error.message : 'Unknown error'
-        })
+        });
+        socket.emit('error', { message: 'Failed to send message', code: 'SERVER_ERROR' });
       }
     }
   }
