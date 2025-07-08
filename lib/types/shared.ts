@@ -83,7 +83,7 @@ export const isValidConversation = (obj: any): obj is DashboardConversation => {
     typeof obj.fan.name === 'string' &&
     typeof obj.unreadCount === 'number' &&
     typeof obj.lastMessageAt === 'string'
-}
+} 
 
 export type MessageWithSender = Message & {
   sender: { id: string; name: string; image?: string | null };

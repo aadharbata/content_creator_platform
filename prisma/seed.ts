@@ -15,13 +15,13 @@ async function main() {
   const creators = [];
   for (let i = 0; i < 5; i++) {
     const creator = await prisma.user.create({
-      data: {
+    data: {
         email: faker.internet.email().toLowerCase(),
         name: `Creator ${i + 1}`,
         passwordHash: sharedPasswordHash,
-        role: 'CREATOR',
-        profile: {
-          create: {
+      role: 'CREATOR',
+      profile: {
+        create: {
             bio: faker.person.bio(),
             avatarUrl: faker.image.avatar(),
           },
@@ -35,7 +35,7 @@ async function main() {
   const fans = [];
   for (let i = 0; i < 20; i++) {
     const fan = await prisma.user.create({
-      data: {
+    data: {
         email: faker.internet.email().toLowerCase(),
         name: `Fan ${i + 1}`,
         passwordHash: sharedPasswordHash,
@@ -69,8 +69,8 @@ async function main() {
         description: `Community for fans of ${creator.name}`,
         type: 'SUBSCRIPTION_COMMUNITY',
         creatorId: creator.id,
-      },
-    });
+    },
+  });
 
     // 2. Gather members (fans who subscribed to this creator) + the creator themselves
     const memberData = subData
