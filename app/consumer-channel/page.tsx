@@ -17,7 +17,16 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Search,
+  Play,
+  Image as LucideImage,
+  Code,
+  Book,
+  Video,
+  Headphones,
+  Grid3X3,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,6 +64,21 @@ interface Post {
   price?: string;
   likes: number;
   comments: number;
+}
+
+interface Product {
+  id: string;
+  title: string;
+  price: number;
+  type: 'image' | 'video' | 'course' | 'template' | 'software' | 'ebook' | 'audio' | 'physical';
+  creator: {
+    name: string;
+    avatar: string;
+    verified: boolean;
+  };
+  thumbnail: string;
+  rating: number;
+  sales: number;
 }
 
 const samplePosts: Post[] = [
@@ -144,6 +168,80 @@ const samplePosts: Post[] = [
   }
 ];
 
+const STORE_PRODUCTS: Product[] = [
+  {
+    id: '1',
+    title: 'Neon Abstract Patterns',
+    price: 299,
+    type: 'image',
+    creator: { name: 'Alex Chen', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face', verified: true },
+    thumbnail: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
+    rating: 4.9,
+    sales: 847
+  },
+  {
+    id: '2',
+    title: 'City Skyline 4K',
+    price: 149,
+    type: 'video',
+    creator: { name: 'Sarah Williams', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=40&h=40&fit=crop&crop=face', verified: true },
+    thumbnail: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=500&h=300&fit=crop',
+    rating: 4.8,
+    sales: 623
+  },
+  {
+    id: '3',
+    title: 'UI Design Kit',
+    price: 79,
+    type: 'template',
+    creator: { name: 'Lisa Chang', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=40&h=40&fit=crop&crop=face', verified: true },
+    thumbnail: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+    rating: 4.8,
+    sales: 756
+  },
+  {
+    id: '4',
+    title: 'Motion Graphics Course',
+    price: 299,
+    type: 'course',
+    creator: { name: 'Jake Miller', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face', verified: true },
+    thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&h=300&fit=crop',
+    rating: 4.9,
+    sales: 1234
+  },
+  {
+    id: '5',
+    title: 'Minimalist Icons',
+    price: 49,
+    type: 'template',
+    creator: { name: 'Chris Lee', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop&crop=face', verified: false },
+    thumbnail: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=300&fit=crop',
+    rating: 4.4,
+    sales: 223
+  },
+  {
+    id: '6',
+    title: 'Creative T-Shirt',
+    price: 499,
+    type: 'physical',
+    creator: { name: 'Emily Stone', avatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=40&h=40&fit=crop&crop=face', verified: false },
+    thumbnail: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
+    rating: 4.6,
+    sales: 312
+  }
+];
+
+const TYPE_ICONS = {
+  image: LucideImage,
+  video: Video,
+  course: Play,
+  template: Grid3X3,
+  software: Code,
+  ebook: Book,
+  audio: Headphones,
+  physical: Package
+};
+
 export default function ConsumerChannelPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -151,6 +249,11 @@ export default function ConsumerChannelPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [topCreators, setTopCreators] = useState<TopCreator[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(true);
+  
+  // Store state
+  const [storeSearchTerm, setStoreSearchTerm] = useState('');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [storeActiveTab, setStoreActiveTab] = useState('top');
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -194,6 +297,159 @@ export default function ConsumerChannelPage() {
     // Force redirect to home page
     window.location.href = '/';
   };
+
+  // Store filtering logic
+  const filteredProducts = STORE_PRODUCTS.filter(product => {
+    const matchesSearch = product.title.toLowerCase().includes(storeSearchTerm.toLowerCase()) ||
+                         product.creator.name.toLowerCase().includes(storeSearchTerm.toLowerCase());
+    const matchesType = selectedType === 'all' || product.type === selectedType;
+    return matchesSearch && matchesType;
+  });
+
+  // Store component
+  const renderStoreContent = () => (
+    <div className="space-y-6">
+      {/* Store Header */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h2 className="text-2xl font-bold text-gray-100">Product Store</h2>
+          <nav className="flex items-center space-x-2 bg-gray-800/50 p-1 rounded-full">
+            <button 
+              onClick={() => setStoreActiveTab('top')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                storeActiveTab === 'top' 
+                  ? 'bg-yellow-500 text-black shadow-sm' 
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              <TrendingUp className="h-4 w-4" />
+              <span>Top Products</span>
+            </button>
+            <button 
+              onClick={() => setStoreActiveTab('following')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                storeActiveTab === 'following' 
+                  ? 'bg-yellow-500 text-black shadow-sm' 
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              <span>Following</span>
+            </button>
+          </nav>
+        </div>
+
+        <div className="flex items-center bg-gray-800/50 p-1 rounded-full space-x-2">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={storeSearchTerm}
+              onChange={(e) => setStoreSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 w-48 bg-transparent focus:outline-none text-gray-100 placeholder-gray-400 text-sm"
+            />
+          </div>
+
+          {/* Type Selector */}
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+            className="bg-gray-700/50 py-2 pl-4 pr-8 rounded-full text-sm focus:outline-none text-gray-100 border border-gray-600"
+          >
+            <option value="all">All Types</option>
+            <option value="image">Images</option>
+            <option value="video">Videos</option>
+            <option value="course">Courses</option>
+            <option value="template">Templates</option>
+            <option value="software">Software</option>
+            <option value="ebook">E-books</option>
+            <option value="audio">Audio</option>
+            <option value="physical">Physical</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProducts.map((product) => {
+          const IconComponent = TYPE_ICONS[product.type];
+          return (
+            <Card key={product.id} className="group cursor-pointer bg-gray-800/50 border-gray-700/40 hover:bg-gray-700/40 transition-all duration-200">
+              <div className="relative">
+                {/* Product Image */}
+                <div className="relative h-48 overflow-hidden rounded-t-lg">
+                  <img 
+                    src={product.thumbnail}
+                    alt={product.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+                  
+                  {/* Type indicator */}
+                  <div className="absolute top-2 right-2">
+                    <div className="bg-black/60 rounded-full p-1.5">
+                      <IconComponent className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+
+                  {/* Video play indicator */}
+                  {product.type === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="bg-black/60 rounded-full p-3">
+                        <Play className="h-6 w-6 text-white fill-current" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Price overlay */}
+                  <div className="absolute top-2 left-2">
+                    <div className="bg-yellow-500 text-black font-bold px-2 py-1 rounded-full text-sm">
+                      ₹{product.price}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Product Info */}
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-100 text-base line-clamp-1 flex-1 mr-2">
+                      {product.title}
+                    </h3>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarImage src={product.creator.avatar} alt={product.creator.name} />
+                        <AvatarFallback className="bg-gray-700 text-white text-xs">
+                          {product.creator.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-gray-300 truncate">{product.creator.name}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                      <span className="text-gray-300">{product.rating}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* No products found */}
+      {filteredProducts.length === 0 && (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-2xl font-bold mb-2 text-gray-400">No products found</h3>
+          <p className="text-gray-500">Try adjusting your search or filters</p>
+        </div>
+      )}
+    </div>
+  );
 
   if (status === 'loading') {
     return (
@@ -358,9 +614,12 @@ export default function ConsumerChannelPage() {
 
       {/* Main Content */}
       <main className={`flex-1 py-8 md:py-4 lg:py-8 overflow-y-auto ${sidebarCollapsed ? 'ml-16' : 'ml-80'} md:ml-16 lg:${sidebarCollapsed ? 'ml-16' : 'ml-80'} transition-all duration-300`}>
-        <div className="max-w-2xl mx-auto px-6 md:px-4 lg:px-6">
-          <div className="space-y-8 md:space-y-6 lg:space-y-8">
-            {samplePosts.map((post) => (
+        <div className={`${activeTab === 'store' ? 'max-w-6xl' : 'max-w-2xl'} mx-auto px-6 md:px-4 lg:px-6`}>
+          {activeTab === 'store' ? (
+            renderStoreContent()
+          ) : (
+            <div className="space-y-8 md:space-y-6 lg:space-y-8">
+              {samplePosts.map((post) => (
               <Card key={post.id} className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 shadow-xl relative overflow-hidden">
                 <CardContent className="p-6 md:p-4 lg:p-6">
                   {/* Post Header */}
@@ -434,7 +693,8 @@ export default function ConsumerChannelPage() {
                 </CardContent>
               </Card>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
