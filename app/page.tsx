@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession, signOut } from "next-auth/react"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
 import Header from "@/frontend/components/Header"
 import Hero from "@/frontend/components/Hero"
@@ -38,6 +39,19 @@ interface TopCourses {
 export default function LandingPage() {
   const { language, setLanguage } = useLanguage();
   const [topCourses, setTopCourses] = useState<TopCourses[]>([]);
+  const { data: session, status } = useSession();
+
+  // Auto-logout any existing sessions when visiting home page
+  useEffect(() => {
+    if (status === 'authenticated' && session) {
+      console.log('User is logged in, logging out...');
+      // Clear session immediately and redirect to force refresh
+      signOut({ 
+        redirect: true,
+        callbackUrl: '/' 
+      });
+    }
+  }, [session, status]);
 
   const fetchTopCourses = async () => {
     try {

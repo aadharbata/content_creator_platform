@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
-import { signIn } from "next-auth/react";
+import { signIn, useSession, signOut } from "next-auth/react";
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -13,6 +13,30 @@ const Login = () => {
   const [success, setSuccess] = useState("");
   const router = useRouter();
   const { language, translations } = useLanguage();
+  const { data: session } = useSession();
+  const searchParams = useSearchParams();
+
+  // Handle redirect after successful login
+  useEffect(() => {
+    if (session?.user) {
+      const userRole = (session.user as any).role;
+      const userId = (session.user as any).id;
+      
+      // Check if user came from home page (indicating they want to start fresh)
+      if (document.referrer.includes(window.location.origin + '/') || 
+          document.referrer.includes(window.location.origin + '/#')) {
+        // User came from home page, they want to start fresh, so logout first
+        signOut({ redirect: false });
+        return;
+      }
+      
+      if (userRole === 'CREATOR' && userId) {
+        router.push(`/creator/${userId}/dashboard`);
+      } else {
+        router.push('/consumer-channel');
+      }
+    }
+  }, [session, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -35,11 +59,7 @@ const Login = () => {
         setError(result.error);
       } else if (result?.ok) {
         setSuccess(language === 'hi' ? "लॉगिन सफल! पुनर्निर्देशित कर रहे हैं..." : "Login successful! Redirecting...");
-        // The session is now handled by NextAuth, redirecting...
-        // We can get user data from a session hook or redirect and let the destination page handle it.
-        // For simplicity, we'll just redirect to a generic home page.
-        // The actual user role should be checked on the server or on the destination page.
-        router.push("/home");
+        // Session will be updated and useEffect will handle the redirect
       }
     } catch (err) {
       setError(language === 'hi' ? "एक अनपेक्षित त्रुटि हुई।" : "An unexpected error occurred.");
@@ -106,7 +126,7 @@ const Login = () => {
         </form>
         {/* Google Login Button */}
         <button
-          onClick={() => signIn('google', { callbackUrl: '/home' })}
+          onClick={() => signIn('google', { redirect: false })}
           className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-2xl py-3 shadow hover:bg-gray-100 transition-colors text-gray-800 font-semibold"
           type="button"
         >
