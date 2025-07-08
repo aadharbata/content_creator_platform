@@ -299,6 +299,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   // --- Backend subscription logic start ---
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [loadingSubscription, setLoadingSubscription] = useState(true)
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false)
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
@@ -428,6 +429,10 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
         console.error('Failed to copy to clipboard:', err)
       }
     }
+  }
+
+  const handleJoinCommunity = () => {
+    setShowWelcomePopup(true)
   }
 
   // Loading state
@@ -598,7 +603,10 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
 
                 {userId && userId !== id && isSubscribed && (
                   <div className="flex items-center md:justify-end w-full md:w-auto">
-                    <Button className="ml-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold shadow-lg px-8 py-4 text-lg rounded-xl h-16">
+                    <Button 
+                      className="ml-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold shadow-lg px-8 py-4 text-lg rounded-xl h-16"
+                      onClick={handleJoinCommunity}
+                    >
                       Join the community
                     </Button>
                   </div>
@@ -824,6 +832,25 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Welcome Popup */}
+      {showWelcomePopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center shadow-2xl">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to the Community!</h2>
+            <p className="text-gray-600 mb-6">
+              You've successfully joined {creator?.name}'s community. Get ready for exclusive content, direct access, and amazing interactions!
+            </p>
+            <Button 
+              onClick={() => setShowWelcomePopup(false)}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold px-8 py-3 rounded-xl"
+            >
+              Get Started
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
