@@ -26,7 +26,8 @@ import {
   Crown,
   Languages,
   Send,
-  Search
+  Search,
+  User
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -267,6 +268,17 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
 
   // Get translations
   const t = translations
+
+  // Handler functions
+  const handleProfileClick = () => {
+    // Navigate to current creator's profile page
+    window.location.href = `/creator/${id}`;
+  };
+
+  const handleCreatorClick = (creatorId: string) => {
+    // Navigate to another creator's profile page
+    window.location.href = `/creator/${creatorId}`;
+  };
 
   // Fetch all creator data
   useEffect(() => {
@@ -648,7 +660,10 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                 {/* Profile Section */}
                 <div className="text-center mb-6">
                   <div className="relative mb-4">
-                    <Avatar className="w-24 h-24 mx-auto ring-4 ring-white shadow-lg">
+                    <Avatar 
+                      className="w-24 h-24 mx-auto ring-4 ring-white shadow-lg cursor-pointer hover:ring-blue-300 transition-all"
+                      onClick={handleProfileClick}
+                    >
                       <AvatarImage 
                         src={creator.profile?.avatarUrl || `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face`} 
                         alt={creator.name} 
@@ -666,7 +681,12 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                     {t.creator || 'Top Creator'}
                   </Badge>
                   
-                  <h2 className="text-xl font-bold mb-2">{creator.name}</h2>
+                  <h2 
+                    className="text-xl font-bold mb-2 cursor-pointer hover:text-blue-600 transition-colors"
+                    onClick={handleProfileClick}
+                  >
+                    {creator.name}
+                  </h2>
                   <p className="text-gray-600 mb-2">
                     {creator.profile?.bio || t.contentCreator}
                   </p>
@@ -695,11 +715,18 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                     { id: "courses", icon: BookOpen, label: t.courses },
                     { id: "analytics", icon: TrendingUp, label: t.analytics },
                     { id: "messages", icon: MessageCircle, label: t.messages },
+                    { id: "profile", icon: User, label: "Profile" },
                     { id: "settings", icon: Settings, label: t.settings }
                   ].map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => {
+                        if (item.id === 'profile') {
+                          handleProfileClick();
+                        } else {
+                          setActiveTab(item.id);
+                        }
+                      }}
                       className={cn(
                         "w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-all",
                         activeTab === item.id
@@ -893,7 +920,13 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                             )}
                           >
                             <div className="flex items-start space-x-3">
-                              <Avatar className="w-11 h-11 flex-shrink-0">
+                              <Avatar 
+                                className="w-11 h-11 flex-shrink-0 cursor-pointer ring-2 ring-transparent hover:ring-blue-300 transition-all"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreatorClick(conversation.fan.id);
+                                }}
+                              >
                                 <AvatarImage src={conversation.fan.avatarUrl || undefined} />
                                 <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium">
                                   {conversation.fan.name.split(" ").map(n => n[0]).join("")}
@@ -901,7 +934,13 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1">
-                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                  <p 
+                                    className="text-sm font-semibold text-gray-900 truncate hover:text-blue-600 cursor-pointer transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCreatorClick(conversation.fan.id);
+                                    }}
+                                  >
                                     {conversation.fan.name}
                                   </p>
                                   <p className="text-xs text-gray-500 flex-shrink-0 ml-2">
@@ -939,14 +978,22 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                             const conversation = conversations.find(c => c.id === selectedConversation.id)
                             return conversation ? (
                               <div className="flex items-center space-x-3">
-                                <Avatar className="w-10 h-10">
+                                <Avatar 
+                                  className="w-10 h-10 cursor-pointer ring-2 ring-transparent hover:ring-blue-300 transition-all"
+                                  onClick={() => handleCreatorClick(conversation.fan.id)}
+                                >
                                   <AvatarImage src={conversation.fan.avatarUrl || undefined} />
                                   <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-medium">
                                     {conversation.fan.name.split(" ").map(n => n[0]).join("")}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <p className="font-semibold text-gray-900">{conversation.fan.name}</p>
+                                  <p 
+                                    className="font-semibold text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
+                                    onClick={() => handleCreatorClick(conversation.fan.id)}
+                                  >
+                                    {conversation.fan.name}
+                                  </p>
                                 </div>
                               </div>
                             ) : null

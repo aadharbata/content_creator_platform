@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get creators from User table where role is CREATOR
+    // Get creators from User table where role is CREATOR with their profiles
     const creators = await prisma.user.findMany({
       where: {
         role: 'CREATOR'
@@ -12,13 +12,47 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         email: true,
-        createdAt: true
-      }
+        createdAt: true,
+        profile: {
+          select: {
+            avatarUrl: true,
+            bio: true,
+            website: true,
+            twitter: true,
+            instagram: true
+          }
+        },
+        _count: {
+          select: {
+            subscribers: true // Count of subscribers for ranking
+          }
+        }
+      },
+      orderBy: {
+        subscribers: {
+          _count: 'desc' // Order by most subscribed first
+        }
+      },
+      take: 10 // Limit to top 10 creators
     });
+
+    // Transform the data to include handles and format for frontend
+    const transformedCreators = creators.map(creator => ({
+      id: creator.id,
+      name: creator.name,
+      handle: `@${creator.name.replace(/\s+/g, '')}`, // Generate handle from name
+      avatar: creator.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.name)}&background=random`,
+      bio: creator.profile?.bio || 'Content creator and influencer',
+      website: creator.profile?.website,
+      instagram: creator.profile?.instagram,
+      twitter: creator.profile?.twitter,
+      subscriberCount: creator._count.subscribers,
+      subscribed: false // Will be updated based on current user's subscriptions
+    }));
 
     return NextResponse.json({ 
       success: true,
-      creators 
+      creators: transformedCreators
     });
 
   } catch (error) {
@@ -30,40 +64,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const { name, email, bankAccount, ifsc, upi } = await request.json();
-
-    // Validate required fields
-    if (!name || !email || !bankAccount || !ifsc) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, email, bankAccount, ifsc' },
-        { status: 400 }
-      );
-    }
-
-    // Create a creator record
-    const creator = await prisma.creator.create({
-      data: {
-        name,
-        email,
-        bankAccount,
-        ifsc,
-        upi: upi || null,
-      },
-    });
-
-    return NextResponse.json({ 
-      success: true,
-      creator,
-      message: 'Creator created successfully' 
-    });
-
-  } catch (error) {
-    console.error('Error creating creator:', error);
-    return NextResponse.json(
-      { error: 'Failed to create creator' },
-      { status: 500 }
-    );
-  }
-} 
+// POST method removed - creator creation is handled through user signup 
