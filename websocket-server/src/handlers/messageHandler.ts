@@ -11,6 +11,8 @@ import {
   CommunityNewMessageData,
   ConversationUpdateData
 } from '../types/events'
+// Profanity filtering
+import Filter from 'bad-words'
 
 // Validation schemas
 const sendMessageSchema = z.object({
@@ -41,7 +43,12 @@ const communityTypingSchema = z.object({
 })
 
 export class MessageHandler {
-  constructor(private io: Server) {}
+  private profanityFilter: Filter
+
+  constructor(private io: Server) {
+    // Initialize profanity filter once per handler instance
+    this.profanityFilter = new Filter()
+  }
 
   // Auto-join user to their community rooms on connection
   async handleAutoJoinCommunities(socket: AuthenticatedSocket): Promise<void> {
@@ -83,11 +90,14 @@ export class MessageHandler {
       const validatedData = sendMessageSchema.parse(data)
       const { conversationId, content } = validatedData
 
+      // Sanitize message content
+      const cleanContent = this.profanityFilter.clean(content)
+
       messageLogger.info('Message send attempt', {
         socketId: socket.id,
         userId: socket.data.userId,
         conversationId,
-        contentLength: content.length
+        contentLength: cleanContent.length
       })
 
       // Check conversation access
@@ -102,7 +112,7 @@ export class MessageHandler {
 
       // Create message in database
       const message = await databaseUtils.createMessage({
-        content,
+        content: cleanContent,
         conversationId,
         senderId: socket.data.userId
       })
@@ -116,7 +126,7 @@ export class MessageHandler {
       // Format message data
       const messageData: MessageSentData = {
         id: message.id,
-        content: message.content,
+        content: message.content, // already clean
         createdAt: message.createdAt,
         conversationId: message.conversationId,
         sender: {
@@ -347,7 +357,7 @@ export class MessageHandler {
     }
   }
 
-  // Handle marking messages as read
+  // Handle marking messages as read for both conversations and communities
   async handleMarkAsRead(socket: AuthenticatedSocket, data: unknown): Promise<void> {
     try {
       const validatedData = markAsReadSchema.parse(data);
@@ -405,6 +415,9 @@ export class MessageHandler {
       const { communityId, content } = validatedData;
       const { userId } = socket.data;
 
+      // Sanitize community message content
+      const cleanContent = this.profanityFilter.clean(content)
+
       // Security check: ensure user is a member of the community
       const member = await databaseUtils.getCommunityMembership(communityId, userId);
       if (!member) {
@@ -417,7 +430,7 @@ export class MessageHandler {
 
       // Create the message in the database
       const message = await databaseUtils.createCommunityMessage({
-        content,
+        content: cleanContent,
         communityId,
         senderId: userId,
       });

@@ -10,7 +10,6 @@ async function main() {
 
   console.log('🌱  Seeding creators...');
 
-  // Better creator data with real names and avatars
   const creatorData = [
     {
       name: 'Sophia Rivera',
@@ -45,18 +44,20 @@ async function main() {
   ];
 
   const creators = [];
+
   for (let i = 0; i < creatorData.length; i++) {
     const creatorInfo = creatorData[i];
-    
-    // Check if creator already exists
+
+    const email = `${creatorInfo.handle.toLowerCase().replace('@', '')}@example.com`;
+
     const existingCreator = await prisma.user.findUnique({
-      where: { email: `${creatorInfo.handle.toLowerCase().replace('@', '')}@example.com` }
+      where: { email }
     });
 
     if (!existingCreator) {
       const creator = await prisma.user.create({
         data: {
-          email: `${creatorInfo.handle.toLowerCase().replace('@', '')}@example.com`,
+          email,
           name: creatorInfo.name,
           passwordHash: sharedPasswordHash,
           role: 'CREATOR',
@@ -81,10 +82,10 @@ async function main() {
 
   console.log('🌱  Creating fans...');
   const fans = [];
+
   for (let i = 0; i < 20; i++) {
     const email = faker.internet.email().toLowerCase();
-    
-    // Check if fan already exists
+
     const existingFan = await prisma.user.findUnique({
       where: { email }
     });
@@ -107,28 +108,46 @@ async function main() {
   console.log('🌱  Creating subscriptions...');
   const subData = [];
   for (const fan of fans) {
-    // each fan subscribes to 2 random creators
     const chosen = faker.helpers.arrayElements(creators, 2);
     for (const creator of chosen) {
       subData.push({ userId: fan.id, creatorId: creator.id });
     }
   }
-  
-  // Insert subscriptions, skipping duplicates
-  for (const sub of subData) {
-    try {
-      await prisma.subscription.create({
-        data: sub
-      });
-    } catch (error) {
-      // Skip if subscription already exists
-      console.log(`  • Subscription already exists: ${sub.userId} -> ${sub.creatorId}`);
-    }
+
+  await prisma.subscription.createMany({ data: subData, skipDuplicates: true });
+
+  console.log('\n🌱  Creating subscription communities...');
+  for (const creator of creators) {
+    const community = await prisma.community.create({
+      data: {
+        name: `${creator.name}'s Community`,
+        description: `Community for fans of ${creator.name}`,
+        type: 'SUBSCRIPTION_COMMUNITY',
+        creatorId: creator.id,
+      },
+    });
+
+    const memberData = subData
+      .filter((sub) => sub.creatorId === creator.id)
+      .map((sub) => ({
+        communityId: community.id,
+        userId: sub.userId,
+      }));
+
+    memberData.push({ communityId: community.id, userId: creator.id });
+
+    await prisma.communityMember.createMany({
+      data: memberData,
+      skipDuplicates: true,
+    });
+
+    await prisma.communityConversation.create({
+      data: { communityId: community.id },
+    });
+
+    console.log(`  • Created community for ${creator.name} with ${memberData.length} members`);
   }
 
-  // --------------------
-  // Final logs
-  // --------------------
   console.log('\n🌱  Seeded Creator Accounts (use password "testing")');
   creators.forEach((c) => console.log(`  • ${c.email}`));
 
@@ -138,4 +157,4 @@ async function main() {
   console.log('\n✅  Seed completed');
 }
 
-main().finally(() => prisma.$disconnect()); 
+main().finally(() => prisma.$disconnect());
