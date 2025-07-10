@@ -36,8 +36,8 @@ export const ChatItem = ({ chat, isActive, onSelectChat, currentUserId }: ChatIt
     <div
       onClick={() => onSelectChat(chat)}
       className={cn(
-        'flex items-center p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700',
-        isActive && 'bg-blue-100 dark:bg-blue-900/50'
+        'flex items-center p-3 cursor-pointer hover:bg-white/5',
+        isActive && 'bg-white/10'
       )}
     >
       <Avatar className="h-12 w-12 mr-4">
@@ -46,12 +46,12 @@ export const ChatItem = ({ chat, isActive, onSelectChat, currentUserId }: ChatIt
       </Avatar>
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center">
-          <h3 className="font-semibold truncate">{name}</h3>
+          <h3 className="font-semibold truncate text-gray-100">{name}</h3>
           {lastMessage && (
             (() => {
               const date = new Date(lastMessage.createdAt);
               return isValid(date) ? (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-400">
                   {formatDistanceToNow(date, { addSuffix: true })}
                 </p>
               ) : null;
@@ -59,7 +59,7 @@ export const ChatItem = ({ chat, isActive, onSelectChat, currentUserId }: ChatIt
           )}
         </div>
         <div className="flex justify-between items-start">
-          <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
+          <p className="text-sm text-gray-300 truncate">
             {lastMessage ? lastMessage.content : 'No messages yet'}
           </p>
           {unreadCount > 0 && (
