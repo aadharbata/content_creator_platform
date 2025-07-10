@@ -21,13 +21,13 @@ export const MessageInput = ({ onSendMessage }: MessageInputProps) => {
   };
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+    <div className="p-4 bg-black/40 backdrop-blur-md border-t border-white/10">
       <form onSubmit={handleSubmit} className="flex items-center gap-4">
         <Input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Type a message..."
-          className="flex-1 bg-gray-100 dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 bg-black/20 border-none focus:ring-2 focus:ring-blue-500 text-gray-100 placeholder-gray-400"
           autoComplete="off"
         />
         <Button type="submit" size="icon" disabled={!inputValue.trim()}>

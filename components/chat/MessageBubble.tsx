@@ -25,8 +25,8 @@ export const MessageBubble = ({ message, isOwnMessage }: MessageBubbleProps) => 
         className={cn(
           'max-w-md lg:max-w-xl p-3 rounded-lg',
           isOwnMessage
-            ? 'bg-blue-500 text-white rounded-br-none'
-            : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
+            ? 'bg-blue-600 text-white rounded-br-none'
+            : 'bg-white/10 text-gray-100 rounded-bl-none'
         )}
       >
         {!isOwnMessage && (
