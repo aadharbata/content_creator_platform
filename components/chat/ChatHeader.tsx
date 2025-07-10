@@ -36,14 +36,14 @@ export const ChatHeader = ({ chat }: ChatHeaderProps) => {
   const subtitle = getSubTitle(chat);
 
   return (
-    <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <div className="flex items-center p-4 border-b border-white/10 bg-black/40 backdrop-blur-md">
       <Avatar className="h-10 w-10 mr-4">
         <AvatarImage src={avatarUrl} alt={name} />
         <AvatarFallback>{name.charAt(0).toUpperCase()}</AvatarFallback>
       </Avatar>
       <div className="flex-1">
-        <h2 className="font-semibold">{name}</h2>
-        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+        <h2 className="font-semibold text-white">{name}</h2>
+        <div className="flex items-center text-sm text-gray-400">
           {chat.type === 'community' 
             ? <Hash className="w-4 h-4 mr-1" /> 
             : <Users className="w-4 h-4 mr-1" />
