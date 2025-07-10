@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import axios from 'axios';
 
 interface SessionUser {
   id: string;
@@ -249,7 +250,7 @@ export default function ConsumerChannelPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [topCreators, setTopCreators] = useState<TopCreator[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(true);
-  
+  const [post, setpost] = useState<Post[]>([]);
   // Store state
   const [storeSearchTerm, setStoreSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -264,23 +265,41 @@ export default function ConsumerChannelPage() {
     }
   }, [session, status, router]);
 
-  // Fetch top creators
-  useEffect(() => {
-    const fetchTopCreators = async () => {
+  //fetch posts
+  useEffect(()=>{
+    const fetchPost = async () => {
       try {
-        setLoadingCreators(true);
-        const response = await fetch('/api/creators');
-        const data = await response.json();
-        
-        if (data.success) {
-          setTopCreators(data.creators);
+        const res = await axios.get("/api/posts");
+        console.log("Response of fetching posts: ", res);
+        if (res.status===200){
+          setpost(res.data.posts);
+        } else if (res.status===500){
+          console.log("Error in fetching post with status code 500");
         }
       } catch (error) {
-        console.error('Error fetching creators:', error);
+        console.log("Error in fetching post: ", error);
+      }
+    }
+    fetchPost();
+  }, []);
+
+  // Fetch top creators
+  useEffect(()=>{
+    const fetchTopCreators = async () => {
+      try {
+        const res = await axios.get("/api/creators");
+        console.log("Response from fetching top creators: ", res);
+        if (res.status===200){
+          setTopCreators(res.data.creators);
+        } else if (res.status===500){
+          console.log("Error in fetching top creators with status code 500: ", res);
+        }
+      } catch (error) {
+        console.log("Error in fetching top creators: ", error);
       } finally {
         setLoadingCreators(false);
       }
-    };
+    }
 
     fetchTopCreators();
   }, []);
@@ -619,7 +638,7 @@ export default function ConsumerChannelPage() {
             renderStoreContent()
           ) : (
             <div className="space-y-8 md:space-y-6 lg:space-y-8">
-              {samplePosts.map((post) => (
+              {post.map((post) => (
               <Card key={post.id} className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 shadow-xl relative overflow-hidden">
                 <CardContent className="p-6 md:p-4 lg:p-6">
                   {/* Post Header */}

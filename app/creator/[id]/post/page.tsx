@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { Upload } from "lucide-react";
@@ -16,11 +16,15 @@ export default function CreatePost() {
   const router = useRouter();
   const params = useParams();
   const creatorId = params?.id as string | undefined;
-  const token = localStorage.getItem("token");
 
-  if (!token){
-    console.log("No token in localstorage");
-  }
+  const [token, setToken] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true); // this ensures we're in the browser
+    const storedToken = localStorage.getItem("token");
+    setToken(storedToken);
+  }, []);
 
   if (!creatorId) {
     return (
@@ -71,26 +75,28 @@ export default function CreatePost() {
     formData.append("content", content);
     formData.append("isPaidOnly", String(isPaidOnly));
     formData.append("creatorId", creatorId);
-    media.forEach((f) => formData.append("media", f));
+    // media.forEach((f) => formData.append("media", f));
+    media.forEach((f)=>formData.append("image", f));
     const jwtPayload = JSON.parse(atob(token.split(".")[1]));
     console.log("🧾 JWT userId:", jwtPayload.userId);
     console.log("📦 FormData creatorId:", creatorId);
 
-    if (jwtPayload.userId !== creatorId) {
-      console.warn("🚨 MISMATCH! Token userId !== creatorId");
-    } else {
-      console.log("✅ JWT userId matches creatorId");
-    }
-    
+    // if (jwtPayload.userId !== creatorId) {
+    //   console.warn("🚨 MISMATCH! Token userId !== creatorId");
+    // } else {
+    //   console.log("✅ JWT userId matches creatorId");
+    // }
+
     // const res = await fetch('/api/posts', {
     //   method: 'POST',
     //   body: formData,
     // })
     try {
+      console.log("Token sending for authorization: ", token);
       const res = await axios.post("/api/posts", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`,
         },
       });
       console.log("Response in uploading post: ", res);

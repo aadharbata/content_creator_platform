@@ -3,6 +3,9 @@ import { mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import prisma from '@/lib/prisma';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]/route';
 
 // Disable Next.js body parser for file uploads
 export const config = {
@@ -30,6 +33,20 @@ const S3_BUCKET = process.env.AWS_S3_BUCKET!;
 
 export async function POST(request: NextRequest) {
   try {
+    // Get session and userId
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Fetch creatorProfile by userId
+    const creatorProfile = await prisma.creatorProfile.findUnique({ where: { userId } });
+    if (!creatorProfile) {
+      return NextResponse.json({ error: 'No creator profile found for user' }, { status: 404 });
+    }
+    const creatorId = creatorProfile.id;
+
     const formData = await request.formData();
     
     // Extract form fields
@@ -86,7 +103,8 @@ export async function POST(request: NextRequest) {
         notes,
         files: savedFiles,
         uploadedAt: new Date().toISOString(),
-        status: 'DRAFT'
+        status: 'DRAFT',
+        creatorId, // <-- use the creatorProfile.id
       };
       console.log('[UPLOAD] Simulated content metadata:', contentMetadata);
       return NextResponse.json({
@@ -145,7 +163,8 @@ export async function POST(request: NextRequest) {
       notes,
       files: savedFiles,
       uploadedAt: new Date().toISOString(),
-      status: 'DRAFT'
+      status: 'DRAFT',
+      creatorId, // <-- use the creatorProfile.id
     };
 
     // TODO: Save to database when DATABASE_URL is configured
@@ -166,6 +185,17 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }
 
 export async function GET() {
