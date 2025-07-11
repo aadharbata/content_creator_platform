@@ -433,6 +433,7 @@ model PostMedia {
   id        String   @id @default(uuid())
   url       String
   type      String   // "photo" or "video"
+  LikesCount Int @default(0)
   post      Post     @relation(fields: [postId], references: [id])
   postId    String
   createdAt DateTime @default(now())

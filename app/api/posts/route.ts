@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
 import jwt from "jsonwebtoken";
 import path from "path";
 import fs from "fs/promises";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
+    // Get current user from NextAuth session
+    const session = await getServerSession(authOptions);
+    console.log("Posts API - Session:", session);
+    const currentUserId = session?.user ? (session.user as { id: string }).id : null;
+    console.log("Posts API - Current user ID:", currentUserId);
+
     // Fetch posts with creator, media, likes, and comments
     const posts = await prisma.post.findMany({
       orderBy: { createdAt: "desc" },
@@ -24,8 +32,16 @@ export async function GET(request: NextRequest) {
           },
         },
         media: true,
-        likes: true,
+        likes: {
+          where: currentUserId ? { userId: currentUserId } : undefined,
+        },
         comments: true,
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
       },
       take: 20, // Limit to 20 posts for now
     });
@@ -33,6 +49,8 @@ export async function GET(request: NextRequest) {
     // Transform posts to match frontend requirements
     const transformed = posts.map((post) => {
       const creatorUser = post.creator.user;
+      const isLiked = currentUserId ? post.likes.length > 0 : false;
+      
       return {
         id: post.id,
         creator: {
@@ -47,11 +65,12 @@ export async function GET(request: NextRequest) {
         time: post.createdAt,
         content: post.content,
         image:
-          post.media && post.media.length > 0 ? post.media[0].url : undefined, // <-- add image field
+          post.media && post.media.length > 0 ? post.media[0].url : undefined,
         isPaid: post.isPaidOnly,
-        price: post.isPaidOnly ? "₹" : undefined, // You can enhance this with actual price if available
-        likes: post.likes.length,
-        comments: post.comments.length,
+        price: post.isPaidOnly ? "₹" : undefined,
+        likes: post._count.likes,
+        comments: post._count.comments,
+        isLiked: isLiked,
       };
     });
 
@@ -157,10 +176,10 @@ export async function POST(request: NextRequest) {
           .toString(36)
           .substring(2, 10)}${ext}`;
         const uploadDir = path.join(process.cwd(), "public", "uploads");
-        const makefsdir = await fs.mkdir(uploadDir, { recursive: true });
+        await fs.mkdir(uploadDir, { recursive: true });
         const filePath = path.join(uploadDir, fileName);
         console.log("File is saved: ", filePath);
-        const writefileres = await fs.writeFile(filePath, buffer);
+        await fs.writeFile(filePath, buffer);
         const fileUrl = `/uploads/${fileName}`;
 
         const postmediares = await prisma.postMedia.create({
