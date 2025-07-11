@@ -2,34 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
 
-// const authHeader =
-//       request.headers.get("authorization") ||
-//       request.headers.get("Authorization") ||
-//       "";
-//     // console.log("Auth header: ", authHeader);
-//     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-//     // console.log("Token: ", token);
-//     const jwtSecret = process.env.JWT_SECRET || "Ishan";
-//     let jwtUser: { userId: string; role: string } | null = null;
-//     if (!token) {
-//       return NextResponse.json(
-//         { error: "Missing authentication token." },
-//         { status: 401 }
-//       );
-//     }
-//     try {
-//       jwtUser = jwt.verify(token, jwtSecret) as {
-//         userId: string;
-//         role: string;
-//       };
-//       // console.log("Jwtuser decoded: ", jwtUser);
-//     } catch {
-//       return NextResponse.json(
-//         { error: "Invalid or expired token." },
-//         { status: 401 }
-//       );
-//     }
-
 export async function POST(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   const { postId } = await params;
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';

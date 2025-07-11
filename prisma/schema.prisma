@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   // url      = env("DATABASE_URL")
-  url = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  url      = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 }
 
 model User {
@@ -25,8 +25,8 @@ model User {
   notifications        Notification[]
   payments             Payment[]
   reviews              Review[]
-  subscriptions        Subscription[] @relation("UserSubscriptions")
-  subscribers          Subscription[] @relation("CreatorSubscriptions")
+  subscriptions        Subscription[]    @relation("UserSubscriptions")
+  subscribers          Subscription[]    @relation("CreatorSubscriptions")
   profile              UserProfile?
   creatorConversations Conversation[]    @relation("CreatorConversations")
   fanConversations     Conversation[]    @relation("FanConversations")
@@ -36,12 +36,13 @@ model User {
   creatorProfile       CreatorProfile? // Added for relation to CreatorProfile
   like                 Like[]
   Comment              Comment[]
-  
+  tip                  Tip[]
+
   // Community relations
   ownedCommunities     Community[]        @relation("CreatorCommunities")
   communityMemberships CommunityMember[]
   communityMessages    CommunityMessage[] @relation("CommunityMessages")
-  
+
   @@index([name])
 }
 
@@ -83,7 +84,7 @@ model Content {
   course           Course?            @relation(fields: [courseId], references: [id])
   Tag              Tag?               @relation(fields: [tagId], references: [id])
   ContentAnalytics ContentAnalytics[]
-  community        Community?         // Content-based community
+  community        Community? // Content-based community
 }
 
 model Course {
@@ -123,10 +124,10 @@ model Lesson {
 }
 
 model Subscription {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
   creatorId String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   payments  Payment[] // Added for relation to Payment
 
   user    User @relation("UserSubscriptions", fields: [userId], references: [id])
@@ -239,50 +240,46 @@ enum NotificationType {
   COMMUNITY
 }
 
-
-
-
-
 model Community {
-  id          String @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   description String?
   type        String // "CONTENT_COMMUNITY" or "SUBSCRIPTION_COMMUNITY"
-  maxMembers  Int    @default(1000)
-  
+  maxMembers  Int     @default(1000)
+
   // References
-  contentId   String?           // For content-based communities
-  creatorId   String            // Creator who owns this community
-  
+  contentId String? // For content-based communities
+  creatorId String // Creator who owns this community
+
   // Metadata
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
   creator      User                   @relation("CreatorCommunities", fields: [creatorId], references: [id])
   content      Content?               @relation(fields: [contentId], references: [id])
   members      CommunityMember[]
   conversation CommunityConversation?
-  
+
   @@unique([contentId]) // One community per content
   @@unique([creatorId, type]) // One subscription community per creator
   @@index([creatorId, type])
 }
 
 model CommunityMember {
-  id          String   @id @default(uuid())
-  joinedAt    DateTime @default(now())
-  lastActive  DateTime?
-  lastReadAt  DateTime @default(now())
-  
+  id         String    @id @default(uuid())
+  joinedAt   DateTime  @default(now())
+  lastActive DateTime?
+  lastReadAt DateTime  @default(now())
+
   // References
   userId      String
   communityId String
-  
+
   // Relations
-  user        User      @relation(fields: [userId], references: [id])
-  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  
+  user      User      @relation(fields: [userId], references: [id])
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
   @@unique([userId, communityId]) // One membership per user per community
   @@index([communityId])
   @@index([userId])
@@ -313,7 +310,7 @@ model CommunityConversation {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  community Community        @relation(fields: [communityId], references: [id])
+  community Community          @relation(fields: [communityId], references: [id])
   messages  CommunityMessage[]
 }
 
@@ -408,10 +405,10 @@ model ContentDelivery {
 
 // --- Membership & Subscription Models Start ---
 model CreatorProfile {
-  id                String         @id @default(uuid())
-  user              User           @relation(fields: [userId], references: [id])
-  userId            String         @unique
-  isPaid            Boolean        @default(false)
+  id                String  @id @default(uuid())
+  user              User    @relation(fields: [userId], references: [id])
+  userId            String  @unique
+  isPaid            Boolean @default(false)
   subscriptionPrice Int?
   posts             Post[]
 }
@@ -427,16 +424,17 @@ model Post {
   likes      Like[]
   comments   Comment[]
   media      PostMedia[]
+  tip        Tip[]
 }
 
 model PostMedia {
-  id        String   @id @default(uuid())
-  url       String
-  type      String   // "photo" or "video"
-  LikesCount Int @default(0)
-  post      Post     @relation(fields: [postId], references: [id])
-  postId    String
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  url        String
+  type       String // "photo" or "video"
+  LikesCount Int      @default(0)
+  post       Post     @relation(fields: [postId], references: [id])
+  postId     String
+  createdAt  DateTime @default(now())
 }
 
 model Like {
@@ -460,3 +458,16 @@ model Comment {
 }
 
 // --- Membership & Subscription Models End ---
+
+model Tip {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  amount    Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@index([postId])
+  @@index([userId])
+}

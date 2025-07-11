@@ -26,12 +26,14 @@ import {
   Headphones,
   Grid3X3,
   Users,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import axios from "axios";
+// import { number } from "zod";
 
 interface SessionUser {
   id: string;
@@ -89,8 +91,6 @@ interface Product {
   rating: number;
   sales: number;
 }
-
-
 
 const STORE_PRODUCTS: Product[] = [
   {
@@ -218,13 +218,35 @@ export default function ConsumerChannelPage() {
 
   // Comments state
   const [comments, setComments] = useState<{ [postId: string]: any[] }>({});
-  const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
-  const [loadingComments, setLoadingComments] = useState<{ [postId: string]: boolean }>({});
-  const [submittingComment, setSubmittingComment] = useState<{ [postId: string]: boolean }>({});
-  const [visibleComments, setVisibleComments] = useState<{ [postId: string]: boolean }>({});
-  const [commentCount, setComentCount] = useState<{[postId: string]: number}>({});
+  const [commentInputs, setCommentInputs] = useState<{
+    [postId: string]: string;
+  }>({});
+  const [loadingComments, setLoadingComments] = useState<{
+    [postId: string]: boolean;
+  }>({});
+  const [submittingComment, setSubmittingComment] = useState<{
+    [postId: string]: boolean;
+  }>({});
+  const [visibleComments, setVisibleComments] = useState<{
+    [postId: string]: boolean;
+  }>({});
+  const [commentCount, setComentCount] = useState<{ [postId: string]: number }>(
+    {}
+  );
+
+  //Tip State
+  // const [tipAmount, setTipAmount] = useState<number>(0);
   const token = localStorage.getItem("token");
   console.log("Token sent for authorization: ", token);
+
+  // Tip modal state
+  const [showTipModal, setShowTipModal] = useState<{ postId: string | null }>({
+    postId: null,
+  });
+  const [tipInput, setTipInput] = useState("");
+  const [tipLoading, setTipLoading] = useState(false);
+  const [tipError, setTipError] = useState("");
+  const [tipSuccess, setTipSuccess] = useState("");
 
   // Toggle comments visibility for a post
   const toggleComments = (postId: string) => {
@@ -243,6 +265,7 @@ export default function ConsumerChannelPage() {
       await fetchComments(postId);
     } catch (error) {
       // Optionally show error
+      console.log("Error in deleting the comments: ", error);
     }
   };
 
@@ -260,13 +283,13 @@ export default function ConsumerChannelPage() {
     const fetchPost = async () => {
       try {
         const res = await axios.get("/api/posts", {
-          withCredentials: true
+          withCredentials: true,
         });
         console.log("Response of fetching posts: ", res);
         if (res.status === 200) {
           const posts = res.data.posts;
           setpost(posts);
-          
+
           // Initialize liked posts state
           const likedPostIds = posts
             .filter((post: Post) => post.isLiked)
@@ -310,13 +333,20 @@ export default function ConsumerChannelPage() {
   const fetchComments = async (postId: string) => {
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
     try {
-      const res = await axios.get(`/api/posts/${postId}/comment`, { withCredentials: true });
+      const res = await axios.get(`/api/posts/${postId}/comment`, {
+        withCredentials: true,
+      });
       setComments((prev) => ({ ...prev, [postId]: res.data.comments }));
-      setComentCount(prev=> ({
+      setComentCount((prev) => ({
         ...prev,
-        [postId]: res.data.comments.length || 0
-      }))
-      console.log("Comment count: ", res.data.comments.length, " with postid: ", postId);
+        [postId]: res.data.comments.length || 0,
+      }));
+      console.log(
+        "Comment count: ",
+        res.data.comments.length,
+        " with postid: ",
+        postId
+      );
     } catch (error) {
       setComments((prev) => ({ ...prev, [postId]: [] }));
       console.log("Error in fetching comments: ", error);
@@ -338,14 +368,18 @@ export default function ConsumerChannelPage() {
     setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
     try {
       // await axios.post(`/api/posts/${postId}/comment`, { content }, { withCredentials: true });
-      const res = await axios.post(`/api/posts/${postId}/comment`, {
-        content
-      }, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
+      const res = await axios.post(
+        `/api/posts/${postId}/comment`,
+        {
+          content,
         },
-        // withCredentials: true,
-      })
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          // withCredentials: true,
+        }
+      );
       console.log("Response of posting comment: ", res);
       setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
       await fetchComments(postId);
@@ -381,32 +415,36 @@ export default function ConsumerChannelPage() {
   const handleLikeToggle = async (postId: string) => {
     try {
       // Get the session token
-      const sessionResponse = await axios.get('/api/auth/session');
+      const sessionResponse = await axios.get("/api/auth/session");
       const sessionData = await sessionResponse.data;
       console.log("Session data:", sessionData);
-      
+
       // Extract user ID from session
       const userId = sessionData.user?.id;
       console.log("User ID from session:", userId);
-      
+
       if (!userId) {
         console.error("No user ID found in session");
         return;
       }
-      
-      const response = await axios.post(`/api/posts/${postId}/like`, {
-        userId: userId
-      }, {
-        withCredentials: true
-      });
-      
+
+      const response = await axios.post(
+        `/api/posts/${postId}/like`,
+        {
+          userId: userId,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+
       if (response.status === 200) {
         const { action } = response.data;
-        
+
         // Update liked posts state
-        setLikedPosts(prev => {
+        setLikedPosts((prev) => {
           const newSet = new Set(prev);
-          if (action === 'liked') {
+          if (action === "liked") {
             newSet.add(postId);
           } else {
             newSet.delete(postId);
@@ -415,19 +453,44 @@ export default function ConsumerChannelPage() {
         });
 
         // Update post likes count
-        setpost(prev => prev.map(p => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              likes: action === 'liked' ? p.likes + 1 : p.likes - 1,
-              isLiked: action === 'liked'
-            };
-          }
-          return p;
-        }));
+        setpost((prev) =>
+          prev.map((p) => {
+            if (p.id === postId) {
+              return {
+                ...p,
+                likes: action === "liked" ? p.likes + 1 : p.likes - 1,
+                isLiked: action === "liked",
+              };
+            }
+            return p;
+          })
+        );
       }
     } catch (error) {
-      console.error('Error toggling like:', error);
+      console.error("Error toggling like:", error);
+    }
+  };
+
+  const handleTip = async (postId: string) => {
+    setTipLoading(true);
+    setTipError("");
+    setTipSuccess("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        `/api/posts/${postId}/tip`,
+        { tipAmount: Number(tipInput) },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log("Tip response: ", res);
+      setTipSuccess("Tip sent! 🎉");
+      setTipInput("");
+      setShowTipModal({ postId: null });
+      // Optionally, update UI with new total tip amount
+    } catch (err: any) {
+      setTipError(err.response?.data?.message || "Failed to send tip.");
+    } finally {
+      setTipLoading(false);
     }
   };
 
@@ -873,18 +936,40 @@ export default function ConsumerChannelPage() {
                               : "text-gray-400 hover:text-red-400"
                           }`}
                         >
-                          <Heart className={`w-5 h-5 ${likedPosts.has(post.id) || post.isLiked ? "fill-current" : ""}`} />
+                          <Heart
+                            className={`w-5 h-5 ${
+                              likedPosts.has(post.id) || post.isLiked
+                                ? "fill-current"
+                                : ""
+                            }`}
+                          />
                           <span className="text-sm font-medium">
                             {post.likes}
                           </span>
                         </button>
                         <button
-                          className={`flex items-center gap-2 ${visibleComments[post.id] ? 'text-blue-400' : 'text-gray-400 hover:text-blue-400'} transition-colors`}
+                          className={`flex items-center gap-2 ${
+                            visibleComments[post.id]
+                              ? "text-blue-400"
+                              : "text-gray-400 hover:text-blue-400"
+                          } transition-colors`}
                           onClick={() => toggleComments(post.id)}
                         >
                           <MessageCircle className="w-5 h-5" />
-                          <span className="text-sm font-medium">{commentCount[post.id]}</span>
-                          <span className="ml-1 text-xs">{visibleComments[post.id] ? 'Hide' : 'Show'}</span>
+                          <span className="text-sm font-medium">
+                            {commentCount[post.id]}
+                          </span>
+                          <span className="ml-1 text-xs">
+                            {visibleComments[post.id] ? "Hide" : "Show"}
+                          </span>
+                        </button>
+                        <button
+                          className="flex items-center gap-2 text-green-500 hover:text-green-700 transition-colors"
+                          onClick={() => setShowTipModal({ postId: post.id })}
+                          title="Tip the creator"
+                        >
+                          <DollarSign size={20} />
+                          <span className="text-sm">Tip</span>
                         </button>
                         <button className="flex items-center gap-2 text-gray-400 hover:text-green-400 transition-colors">
                           <Share className="w-5 h-5" />
@@ -895,38 +980,104 @@ export default function ConsumerChannelPage() {
                       </button>
                     </div>
 
+                    {/* Tip Modal */}
+                    {showTipModal.postId === post.id && (
+                      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+                        <div className="bg-white rounded-lg p-6 shadow-lg w-80">
+                          <h2 className="text-lg font-bold mb-2 text-gray-900">
+                            Tip the Creator
+                          </h2>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={tipInput}
+                            onChange={(e) => setTipInput(e.target.value)}
+                            placeholder="Enter amount"
+                            className="w-full border rounded px-3 py-2 mb-2 text-black"
+                          />
+                          {tipError && (
+                            <div className="text-red-600 mb-2">{tipError}</div>
+                          )}
+                          {tipSuccess && (
+                            <div className="text-green-600 mb-2">
+                              {tipSuccess}
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                              onClick={() => handleTip(post.id)}
+                              disabled={tipLoading}
+                            >
+                              {tipLoading ? "Tipping..." : "Send Tip"}
+                            </button>
+                            <button
+                              className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+                              onClick={() => setShowTipModal({ postId: null })}
+                              disabled={tipLoading}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Comments Section */}
                     {visibleComments[post.id] && (
                       <div className="mt-4">
-                        <div className="mb-2 font-semibold text-gray-300 text-sm">Comments</div>
+                        <div className="mb-2 font-semibold text-gray-300 text-sm">
+                          Comments
+                        </div>
                         {loadingComments[post.id] ? (
-                          <div className="text-gray-400 text-xs">Loading comments...</div>
+                          <div className="text-gray-400 text-xs">
+                            Loading comments...
+                          </div>
                         ) : (
                           <div className="space-y-2">
                             {(comments[post.id] || []).length === 0 && (
-                              <div className="text-gray-500 text-xs">No comments yet.</div>
+                              <div className="text-gray-500 text-xs">
+                                No comments yet.
+                              </div>
                             )}
                             {(comments[post.id] || []).map((comment) => (
-                              <div key={comment.id} className="flex items-start gap-2 text-sm group">
+                              <div
+                                key={comment.id}
+                                className="flex items-start gap-2 text-sm group"
+                              >
                                 <img
-                                  src={comment.user?.profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || 'U')}`}
-                                  alt={comment.user?.name || 'User'}
+                                  src={
+                                    comment.user?.profile?.avatarUrl ||
+                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                      comment.user?.name || "U"
+                                    )}`
+                                  }
+                                  alt={comment.user?.name || "User"}
                                   className="w-7 h-7 rounded-full object-cover border border-gray-700"
                                 />
                                 <div className="flex-1">
-                                  <span className="font-medium text-gray-200">{comment.user?.name || 'User'}</span>
-                                  <span className="ml-2 text-gray-400">{comment.content}</span>
+                                  <span className="font-medium text-gray-200">
+                                    {comment.user?.name || "User"}
+                                  </span>
+                                  <span className="ml-2 text-gray-400">
+                                    {comment.content}
+                                  </span>
                                 </div>
                                 {/* Delete button for own comment */}
-                                {session?.user && comment.userId === (session.user as any).id && (
-                                  <button
-                                    className="ml-2 text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
-                                    title="Delete comment"
-                                    onClick={() => handleDeleteComment(post.id, comment.id)}
-                                  >
-                                    Delete
-                                  </button>
-                                )}
+                                {session?.user &&
+                                  comment.userId ===
+                                    (session.user as any).id && (
+                                    <button
+                                      className="ml-2 text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
+                                      title="Delete comment"
+                                      onClick={() =>
+                                        handleDeleteComment(post.id, comment.id)
+                                      }
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
                               </div>
                             ))}
                           </div>
@@ -937,20 +1088,31 @@ export default function ConsumerChannelPage() {
                             <input
                               type="text"
                               value={commentInputs[post.id] || ""}
-                              onChange={(e) => handleCommentInputChange(post.id, e.target.value)}
+                              onChange={(e) =>
+                                handleCommentInputChange(
+                                  post.id,
+                                  e.target.value
+                                )
+                              }
                               placeholder="Add a comment..."
                               className="flex-1 px-3 py-2 rounded bg-gray-800 text-gray-100 border border-gray-700 focus:outline-none text-sm"
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleCommentSubmit(post.id);
+                                if (e.key === "Enter")
+                                  handleCommentSubmit(post.id);
                               }}
                               disabled={submittingComment[post.id]}
                             />
                             <button
                               onClick={() => handleCommentSubmit(post.id)}
-                              disabled={submittingComment[post.id] || !(commentInputs[post.id]?.trim())}
+                              disabled={
+                                submittingComment[post.id] ||
+                                !commentInputs[post.id]?.trim()
+                              }
                               className="px-3 py-2 rounded bg-yellow-500 text-black font-semibold text-xs hover:bg-yellow-600 disabled:opacity-60"
                             >
-                              {submittingComment[post.id] ? 'Posting...' : 'Post'}
+                              {submittingComment[post.id]
+                                ? "Posting..."
+                                : "Post"}
                             </button>
                           </div>
                         )}
