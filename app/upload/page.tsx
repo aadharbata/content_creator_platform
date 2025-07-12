@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { Upload, FileText, DollarSign, Tag, Globe, Link, BookOpen, Video, Info, XCircle, LayoutGrid } from 'lucide-react';
+import { useSession } from "next-auth/react";
 
 interface ContentUploadFormProps {
   onSubmit?: (data: any) => void;
@@ -38,8 +39,13 @@ const languages = [
   { value: "both", label: "Both" },
 ];
 
+function hasUserId(user: unknown): user is { id: string } {
+  return typeof user === 'object' && user !== null && 'id' in user && typeof (user as any).id === 'string';
+}
+
 export default function ContentUploadForm({ onSubmit, onCancel }: ContentUploadFormProps) {
   const { language } = useLanguage();
+  const { data: session } = useSession();
   const [contentFor, setContentFor] = useState("");
   const [contentType, setContentType] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -62,6 +68,14 @@ export default function ContentUploadForm({ onSubmit, onCancel }: ContentUploadF
     setUploading(true);
     setResult(null);
 
+    if (!session || !session.user || !hasUserId(session.user)) {
+      setResult(language === 'hi' 
+        ? "आपको सामग्री अपलोड करने के लिए लॉग इन करना होगा।" 
+        : "You must be logged in to upload content.");
+      setUploading(false);
+      return;
+    }
+
     const form = e.currentTarget;
     const formData = new FormData(form);
 
@@ -69,6 +83,9 @@ export default function ContentUploadForm({ onSubmit, onCancel }: ContentUploadF
     selectedFiles.forEach((file) => {
       formData.append('files', file);
     });
+
+    // Set creatorId from session
+    formData.set('creatorId', session.user.id);
 
     try {
       const res = await fetch("/api/content/upload", {

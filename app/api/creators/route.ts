@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       take: 10 // Limit to top 10 creators
     });
 
+    // console.log("fetching creaotrs: ", creators);
     // Transform the data to include handles and format for frontend
     const transformedCreators = creators.map(creator => ({
       id: creator.id,
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       success: true,
       creators: transformedCreators
-    });
+    }, {status: 200});
 
   } catch (error) {
     console.error('Error fetching creators:', error);

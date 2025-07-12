@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma';
 export async function POST(request: NextRequest) {
   try {
     const { name, email, password, role } = await request.json();
+    console.log("Role: ", role);
 
     if (!name || !email || !password || !role) {
       return NextResponse.json(
@@ -47,12 +48,13 @@ export async function POST(request: NextRequest) {
 
     // Automatically create CreatorProfile if user is a CREATOR
     if (user.role === 'CREATOR') {
-      await prisma.creatorProfile.create({
+      const creatorProfile=await prisma.creatorProfile.create({
         data: {
           userId: user.id,
           isPaid: false,
         },
       });
+      console.log("CreatorProfile Created: ", creatorProfile);
     }
 
     // After successful user creation, automatically sign them in

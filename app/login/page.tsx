@@ -31,6 +31,7 @@ const Login = () => {
       }
       
       if (userRole === 'CREATOR' && userId) {
+        console.log("Directing to creator route!");
         router.push(`/creator/${userId}/dashboard`);
       } else {
         router.push('/consumer-channel');
@@ -55,10 +56,15 @@ const Login = () => {
         password: form.password,
       });
 
+      const createprofileresult = await axios.post("")
+
+      console.log("Result of login: ", result);
+
       if (result?.error) {
         setError(result.error);
       } else if (result?.ok) {
         setSuccess(language === 'hi' ? "लॉगिन सफल! पुनर्निर्देशित कर रहे हैं..." : "Login successful! Redirecting...");
+        console.log("Redirecting!");
         // Session will be updated and useEffect will handle the redirect
       }
     } catch (err) {
