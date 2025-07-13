@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 export async function GET(request: NextRequest) {
   try {
     // Get creators from User table where role is CREATOR with their profiles
+    // Prioritize creators who have posted content
     const creators = await prisma.user.findMany({
       where: {
         role: 'CREATOR'
@@ -26,17 +27,37 @@ export async function GET(request: NextRequest) {
           select: {
             subscribers: true // Count of subscribers for ranking
           }
+        },
+        creatorProfile: {
+          select: {
+            _count: {
+              select: {
+                posts: true // Count of posts for ranking
+              }
+            }
+          }
         }
       },
-      orderBy: {
-        subscribers: {
-          _count: 'desc' // Order by most subscribed first
+      orderBy: [
+        {
+          creatorProfile: {
+            posts: {
+              _count: 'desc' // Order by most posts first
+            }
+          }
+        },
+        {
+          subscribers: {
+            _count: 'desc' // Then by most subscribed
+          }
+        },
+        {
+          createdAt: 'desc' // Then by newest
         }
-      },
+      ],
       take: 10 // Limit to top 10 creators
     });
 
-    // console.log("fetching creaotrs: ", creators);
     // Transform the data to include handles and format for frontend
     const transformedCreators = creators.map(creator => ({
       id: creator.id,
@@ -48,6 +69,7 @@ export async function GET(request: NextRequest) {
       instagram: creator.profile?.instagram,
       twitter: creator.profile?.twitter,
       subscriberCount: creator._count.subscribers,
+      postCount: creator.creatorProfile?._count?.posts || 0,
       subscribed: false // Will be updated based on current user's subscriptions
     }));
 

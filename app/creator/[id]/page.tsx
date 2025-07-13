@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils"
 import { getTranslations, type Language } from "@/lib/translations"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
 import { dummyCourses } from "./dummy-courses"
-import { getAuthUser } from "@/lib/auth"
+import { useSession } from "next-auth/react"
 
 // Constants
 const COURSE_LEVELS = {
@@ -261,10 +261,15 @@ function ReviewCard({ review, t }: { review: Review; t: any }) {
 export default function CreatorProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { language, setLanguage, translations } = useLanguage()
+  const { data: session } = useSession()
 
-  // Get the logged-in user ID synchronously
-  const user = getAuthUser();
-  const userId = user?.id;
+  // Get the logged-in user ID from session
+  const userId = (session?.user as any)?.id;
+  
+  // Console logging for debugging
+  console.log("🆔 Creator ID from URL params:", id);
+  console.log("👤 User ID from session:", userId);
+  console.log("📝 Session data:", session);
   
   // Validate UUID
   if (!validateUUID(id)) {
@@ -303,16 +308,27 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
-      const user = getAuthUser();
-      if (!user) {
+      if (!session?.user) {
         setIsSubscribed(false);
         setLoadingSubscription(false);
         return;
       }
+      
+      const currentUserId = (session?.user as any)?.id;
+      
       // Debug: log userId and creatorId for subscription check
-      console.log('Check subscription:', { userId: user.id, creatorId: id });
+      console.log('Check subscription:', { userId: currentUserId, creatorId: id });
+      
+      // If the creator is viewing their own profile, they should see it as "subscribed"
+      if (currentUserId === id) {
+        console.log('🔍 Creator viewing own profile - auto-subscribing');
+        setIsSubscribed(true);
+        setLoadingSubscription(false);
+        return;
+      }
+      
       try {
-        const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${user.id}`);
+        const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${currentUserId}`);
         const data = await res.json();
         setIsSubscribed(data.subscribed === true);
       } catch {
@@ -321,7 +337,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       setLoadingSubscription(false);
     }
     checkSubscription();
-  }, [id])
+  }, [id, session])
   // --- Backend subscription logic end ---
 
   // Fetch all creator data
@@ -585,13 +601,13 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
                     </ul>
                     <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
-                      const user = getAuthUser();
+                      const user = session?.user;
                       // Debug: log userId and creatorId for subscription POST
-                      console.log('Subscribe POST:', { userId: user?.id, creatorId: id });
+                      console.log('Subscribe POST:', { userId: (user as any)?.id, creatorId: id });
                       await fetch("/api/subscribe", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ creatorId: id, userId: user?.id })
+                        body: JSON.stringify({ creatorId: id, userId: (user as any)?.id })
                       });
                       setIsSubscribed(true);
                     }}>

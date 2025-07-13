@@ -55,6 +55,7 @@ interface TopCreator {
 interface Post {
   id: string;
   creator: {
+    id: string;
     name: string;
     handle: string;
     avatar: string;
@@ -283,6 +284,9 @@ export default function ConsumerChannelPage() {
     const fetchPost = async () => {
       try {
         const res = await axios.get("/api/posts", {
+          headers: token ? {
+            Authorization: `Bearer ${token}`,
+          } : {},
           withCredentials: true,
         });
         console.log("Response of fetching posts: ", res);
@@ -303,7 +307,7 @@ export default function ConsumerChannelPage() {
       }
     };
     fetchPost();
-  }, []);
+  }, [token]);
 
   // Fetch top creators
   useEffect(() => {
@@ -874,14 +878,17 @@ export default function ConsumerChannelPage() {
                             {post.creator.name.charAt(1)}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="font-bold text-yellow-400 text-lg">
-                            {post.creator.name}
-                          </div>
-                          <div className="text-gray-400 text-sm">
-                            {post.time}
-                          </div>
+                                              <div>
+                        <div 
+                          className="font-bold text-yellow-400 text-lg cursor-pointer hover:text-yellow-300 transition-colors"
+                          onClick={() => handleCreatorClick(post.creator.id)}
+                        >
+                          {post.creator.name}
                         </div>
+                        <div className="text-gray-400 text-sm">
+                          {post.time}
+                        </div>
+                      </div>
                       </div>
                       <Button
                         size="sm"

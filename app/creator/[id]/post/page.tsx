@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { Upload } from "lucide-react";
 import axios from "axios";
+import { useSession } from "next-auth/react";
 
 export default function CreatePost() {
   const [title, setTitle] = useState("");
@@ -16,15 +17,46 @@ export default function CreatePost() {
   const router = useRouter();
   const params = useParams();
   const creatorId = params?.id as string | undefined;
+  const { data: session, status } = useSession();
 
-  const [token, setToken] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
-
+  // Check if user is authenticated and is the correct creator
   useEffect(() => {
-    setIsClient(true); // this ensures we're in the browser
-    const storedToken = localStorage.getItem("token");
-    setToken(storedToken);
-  }, []);
+    if (status === 'loading') return; // Still loading
+    
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+
+    const sessionUserId = (session.user as any).id;
+    const userRole = (session.user as any).role;
+    
+    if (userRole !== 'CREATOR') {
+      router.push('/consumer-channel');
+      return;
+    }
+    
+    if (sessionUserId !== creatorId) {
+      router.push(`/creator/${sessionUserId}/dashboard`);
+      return;
+    }
+  }, [session, status, creatorId, router]);
+
+  if (status === 'loading') {
+    return (
+      <div className="p-6 max-w-xl mx-auto">
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="p-6 max-w-xl mx-auto text-red-600 font-bold">
+        Please login to create posts.
+      </div>
+    );
+  }
 
   if (!creatorId) {
     return (
@@ -70,43 +102,36 @@ export default function CreatePost() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!session) {
+      alert("Please login to create posts");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("title", title);
     formData.append("content", content);
     formData.append("isPaidOnly", String(isPaidOnly));
     formData.append("creatorId", creatorId);
-    // media.forEach((f) => formData.append("media", f));
-    media.forEach((f)=>formData.append("image", f));
-    const jwtPayload = JSON.parse(atob(token.split(".")[1]));
-    console.log("🧾 JWT userId:", jwtPayload.userId);
-    console.log("📦 FormData creatorId:", creatorId);
+    media.forEach((f) => formData.append("image", f));
 
-    // if (jwtPayload.userId !== creatorId) {
-    //   console.warn("🚨 MISMATCH! Token userId !== creatorId");
-    // } else {
-    //   console.log("✅ JWT userId matches creatorId");
-    // }
-
-    // const res = await fetch('/api/posts', {
-    //   method: 'POST',
-    //   body: formData,
-    // })
     try {
-      console.log("Token sending for authorization: ", token);
+      console.log("Creating post with NextAuth session...");
       const res = await axios.post("/api/posts", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          "Authorization": `Bearer ${token}`,
         },
       });
-      console.log("Response in uploading post: ", res);
+      
+      console.log("Post created successfully: ", res);
       if (res.status === 200) {
         router.push(`/creator/${creatorId}/feed`);
       } else {
-        alert("Failed to post");
+        alert("Failed to create post");
       }
     } catch (error) {
-      console.log("Error in post: ", error);
+      console.error("Error creating post: ", error);
+      alert("Failed to create post");
     }
   };
 
