@@ -1,10 +1,14 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessageHandler = void 0;
 const zod_1 = require("zod");
 const auth_1 = require("../middleware/auth");
 const database_1 = require("../utils/database");
 const logger_1 = require("../utils/logger");
+const bad_words_1 = __importDefault(require("bad-words"));
 const sendMessageSchema = zod_1.z.object({
     conversationId: zod_1.z.string().uuid('Invalid conversation ID format'),
     content: zod_1.z.string()
@@ -28,8 +32,10 @@ const communityTypingSchema = zod_1.z.object({
 });
 class MessageHandler {
     io;
+    profanityFilter;
     constructor(io) {
         this.io = io;
+        this.profanityFilter = new bad_words_1.default();
     }
     async handleAutoJoinCommunities(socket) {
         try {
@@ -62,11 +68,12 @@ class MessageHandler {
             }
             const validatedData = sendMessageSchema.parse(data);
             const { conversationId, content } = validatedData;
+            const cleanContent = this.profanityFilter.clean(content);
             logger_1.messageLogger.info('Message send attempt', {
                 socketId: socket.id,
                 userId: socket.data.userId,
                 conversationId,
-                contentLength: content.length
+                contentLength: cleanContent.length
             });
             const hasAccess = await (0, auth_1.checkConversationAccess)(socket, conversationId);
             if (!hasAccess) {
@@ -77,7 +84,7 @@ class MessageHandler {
                 return;
             }
             const message = await database_1.databaseUtils.createMessage({
-                content,
+                content: cleanContent,
                 conversationId,
                 senderId: socket.data.userId
             });
@@ -327,6 +334,7 @@ class MessageHandler {
             const validatedData = sendCommunityMessageSchema.parse(data);
             const { communityId, content } = validatedData;
             const { userId } = socket.data;
+            const cleanContent = this.profanityFilter.clean(content);
             const member = await database_1.databaseUtils.getCommunityMembership(communityId, userId);
             if (!member) {
                 socket.emit('error', {
@@ -336,7 +344,7 @@ class MessageHandler {
                 return;
             }
             const message = await database_1.databaseUtils.createCommunityMessage({
-                content,
+                content: cleanContent,
                 communityId,
                 senderId: userId,
             });

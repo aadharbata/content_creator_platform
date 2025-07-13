@@ -3,7 +3,6 @@
 import { useState, useEffect, use, useRef } from "react"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { socketManager } from "@/lib/socket"
-import { getAuthToken } from "@/lib/auth"
 import { 
   DashboardMessage, 
   DashboardConversation, 
@@ -33,13 +32,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
+import { useSession } from "next-auth/react";
+import Image from 'next/image';
+import { Session } from 'next-auth';
+import { useRouter } from "next/navigation";
+import axios from "axios";
 
 // Import professional utilities
 import { cn } from "@/lib/utils"
-import { getTranslations, type Language } from "@/lib/translations"
+import { type Language } from "@/lib/translations"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
 
 // Professional constants
@@ -118,21 +122,11 @@ const formatDate = (timestamp: string): string => {
       month: 'short',
       day: 'numeric'
     })
-  } catch (error) {
-    return 'Invalid date'
-  }
+  } catch {}
+  return '';
 }
 
-const formatDuration = (minutes: number | null | undefined): string => {
-  if (!minutes || isNaN(minutes) || minutes < 0) {
-    return '0m'
-  }
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
-}
-
-const getBadge = (course: Course, t: any) => {
+const getBadge = (course: Course, t: Record<string, string>) => {
   if (course.salesCount >= COURSE_BADGES.BESTSELLER.threshold) return t.bestseller
   if (course.salesCount >= COURSE_BADGES.POPULAR.threshold) return t.popular
   if (course._count.reviews >= COURSE_BADGES.TOP_RATED.threshold) return t.topRated
@@ -166,19 +160,20 @@ const formatMessageTime = (timestamp: string): string => {
       month: '2-digit',
       year: 'numeric'
     })
-  } catch (error) {
-    return timestamp
-  }
+  } catch {}
+  return timestamp
 }
 
 // Course Card Component
-function CourseCard({ course, t }: { course: Course; t: any }) {
+function CourseCard({ course, t }: { course: Course; t: Record<string, string> }) {
   return (
     <Card className="group hover:shadow-lg transition-shadow duration-300 border-0 bg-white/80 backdrop-blur-sm h-full flex flex-col">
       <div className="relative overflow-hidden rounded-t-lg">
-        <img
+        <Image
           src={course.imgURL || getCourseImageFallback(course.category)}
           alt={course.title}
+          layout="fill"
+          objectFit="cover"
           className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
         />
         <div className="absolute top-2 left-2 flex gap-2">
@@ -231,22 +226,12 @@ function CourseCard({ course, t }: { course: Course; t: any }) {
 export default function CreatorDashboard({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { language, setLanguage, translations } = useLanguage()
-  
-  // Validate UUID
-  if (!validateUUID(id)) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-red-600">Invalid creator ID</p>
-          <Button asChild className="mt-4">
-            <Link href="/">Go Home</Link>
-          </Button>
-        </div>
-      </div>
-    )
-  }
+  const router = useRouter();
+  const { data: session } = useSession();
+  const [goLiveLoading, setGoLiveLoading] = useState(false);
+  const creatorId = (session?.user as any)?.id;
 
-  // State for real data
+  // State for real data (move all useState calls here, before any conditional logic)
   const [creator, setCreator] = useState<Creator | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
   const [stats, setStats] = useState<CreatorStats | null>(null)
@@ -266,6 +251,20 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
 
+  // Validate UUID
+  if (!validateUUID(id)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-red-600">Invalid creator ID</p>
+          <Button asChild className="mt-4">
+            <Link href="/">Go Home</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   // Get translations
   const t = translations
 
@@ -278,6 +277,18 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   const handleCreatorClick = (creatorId: string) => {
     // Navigate to another creator's profile page
     window.location.href = `/creator/${creatorId}`;
+  };
+
+  const handleGoLive = async () => {
+    setGoLiveLoading(true);
+    try {
+      await axios.post(`/api/creator/${creatorId}/golive`);
+      router.push(`/livestream/${creatorId}`);
+    } catch (err) {
+      // Optionally show error
+      setGoLiveLoading(false);
+      alert("Failed to go live. Please try again.");
+    }
   };
 
   // Fetch all creator data
@@ -356,71 +367,70 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     }
   }, [id])
 
-  // Initial conversations fetch
-  const fetchConversations = async () => {
-    try {
-      const response = await fetch(`/api/creator/${id}/conversations`)
-      if (response.ok) {
-        const data = await response.json()
-        setConversations(data)
+  // Conversations fetch
+  useEffect(() => {
+    if (activeTab !== 'messages') return;
+    const fetchConversations = async () => {
+      try {
+        const response = await fetch(`/api/creator/${id}/conversations`)
+        if (response.ok) {
+          const data = await response.json()
+          setConversations(data)
+        }
+      } catch (error) {
+        console.error('Error fetching conversations:', error)
       }
-    } catch (error) {
-      console.error('Error fetching conversations:', error)
-    }
-  }
+    };
+    fetchConversations();
+  }, [activeTab, id]);
 
-  // Initial messages fetch for selected conversation
-  const fetchMessages = async (conversationId: string) => {
-    try {
-      setMessagesLoading(true)
-      const response = await fetch(`/api/creator/${id}/conversations/${conversationId}/messages`)
-      if (response.ok) {
-        const data = await response.json()
-        setMessages(data)
-        
-        // Scroll to bottom
-        setTimeout(() => {
-          const container = messagesContainerRef.current
-          if (container) {
-            container.scrollTo({
-              top: container.scrollHeight,
-              behavior: 'smooth'
-            })
-          }
-        }, 100)
+  // Messages fetch
+  useEffect(() => {
+    if (!selectedConversation) return;
+    const fetchMessages = async (conversationId: string) => {
+      try {
+        setMessagesLoading(true)
+        const response = await fetch(`/api/creator/${id}/conversations/${conversationId}/messages`)
+        if (response.ok) {
+          const data = await response.json()
+          setMessages(data)
+          setTimeout(() => {
+            const container = messagesContainerRef.current
+            if (container) {
+              container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+              })
+            }
+          }, 100)
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error)
+      } finally {
+        setMessagesLoading(false)
       }
-    } catch (error) {
-      console.error('Error fetching messages:', error)
-    } finally {
-      setMessagesLoading(false)
-    }
-  }
+    };
+    fetchMessages(selectedConversation.id);
+    setNewMessage("");
+    socketManager.joinConversation(selectedConversation.id);
+    setConversations(prev => prev.map(conv =>
+      conv.id === selectedConversation.id
+        ? { ...conv, unreadCount: 0 }
+        : conv
+    ));
+  }, [selectedConversation, id]);
 
-  // Send message via WebSocket
-  const sendMessage = async () => {
-    if (!selectedConversation || !newMessage.trim() || sendingMessage) return
-
-    try {
-      setSendingMessage(true)
-      socketManager.sendMessage(selectedConversation.id, newMessage.trim())
-      setNewMessage("")
-    } catch (error) {
-      console.error('Error sending message:', error)
-      setSendingMessage(false)
-    }
-  }
+  // Filter conversations based on search
+  const filteredConversations = conversations.filter(conv =>
+    conv.fan.name.toLowerCase().includes(conversationSearch.toLowerCase())
+  )
 
   // WebSocket connection and event handling
   useEffect(() => {
-    if (!creator) return
-
-    const token = getAuthToken()
-    if (!token) {
-      console.error('No authentication token found')
-      return
-    }
-
-    const socket = socketManager.connect(token)
+    if (!creator) return;
+    const token = (session as Session & { accessToken?: string })?.accessToken;
+    if (!token) return;
+    socketManager.connect(token);
 
     // Handle new messages
     socketManager.onNewMessage((messageData) => {
@@ -529,37 +539,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     return () => {
       socketManager.removeAllListeners()
     }
-  }, [creator])
-
-  // Load conversations when messages tab is active
-  useEffect(() => {
-    if (activeTab === 'messages') {
-      fetchConversations()
-    }
-  }, [activeTab, id])
-
-  // Load messages when conversation is selected
-  useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation.id)
-      setNewMessage("")
-      
-      // Join the conversation room (server auto-marks messages as read)
-      socketManager.joinConversation(selectedConversation.id)
-      
-      // Update local unread count immediately since server marks as read
-      setConversations(prev => prev.map(conv => 
-        conv.id === selectedConversation.id 
-          ? { ...conv, unreadCount: 0 }
-          : conv
-      ))
-    }
-  }, [selectedConversation, id])
-
-  // Filter conversations based on search
-  const filteredConversations = conversations.filter(conv =>
-    conv.fan.name.toLowerCase().includes(conversationSearch.toLowerCase())
-  )
+  }, [creator, session]);
 
   // Loading state
   if (loading) {
@@ -601,6 +581,46 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
       </div>
     )
   }
+
+  // Send message function
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage) return;
+    setSendingMessage(true);
+
+    try {
+      const response = await fetch(`/api/creator/${id}/conversations/${selectedConversation?.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.accessToken}`
+        },
+        body: JSON.stringify({ content: newMessage })
+      });
+
+      if (!response.ok) {
+        throw new ApiError('Failed to send message', response.status, `/api/creator/${id}/conversations/${selectedConversation?.id}/messages`);
+      }
+
+      const messageData = await response.json();
+      setMessages(prev => [...prev, messageData]);
+      setNewMessage('');
+
+      // Join the conversation room (server auto-marks messages as read)
+      socketManager.joinConversation(selectedConversation?.id || '');
+
+      // Update local unread count immediately since server marks as read
+      setConversations(prev => prev.map(conv => 
+        conv.id === selectedConversation?.id 
+          ? { ...conv, unreadCount: 0 }
+          : conv
+      ));
+
+    } catch (err) {
+      setError(handleApiError(err, `/api/creator/${id}/conversations/${selectedConversation?.id}/messages`));
+    } finally {
+      setSendingMessage(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -1155,6 +1175,12 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
             </Tabs>
           </div>
         </div>
+      </div>
+      {/* Go Live Button at the top */}
+      <div className="flex justify-end mb-6">
+        <Button onClick={handleGoLive} disabled={goLiveLoading} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg">
+          {goLiveLoading ? "Going Live..." : "Go Live"}
+        </Button>
       </div>
     </div>
   )

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
-import jwt from "jsonwebtoken";
 import path from "path";
 import fs from "fs/promises";
+import { getToken } from "next-auth/jwt";
 
 export async function GET() {
   try {
@@ -89,36 +89,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse JWT from Authorization header
-    // console.log("Request reached to app/api/posts");
-    const authHeader =
-      request.headers.get("authorization") ||
-      request.headers.get("Authorization") ||
-      "";
-    // console.log("Auth header: ", authHeader);
+    // Use next-auth/jwt to get the user token from Authorization header
+    const authHeader = request.headers.get("authorization") || request.headers.get("Authorization") || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    // console.log("Token: ", token);
-    const jwtSecret = process.env.JWT_SECRET || "Ishan";
-    let jwtUser: { userId: string; role: string } | null = null;
     if (!token) {
-      return NextResponse.json(
-        { error: "Missing authentication token." },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Missing authentication token." }, { status: 401 });
     }
-    try {
-      jwtUser = jwt.verify(token, jwtSecret) as {
-        userId: string;
-        role: string;
-      };
-      // console.log("Jwtuser decoded: ", jwtUser);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid or expired token." },
-        { status: 401 }
-      );
+    const jwtUser = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET || "Ishan" });
+    if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+      return NextResponse.json({ error: "Invalid or expired token." }, { status: 401 });
     }
-
     // Parse form data
     const formData = await request.formData();
     console.log("FormData: ", formData.getAll("media"));
@@ -135,19 +115,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up creator profile by id (from form/params)
+    console.log("JwtUserId: ", jwtUser);
     const creatorProfile = await prisma.creatorProfile.findUnique({
-      where: { userId: jwtUser.userId },
+      where: { userId: jwtUser.id },
     });
-    // console.log("creator profile search");
+    console.log("creator profile search");
     if (!creatorProfile) {
+      console.log("No creator profile found")
       return NextResponse.json(
         { error: "No creator profile found for this id." },
         { status: 404 }
       );
     }
+    console.log("CreatorProfile found: ", creatorProfile);
 
     // Compare userId from token to userId in creatorProfile
-    if (jwtUser.userId !== creatorProfile.userId) {
+    if (jwtUser.id !== creatorProfile.userId) {
       return NextResponse.json(
         { error: "You are not authorized to post for this creator." },
         { status: 403 }

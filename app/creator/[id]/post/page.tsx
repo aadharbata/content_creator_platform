@@ -1,9 +1,10 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { Upload } from "lucide-react";
 import axios from "axios";
+import { useSession } from "next-auth/react";
 
 export default function CreatePost() {
   const [title, setTitle] = useState("");
@@ -17,14 +18,7 @@ export default function CreatePost() {
   const params = useParams();
   const creatorId = params?.id as string | undefined;
 
-  const [token, setToken] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true); // this ensures we're in the browser
-    const storedToken = localStorage.getItem("token");
-    setToken(storedToken);
-  }, []);
+  const { data: session } = useSession();
 
   if (!creatorId) {
     return (
@@ -75,38 +69,24 @@ export default function CreatePost() {
     formData.append("content", content);
     formData.append("isPaidOnly", String(isPaidOnly));
     formData.append("creatorId", creatorId);
-    // media.forEach((f) => formData.append("media", f));
-    media.forEach((f)=>formData.append("image", f));
-    const jwtPayload = JSON.parse(atob(token.split(".")[1]));
-    console.log("🧾 JWT userId:", jwtPayload.userId);
-    console.log("📦 FormData creatorId:", creatorId);
-
-    // if (jwtPayload.userId !== creatorId) {
-    //   console.warn("🚨 MISMATCH! Token userId !== creatorId");
-    // } else {
-    //   console.log("✅ JWT userId matches creatorId");
-    // }
-
-    // const res = await fetch('/api/posts', {
-    //   method: 'POST',
-    //   body: formData,
-    // })
+    media.forEach((f) => formData.append("image", f));
+    // Use NextAuth JWT token from session
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const token = (session as any)?.accessToken;
     try {
       console.log("Token sending for authorization: ", token);
       const res = await axios.post("/api/posts", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          "Authorization": `Bearer ${token}`,
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
         },
       });
       console.log("Response in uploading post: ", res);
       if (res.status === 200) {
         router.push(`/creator/${creatorId}/feed`);
-      } else {
-        alert("Failed to post");
       }
     } catch (error) {
-      console.log("Error in post: ", error);
+      console.log("Error in uploading post: ", error);
     }
   };
 

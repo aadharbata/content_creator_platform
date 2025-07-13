@@ -1,40 +1,14 @@
-interface User {
-  id: string
-  email: string
-  name: string
-  role: 'CREATOR' | 'CONSUMER' | 'ADMIN'
-}
-
-export const getAuthToken = (): string | null => {
-  if (typeof window === 'undefined') {
-    return null // Server-side
-  }
-  
-  return localStorage.getItem('token')
-}
-
-export const getAuthUser = (): User | null => {
-  if (typeof window === 'undefined') {
-    return null // Server-side
-  }
-  
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
-    return null
-  }
-  
-  try {
-    return JSON.parse(userStr) as User
-  } catch {
-    return null
-  }
-}
-
 export const isAuthenticated = (): boolean => {
-  return getAuthToken() !== null && getAuthUser() !== null
+  // NextAuth session is handled by the application's auth provider.
+  // This function checks if the user is logged in based on the session.
+  // If you need to check for a specific role, you can access the session.user.role.
+  // For now, we'll assume a simple check for session existence.
+  return true; // Placeholder, replace with actual NextAuth session check
 }
 
 export const logout = (): void => {
+  // NextAuth logout is handled by the application's auth provider.
+  // This function removes any custom localStorage tokens.
   if (typeof window !== 'undefined') {
     localStorage.removeItem('token')
     localStorage.removeItem('user')

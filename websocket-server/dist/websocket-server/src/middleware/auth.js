@@ -55,7 +55,7 @@ async function authenticateSocket(socket, next) {
     try {
         const decodedToken = await (0, jwt_1.decode)({
             token,
-            secret: process.env.NEXTAUTH_SECRET,
+            secret: process.env.NEXTAUTH_SECRET || 'Ishan',
         });
         if (!decodedToken || !decodedToken.id || !decodedToken.name || !decodedToken.role) {
             logger_2.socketLogger.warn('Authentication error: Invalid or incomplete token', {

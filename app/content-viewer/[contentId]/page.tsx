@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   Lock
 } from "lucide-react"
+import { useSession } from "next-auth/react";
+import { Session } from "next-auth";
 
 interface SecureContent {
   id: string
@@ -21,7 +23,7 @@ interface SecureContent {
   description: string
   type: string
   url: string
-  metadata: any
+  metadata: Record<string, unknown> | null
   hasAccess: boolean
   course: {
     title: string
@@ -37,17 +39,15 @@ export default function ContentViewer() {
   const [content, setContent] = useState<SecureContent | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetchSecureContent()
-  }, [contentId])
+  const { data: session } = useSession();
 
   const fetchSecureContent = async () => {
     try {
-      // TODO: Include actual user authentication
+      // Use NextAuth JWT token from session
+      const token = (session as Session & { accessToken?: string })?.accessToken;
       const response = await fetch(`/api/content/secure/${contentId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || 'temp-token'}`
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -65,6 +65,10 @@ export default function ContentViewer() {
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    fetchSecureContent()
+  }, [contentId, fetchSecureContent])
 
   const renderContent = () => {
     if (!content) return null

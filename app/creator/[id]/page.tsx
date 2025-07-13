@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils"
 import { getTranslations, type Language } from "@/lib/translations"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
 import { dummyCourses } from "./dummy-courses"
-import { getAuthUser } from "@/lib/auth"
+import { useSession } from "next-auth/react"
 
 // Constants
 const COURSE_LEVELS = {
@@ -262,9 +262,9 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   const { id } = use(params)
   const { language, setLanguage, translations } = useLanguage()
 
-  // Get the logged-in user ID synchronously
-  const user = getAuthUser();
-  const userId = user?.id;
+  // Get the logged-in user ID from session
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
   
   // Validate UUID
   if (!validateUUID(id)) {
@@ -303,16 +303,15 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
-      const user = getAuthUser();
-      if (!user) {
+      if (!session?.user?.id) {
         setIsSubscribed(false);
         setLoadingSubscription(false);
         return;
       }
       // Debug: log userId and creatorId for subscription check
-      console.log('Check subscription:', { userId: user.id, creatorId: id });
+      console.log('Check subscription:', { userId: session.user.id, creatorId: id });
       try {
-        const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${user.id}`);
+        const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${session.user.id}`);
         const data = await res.json();
         setIsSubscribed(data.subscribed === true);
       } catch {
@@ -321,7 +320,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       setLoadingSubscription(false);
     }
     checkSubscription();
-  }, [id])
+  }, [id, session?.user?.id])
   // --- Backend subscription logic end ---
 
   // Fetch all creator data

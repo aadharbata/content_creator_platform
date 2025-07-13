@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import Razorpay from 'razorpay';
+import { getToken } from "next-auth/jwt";
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -9,6 +10,13 @@ const razorpay = new Razorpay({
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract user from NextAuth JWT
+    const jwtUser = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+    if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = jwtUser.id;
+
     const { amount, currency, creatorId } = await request.json();
 
     // Validate required fields
@@ -20,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if creator exists
-    const creator = await prisma.creator.findUnique({ 
+    const creator = await prisma.creatorProfile.findUnique({ 
       where: { id: creatorId } 
     });
     
@@ -41,17 +49,13 @@ export async function POST(request: NextRequest) {
     // Store payment record in database
     await prisma.payment.create({
       data: {
-        razorpayOrderId: order.id,
-        creatorId,
-        originalAmount: amount,
-        originalCurrency: currency,
         amount: amount,
         currency: currency,
         status: 'PENDING',
         paymentvia: 'RAZORPAY',
         paymentId: order.id,
         subscriptionId: 'temp-subscription-id', // You might want to handle this differently
-        userId: 'temp-user-id', // You might want to get this from auth
+        userId: userId,
       },
     });
 
