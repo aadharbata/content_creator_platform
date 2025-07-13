@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useRef } from "react"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { socketManager } from "@/lib/socket"
-import { getAuthToken } from "@/lib/auth"
+import { useSession } from "next-auth/react"
 import { 
   DashboardMessage, 
   DashboardConversation, 
@@ -17,17 +17,17 @@ import {
   DollarSign, 
   Users, 
   MessageCircle, 
-  Settings, 
-  Upload, 
-  Star, 
-  Edit3,
-  BarChart3,
-  Calendar,
-  Crown,
+  Settings,
   Languages,
+  Edit3,
+  Upload,
+  BarChart3,
+  User,
+  Star, 
   Send,
-  Search,
-  User
+  Crown,
+  Calendar,
+  Search
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -231,6 +231,7 @@ function CourseCard({ course, t }: { course: Course; t: any }) {
 export default function CreatorDashboard({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { language, setLanguage, translations } = useLanguage()
+  const { data: session } = useSession()
   
   // Validate UUID
   if (!validateUUID(id)) {
@@ -412,15 +413,10 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
 
   // WebSocket connection and event handling
   useEffect(() => {
-    if (!creator) return
+    if (!creator || !session?.user) return
 
-    const token = getAuthToken()
-    if (!token) {
-      console.error('No authentication token found')
-      return
-    }
-
-    const socket = socketManager.connect(token)
+    // Connect with user session instead of token
+    const socket = socketManager.connect(session.user.email || 'anonymous')
 
     // Handle new messages
     socketManager.onNewMessage((messageData) => {
@@ -529,7 +525,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     return () => {
       socketManager.removeAllListeners()
     }
-  }, [creator])
+  }, [creator, session?.user])
 
   // Load conversations when messages tab is active
   useEffect(() => {

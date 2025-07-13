@@ -1,92 +1,68 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Heart, MessageCircle, MoreHorizontal } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Heart, MessageCircle, MoreHorizontal, Lock } from 'lucide-react'
 
 interface Post {
   id: string
   creator: {
+    id: string
     name: string
+    handle: string
     avatar: string
-    headline: string
   }
   time: string
   content: string
   image?: string
+  isPaid?: boolean
+  price?: string
   likes: number
   comments: number
+  isLiked: boolean
 }
 
-const DUMMY_POSTS: Post[] = [
-  {
-    id: '1',
-    creator: {
-      name: 'Alex Chen',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face',
-      headline: 'Digital Artist'
-    },
-    time: '2h',
-    content: 'Just released my new Neon Abstract Patterns pack! Super excited to see what you create with it 🔥',
-    image: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    likes: 89,
-    comments: 12
-  },
-  {
-    id: '2',
-    creator: {
-      name: 'Sarah Williams',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face',
-      headline: 'Filmmaker & Vlogger'
-    },
-    time: '5h',
-    content: 'City Skyline 4K timelapse is now live 🌆✨ Check it out and let me know your thoughts!',
-    image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    likes: 142,
-    comments: 34
-  },
-  {
-    id: '3',
-    creator: {
-      name: 'Mila Rossi',
-      avatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=80&h=80&fit=crop&crop=face',
-      headline: 'Music Producer'
-    },
-    time: '1d',
-    content: 'Dropped a chill lo-fi beats pack perfect for relaxing & studying. Give it a listen 🎧',
-    image: 'https://images.unsplash.com/photo-1507878866276-a947ef722fee?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    likes: 245,
-    comments: 47
-  },
-  {
-    id: '4',
-    creator: {
-      name: 'Grace Kim',
-      avatar: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=80&h=80&fit=crop&crop=face',
-      headline: 'Product Designer'
-    },
-    time: '2d',
-    content: 'Working on a minimal desk calendar design for 2026 📅 Here is a sneak peek!',
-    image: 'https://images.unsplash.com/photo-1518231782843-287b0d38a07a?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    likes: 98,
-    comments: 19
-  },
-  {
-    id: '5',
-    creator: {
-      name: 'Daniel Lee',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face',
-      headline: 'Data Scientist'
-    },
-    time: '3d',
-    content: 'My Business Analytics Course hit 1000+ students! 🎉 Thank you for the support.',
-    image: 'https://images.unsplash.com/photo-1556761175-4b46a572b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    likes: 321,
-    comments: 76
-  }
-]
-
 const FeedPage = () => {
-  const [posts, setPosts] = useState(DUMMY_POSTS)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    fetchPosts()
+  }, [])
+
+  const fetchPosts = async () => {
+    try {
+      // Try to get token from localStorage for authentication
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      
+      const response = await fetch('/api/posts', {
+        headers: token ? {
+          'Authorization': `Bearer ${token}`,
+        } : {},
+      })
+      const data = await response.json()
+      if (data.success) {
+        setPosts(data.posts)
+      }
+    } catch (error) {
+      console.error('Error fetching posts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreatorClick = (creatorId: string) => {
+    router.push(`/creator/${creatorId}`)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-gray-100 flex items-center justify-center">
+        <div className="text-lg">Loading posts...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-black text-gray-100 flex flex-col items-center px-4 py-6">
@@ -100,8 +76,13 @@ const FeedPage = () => {
               <div className="flex items-center space-x-4">
                 <img src={post.creator.avatar} alt={post.creator.name} className="w-12 h-12 rounded-full" />
                 <div>
-                  <p className="font-medium text-white leading-tight">{post.creator.name}</p>
-                  <p className="text-sm text-gray-400 leading-tight">{post.creator.headline} • {post.time}</p>
+                  <p 
+                    className="font-medium text-white leading-tight hover:text-blue-400 cursor-pointer transition-colors"
+                    onClick={() => handleCreatorClick(post.creator.id)}
+                  >
+                    {post.creator.name}
+                  </p>
+                  <p className="text-sm text-gray-400 leading-tight">{post.creator.handle} • {new Date(post.time).toLocaleDateString()}</p>
                 </div>
               </div>
               <MoreHorizontal className="h-5 w-5 text-gray-400" />
@@ -111,8 +92,25 @@ const FeedPage = () => {
             <div className="px-4 pb-4 space-y-4">
               <p className="text-gray-200 whitespace-pre-line">{post.content}</p>
               {post.image && (
-                <div className="w-full h-64 bg-black/20 overflow-hidden rounded-lg">
+                <div className="w-full h-64 bg-black/20 overflow-hidden rounded-lg relative">
                   <img src={post.image} alt="post" className="w-full h-full object-cover" />
+                  
+                  {/* Paywall Overlay */}
+                  {post.isPaid && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-transparent rounded-lg flex flex-col items-center justify-center text-center backdrop-blur-sm">
+                      <Lock className="w-12 h-12 text-yellow-400 mb-4" />
+                      <div className="text-gray-100 mb-6 text-lg">
+                        This post is behind a paywall.
+                        <br />
+                        <span className="font-bold text-yellow-400">
+                          Subscribe to unlock
+                        </span>
+                      </div>
+                      <button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-semibold transition-colors">
+                        Subscribe Now
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

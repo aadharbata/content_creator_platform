@@ -22,7 +22,6 @@ const SignUpCreator = () => {
     phone: "",
     password: "",
     confirm_password: "",
-    role: 'CREATOR',
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -96,7 +95,7 @@ const SignUpCreator = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccess(language === 'hi' ? "साइन अप सफल! पुनर्निर्देशित कर रहे हैं..." : "Sign up successful! Redirecting...");
+        setSuccess(language === 'hi' ? "साइन अप सफल! लॉगिन पेज पर जा रहे हैं..." : "Sign up successful! Redirecting to login...");
         setTimeout(() => {
           router.push('/login');
         }, 1500);
@@ -179,27 +178,32 @@ const SignUpCreator = () => {
               />
             </label>
           ) : (
-            <div className="flex gap-2">
-              <select
-                name="countryCode"
-                value={form.countryCode}
-                onChange={handleChange}
-                className="mt-1 px-2 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-              >
-                {countryCodes.map((c) => (
-                  <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
-                ))}
-              </select>
-              <input
-                name="phone"
-                type="tel"
-                value={form.phone}
-                onChange={handleChange}
-                placeholder={language === 'hi' ? 'फोन नंबर' : 'Phone number'}
-                required
-                className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
-              />
-            </div>
+            <label className="font-semibold text-gray-800">
+              {language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
+              <div className="flex gap-2 mt-1">
+                <select
+                  name="countryCode"
+                  value={form.countryCode}
+                  onChange={handleChange}
+                  className="px-2 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+                >
+                  {countryCodes.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code} ({c.name})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="phone"
+                  type="tel"
+                  value={form.phone}
+                  onChange={handleChange}
+                  placeholder={language === 'hi' ? 'फोन नंबर' : 'Phone number'}
+                  required
+                  className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+            </label>
           )}
           <label className="font-semibold text-gray-800">
             {language === 'hi' ? 'पासवर्ड' : 'Password'}

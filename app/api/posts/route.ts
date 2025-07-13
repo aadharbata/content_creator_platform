@@ -6,13 +6,27 @@ import jwt from "jsonwebtoken";
 import path from "path";
 import fs from "fs/promises";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Get current user from NextAuth session
     const session = await getServerSession(authOptions);
-    console.log("Posts API - Session:", session);
-    const currentUserId = session?.user ? (session.user as { id: string }).id : null;
-    console.log("Posts API - Current user ID:", currentUserId);
+    let currentUserId = session?.user ? (session.user as { id: string }).id : null;
+    
+    // If no session, try to get user from JWT token
+    if (!currentUserId) {
+      const authHeader = request.headers.get("authorization") || request.headers.get("Authorization") || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      
+      if (token) {
+        try {
+          const jwtSecret = process.env.JWT_SECRET || "Ishan";
+          const jwtUser = jwt.verify(token, jwtSecret) as { userId: string; role: string };
+          currentUserId = jwtUser.userId;
+        } catch (jwtError) {
+          // Invalid token, continue without authentication
+        }
+      }
+    }
 
     // Fetch posts with creator, media, likes, and comments
     const posts = await prisma.post.findMany({
@@ -46,14 +60,33 @@ export async function GET() {
       take: 20, // Limit to 20 posts for now
     });
 
+    // Get user's subscriptions to check access to paid content
+    const userSubscriptions = currentUserId ? await prisma.subscription.findMany({
+      where: { userId: currentUserId },
+      select: { creatorId: true }
+    }) : [];
+
+    const subscribedCreatorIds = new Set(userSubscriptions.map(sub => sub.creatorId));
+
     // Transform posts to match frontend requirements
     const transformed = posts.map((post) => {
       const creatorUser = post.creator.user;
       const isLiked = currentUserId ? post.likes.length > 0 : false;
       
+      // Check if user is subscribed to this creator
+      const creatorUserId = creatorUser?.id;
+      const isSubscribed = creatorUserId ? subscribedCreatorIds.has(creatorUserId) : false;
+      
+      // Determine if post should be shown as locked
+      // If post is not paidOnly, always show unlocked
+      // If post is paidOnly but user is subscribed, show unlocked
+      // If post is paidOnly and user is not subscribed, show locked
+      const shouldShowLocked = post.isPaidOnly && !isSubscribed;
+      
       return {
         id: post.id,
         creator: {
+          id: creatorUser?.id || "unknown",
           name: creatorUser?.name || "Unknown",
           handle: `@${creatorUser?.name?.replace(/\s+/g, "") || "unknown"}`,
           avatar:
@@ -66,8 +99,8 @@ export async function GET() {
         content: post.content,
         image:
           post.media && post.media.length > 0 ? post.media[0].url : undefined,
-        isPaid: post.isPaidOnly,
-        price: post.isPaidOnly ? "₹" : undefined,
+        isPaid: shouldShowLocked,
+        price: shouldShowLocked ? "₹" : undefined,
         likes: post._count.likes,
         comments: post._count.comments,
         isLiked: isLiked,
@@ -90,14 +123,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     // Parse JWT from Authorization header
-    // console.log("Request reached to app/api/posts");
+    console.log("Request reached to app/api/posts");
     const authHeader =
       request.headers.get("authorization") ||
       request.headers.get("Authorization") ||
       "";
     // console.log("Auth header: ", authHeader);
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    // console.log("Token: ", token);
+    console.log("Token: ", token);
     const jwtSecret = process.env.JWT_SECRET || "Ishan";
     let jwtUser: { userId: string; role: string } | null = null;
     if (!token) {

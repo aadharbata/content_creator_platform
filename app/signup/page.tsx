@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
-import { signIn } from "next-auth/react";
 
 const countryCodes = [
   { code: "+1", name: "US/Canada", flag: "🇺🇸" },
@@ -23,7 +22,7 @@ const SignUp = () => {
     phone: "",
     password: "",
     confirm_password: "",
-    role: 'CREATOR',
+    role: 'CONSUMER',
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -97,25 +96,10 @@ const SignUp = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccess(language === 'hi' ? "साइन अप सफल! अब आपको लॉगिन किया जा रहा है..." : "Sign up successful! Logging you in...");
-        
-        // Automatically sign in the user after successful registration
-        const signInResult = await signIn('credentials', {
-          redirect: false,
-          email: form.email,
-          password: form.password,
-        });
-
-        if (signInResult?.ok) {
-          // Redirect to home or dashboard
-          router.push('/home');
-        } else {
-          // If auto-login fails, redirect to login page as a fallback
-          setError(language === 'hi' ? "स्वतः लॉगिन विफल। कृपया मैन्युअल रूप से लॉगिन करें।" : "Auto-login failed. Please log in manually.");
-          setTimeout(() => {
-            router.push('/login');
-          }, 2000);
-        }
+        setSuccess(language === 'hi' ? "साइन अप सफल! लॉगिन पेज पर जा रहे हैं..." : "Sign up successful! Redirecting to login...");
+        setTimeout(() => {
+          router.push('/login');
+        }, 1500);
       } else {
         setError(data.message || (language === 'hi' ? "साइन अप विफल।" : "Sign up failed."));
       }
@@ -249,7 +233,7 @@ const SignUp = () => {
                   value={form.phone}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
+                  className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none"
                   placeholder={language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
                 />
               </div>
@@ -279,7 +263,6 @@ const SignUp = () => {
               placeholder={language === 'hi' ? 'पासवर्ड की पुष्टि करें' : 'Confirm Password'}
             />
           </label>
-
           <button
             type="submit"
             className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
@@ -287,7 +270,7 @@ const SignUp = () => {
           >
             {loading 
               ? (language === 'hi' ? "साइन अप हो रहा है..." : "Signing up...") 
-              : (language === 'hi' ? "साइन अप" : "Sign Up")
+              : (language === 'hi' ? "साइन अप करें" : "Sign Up")
             }
           </button>
         </form>
@@ -301,7 +284,7 @@ const SignUp = () => {
             href="/login"
             className="text-orange-500 font-semibold hover:underline"
           >
-            {language === 'hi' ? "साइन इन करें" : "Sign in"}
+            {language === 'hi' ? "लॉगिन करें" : "Login"}
           </a>
         </p>
       </main>
