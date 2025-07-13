@@ -8,11 +8,11 @@ import fs from "fs/promises";
 
 export async function GET(request: NextRequest) {
   try {
-    // Get current user from NextAuth session
+    // Get current user from NextAuth session first
     const session = await getServerSession(authOptions);
     let currentUserId = session?.user ? (session.user as { id: string }).id : null;
     
-    // If no session, try to get user from JWT token
+    // If no session, try to get user from JWT token (fallback for old token-based requests)
     if (!currentUserId) {
       const authHeader = request.headers.get("authorization") || request.headers.get("Authorization") || "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       
       // Determine if post should be shown as locked
       // If post is not paidOnly, always show unlocked
-      // If post is paidOnly but user is subscribed, show unlocked
+      // If post is paidOnly but user is subscribed, show unlocked  
       // If post is paidOnly and user is not subscribed, show locked
       const shouldShowLocked = post.isPaidOnly && !isSubscribed;
       
@@ -122,39 +122,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse JWT from Authorization header
-    console.log("Request reached to app/api/posts");
-    const authHeader =
-      request.headers.get("authorization") ||
-      request.headers.get("Authorization") ||
-      "";
-    // console.log("Auth header: ", authHeader);
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    console.log("Token: ", token);
-    const jwtSecret = process.env.JWT_SECRET || "Ishan";
-    let jwtUser: { userId: string; role: string } | null = null;
-    if (!token) {
+    // Get current user from NextAuth session
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
       return NextResponse.json(
-        { error: "Missing authentication token." },
-        { status: 401 }
-      );
-    }
-    try {
-      jwtUser = jwt.verify(token, jwtSecret) as {
-        userId: string;
-        role: string;
-      };
-      // console.log("Jwtuser decoded: ", jwtUser);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid or expired token." },
+        { error: "Authentication required. Please login." },
         { status: 401 }
       );
     }
 
+    const currentUserId = (session.user as { id: string }).id;
+
     // Parse form data
     const formData = await request.formData();
-    console.log("FormData: ", formData.getAll("media"));
     const creatorId = formData.get("creatorId") as string;
     const content = formData.get("content") as string;
     const title = formData.get("title") as string;
@@ -167,28 +148,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Look up creator profile by id (from form/params)
+    // Look up creator profile by userId from session
     const creatorProfile = await prisma.creatorProfile.findUnique({
-      where: { userId: jwtUser.userId },
+      where: { userId: currentUserId },
     });
-    // console.log("creator profile search");
+    
     if (!creatorProfile) {
       return NextResponse.json(
-        { error: "No creator profile found for this id." },
+        { error: "No creator profile found for this user." },
         { status: 404 }
       );
     }
 
-    // Compare userId from token to userId in creatorProfile
-    if (jwtUser.userId !== creatorProfile.userId) {
+    // Verify the creator ID matches
+    if (creatorProfile.userId !== currentUserId) {
       return NextResponse.json(
         { error: "You are not authorized to post for this creator." },
         { status: 403 }
       );
     }
 
-    // (Optional) Create the post here if you want
-    // console.log("Creating Post");
+    // Create the post
     const post = await prisma.post.create({
       data: {
         title,
@@ -198,8 +178,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Handle image upload
     const imageFile = formData.get("image") as File | null;
-    console.log("Imagefile: ", imageFile);
     if (imageFile) {
       try {
         const arrayBuffer = await imageFile.arrayBuffer();
@@ -211,29 +191,29 @@ export async function POST(request: NextRequest) {
         const uploadDir = path.join(process.cwd(), "public", "uploads");
         await fs.mkdir(uploadDir, { recursive: true });
         const filePath = path.join(uploadDir, fileName);
-        console.log("File is saved: ", filePath);
         await fs.writeFile(filePath, buffer);
         const fileUrl = `/uploads/${fileName}`;
 
-        const postmediares = await prisma.postMedia.create({
+        await prisma.postMedia.create({
           data: {
             url: fileUrl,
             type: "photo",
             postId: post.id,
           },
         });
-
-        console.log("Post media created: ", postmediares);
       } catch (error) {
-        console.log("Error in saving imagefile: ", error);
+        console.error("Error saving image file:", error);
       }
     }
 
-    // console.log("Post created: ", post);
-
     return NextResponse.json({
       success: true,
-      message: "Post validated and would be created here.",
+      message: "Post created successfully",
+      post: {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+      },
     });
   } catch (error) {
     console.error("Error in POST /api/posts:", error);
@@ -243,30 +223,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-// const imageFile = formData.get('image') as File | null;
-// if (imageFile) {
-//   // Save the file to /public/uploads
-//   const arrayBuffer = await imageFile.arrayBuffer();
-//   const buffer = Buffer.from(arrayBuffer);
-//   const ext = path.extname(imageFile.name) || '.jpg';
-//   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}${ext}`;
-//   const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-//   await fs.mkdir(uploadDir, { recursive: true });
-//   const filePath = path.join(uploadDir, fileName);
-//   await fs.writeFile(filePath, buffer);
-//   const fileUrl = `/uploads/${fileName}`;
-//   // Create PostMedia record
-
-//   const postMediaRes = await prisma.postMedia.create({
-//     data: {
-//       url: fileUrl,
-//       type: "photo",
-//       postId: post.id
-//     }
-//   })
-//   // console.log("Post created: ", post);
-//   console.log("Post media also created: ", postMediaRes);
-// }
-
-// console.log("Post Created: ", post);

@@ -237,8 +237,8 @@ export default function ConsumerChannelPage() {
 
   //Tip State
   // const [tipAmount, setTipAmount] = useState<number>(0);
-  const token = localStorage.getItem("token");
-  console.log("Token sent for authorization: ", token);
+  // Removed JWT token dependency - now using NextAuth sessions
+  console.log("Using NextAuth session-based authentication");
 
   // Tip modal state
   const [showTipModal, setShowTipModal] = useState<{ postId: string | null }>({
@@ -284,9 +284,6 @@ export default function ConsumerChannelPage() {
     const fetchPost = async () => {
       try {
         const res = await axios.get("/api/posts", {
-          headers: token ? {
-            Authorization: `Bearer ${token}`,
-          } : {},
           withCredentials: true,
         });
         console.log("Response of fetching posts: ", res);
@@ -307,7 +304,7 @@ export default function ConsumerChannelPage() {
       }
     };
     fetchPost();
-  }, [token]);
+  }, []);
 
   // Fetch top creators
   useEffect(() => {
@@ -378,10 +375,7 @@ export default function ConsumerChannelPage() {
           content,
         },
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          // withCredentials: true,
+          withCredentials: true,
         }
       );
       console.log("Response of posting comment: ", res);
@@ -480,11 +474,10 @@ export default function ConsumerChannelPage() {
     setTipError("");
     setTipSuccess("");
     try {
-      const token = localStorage.getItem("token");
       const res = await axios.post(
         `/api/posts/${postId}/tip`,
         { tipAmount: Number(tipInput) },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { withCredentials: true }
       );
       console.log("Tip response: ", res);
       setTipSuccess("Tip sent! 🎉");

@@ -33,13 +33,9 @@ const FeedPage = () => {
 
   const fetchPosts = async () => {
     try {
-      // Try to get token from localStorage for authentication
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      
+      // Use NextAuth session-based authentication
       const response = await fetch('/api/posts', {
-        headers: token ? {
-          'Authorization': `Bearer ${token}`,
-        } : {},
+        credentials: 'include',
       })
       const data = await response.json()
       if (data.success) {
