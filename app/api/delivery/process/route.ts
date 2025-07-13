@@ -5,6 +5,7 @@ import {
   canBeDeliveredExternally, 
   DELIVERY_TEMPLATES 
 } from "@/lib/content-delivery"
+import { getToken } from 'next-auth/jwt';
 
 interface DeliveryRequest {
   courseId: string
@@ -16,15 +17,21 @@ interface DeliveryRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract user from NextAuth JWT
+    const jwtUser = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+    if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = jwtUser.id;
+
     const { 
       courseId, 
-      userId, 
       deliveryMethod, 
       contact, 
       userPassword 
-    }: DeliveryRequest = await request.json()
+    }: Omit<DeliveryRequest, 'userId'> = await request.json()
 
-    if (!courseId || !userId || !deliveryMethod) {
+    if (!courseId || !deliveryMethod) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }

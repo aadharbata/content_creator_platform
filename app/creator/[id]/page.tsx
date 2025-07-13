@@ -264,12 +264,17 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   const { data: session } = useSession()
 
   // Get the logged-in user ID from session
+<<<<<<< HEAD
   const userId = (session?.user as any)?.id;
   
   // Console logging for debugging
   console.log("🆔 Creator ID from URL params:", id);
   console.log("👤 User ID from session:", userId);
   console.log("📝 Session data:", session);
+=======
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
+>>>>>>> 7b4e8468850e43e0329a2a933ac6bede186834ce
   
   // Validate UUID
   if (!validateUUID(id)) {
@@ -308,7 +313,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
+<<<<<<< HEAD
       if (!session?.user) {
+=======
+      if (!session?.user?.id) {
+>>>>>>> 7b4e8468850e43e0329a2a933ac6bede186834ce
         setIsSubscribed(false);
         setLoadingSubscription(false);
         return;
@@ -317,6 +326,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       const currentUserId = (session?.user as any)?.id;
       
       // Debug: log userId and creatorId for subscription check
+<<<<<<< HEAD
       console.log('Check subscription:', { userId: currentUserId, creatorId: id });
       
       // If the creator is viewing their own profile, they should see it as "subscribed"
@@ -329,6 +339,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       
       try {
         const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${currentUserId}`);
+=======
+      console.log('Check subscription:', { userId: session.user.id, creatorId: id });
+      try {
+        const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${session.user.id}`);
+>>>>>>> 7b4e8468850e43e0329a2a933ac6bede186834ce
         const data = await res.json();
         setIsSubscribed(data.subscribed === true);
       } catch {
@@ -337,7 +352,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       setLoadingSubscription(false);
     }
     checkSubscription();
+<<<<<<< HEAD
   }, [id, session])
+=======
+  }, [id, session?.user?.id])
+>>>>>>> 7b4e8468850e43e0329a2a933ac6bede186834ce
   // --- Backend subscription logic end ---
 
   // Fetch all creator data

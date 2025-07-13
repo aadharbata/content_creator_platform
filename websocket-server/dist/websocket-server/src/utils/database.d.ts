@@ -65,6 +65,7 @@ export declare const databaseUtils: {
             senderId: string;
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             isRead: boolean;
             conversationId: string;
         }[];
@@ -83,17 +84,69 @@ export declare const databaseUtils: {
     }): Promise<any>;
     markMessagesAsRead(conversationId: string, userId: string): Promise<import("../../../lib/generated/prisma").Prisma.BatchPayload>;
     getUnreadCount(conversationId: string, userId: string): Promise<number>;
-    getUserCommunityMemberships(userId: string): Promise<any>;
-    getCommunityMembership(communityId: string, userId: string): Promise<any>;
-    getCommunityWithConversation(communityId: string): Promise<any>;
-    getCommunityMembers(communityId: string): Promise<any>;
-    getCommunityUnreadCount(communityId: string, userId: string): Promise<any>;
+    getUserCommunityMemberships(userId: string): Promise<{
+        communityId: string;
+    }[]>;
+    getCommunityMembership(communityId: string, userId: string): Promise<{
+        communityId: string;
+        id: string;
+        userId: string;
+        joinedAt: Date;
+        lastActive: Date | null;
+        lastReadAt: Date;
+    } | null>;
+    getCommunityWithConversation(communityId: string): Promise<({
+        conversation: {
+            communityId: string;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            lastMessageAt: Date;
+        } | null;
+    } & {
+        id: string;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        creatorId: string;
+        description: string | null;
+        type: string;
+        maxMembers: number;
+        contentId: string | null;
+    }) | null>;
+    getCommunityMembers(communityId: string): Promise<{
+        userId: string;
+    }[]>;
+    getCommunityUnreadCount(communityId: string, userId: string): Promise<number>;
     createCommunityMessage({ content, communityId, senderId, }: {
         content: string;
         communityId: string;
         senderId: string;
-    }): Promise<any>;
+    }): Promise<{
+        sender: {
+            image: string | null | undefined;
+            id: string;
+            name: string;
+            profile: {
+                avatarUrl: string | null;
+            } | null;
+        };
+        communityId: string;
+        content: string;
+        senderId: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        conversationId: string;
+    }>;
     markConversationAsRead(conversationId: string, userId: string): Promise<import("../../../lib/generated/prisma").Prisma.BatchPayload>;
-    markCommunityAsRead(communityId: string, userId: string): Promise<any>;
+    markCommunityAsRead(communityId: string, userId: string): Promise<{
+        communityId: string;
+        id: string;
+        userId: string;
+        joinedAt: Date;
+        lastActive: Date | null;
+        lastReadAt: Date;
+    }>;
 };
 //# sourceMappingURL=database.d.ts.map

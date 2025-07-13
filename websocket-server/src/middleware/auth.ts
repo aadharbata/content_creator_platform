@@ -46,7 +46,7 @@ export async function authenticateSocket(socket: Socket, next: (err?: Error) => 
   try {
     const decodedToken = await decode({
       token,
-      secret: process.env.NEXTAUTH_SECRET!,
+      secret: process.env.NEXTAUTH_SECRET || 'Ishan',
     });
 
     if (!decodedToken || !decodedToken.id || !decodedToken.name || !decodedToken.role) {

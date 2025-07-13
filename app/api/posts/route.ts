@@ -154,11 +154,13 @@ export async function POST(request: NextRequest) {
     });
     
     if (!creatorProfile) {
+      console.log("No creator profile found")
       return NextResponse.json(
         { error: "No creator profile found for this user." },
         { status: 404 }
       );
     }
+    console.log("CreatorProfile found: ", creatorProfile);
 
     // Verify the creator ID matches
     if (creatorProfile.userId !== currentUserId) {

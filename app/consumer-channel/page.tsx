@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { Session } from "next-auth";
 import {
   Home,
   Store,
@@ -33,6 +34,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import axios from "axios";
+import Image from "next/image";
 // import { number } from "zod";
 
 interface SessionUser {
@@ -50,6 +52,7 @@ interface TopCreator {
   bio?: string;
   subscriberCount: number;
   subscribed: boolean;
+  IsLive?: boolean; // Added IsLive to TopCreator interface
 }
 
 interface Post {
@@ -203,6 +206,17 @@ const TYPE_ICONS = {
   physical: Package,
 };
 
+// Define Comment type
+interface Comment {
+  id: string;
+  content: string;
+  userId: string;
+  user?: {
+    name?: string;
+    profile?: { avatarUrl?: string };
+  };
+}
+
 export default function ConsumerChannelPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -216,9 +230,23 @@ export default function ConsumerChannelPage() {
   const [storeSearchTerm, setStoreSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [storeActiveTab, setStoreActiveTab] = useState("top");
+  const [creatorSearchTerm, setCreatorSearchTerm] = useState("");
+  const [creatorCategory, setCreatorCategory] = useState("all");
+  const [allCreator, setAllCreator] = useState<TopCreator[]>([]);
+  const [liveCreators, setLiveCreators] = useState<TopCreator[]>([]);
+
+  // const navItems = [
+  //   { id: "feed", label: "Feed", icon: Home },
+  //   { id: "store", label: "Product Store", icon: Store },
+  //   { id: "products", label: "My Products", icon: Package },
+  //   { id: "subscriptions", label: "Manage Subscriptions", icon: CreditCard },
+  //   { id: "creators", label: "Creators", icon: Users },
+  //   { id: "chats", label: "Chats", icon: MessageCircle },
+  //   { id: "settings", label: "Settings", icon: Settings },
+  // ];
 
   // Comments state
-  const [comments, setComments] = useState<{ [postId: string]: any[] }>({});
+  const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
   const [commentInputs, setCommentInputs] = useState<{
     [postId: string]: string;
   }>({});
@@ -259,9 +287,16 @@ export default function ConsumerChannelPage() {
   // Delete a comment
   const handleDeleteComment = async (postId: string, commentId: string) => {
     try {
+      const token = (session as Session & { accessToken?: string })
+        ?.accessToken;
+      if (!token) {
+        console.error("No authentication token found");
+        return;
+      }
+
       await axios.delete(`/api/posts/${postId}/comment`, {
         data: { commentId },
-        withCredentials: true,
+        headers: { Authorization: `Bearer ${token}` },
       });
       await fetchComments(postId);
     } catch (error) {
@@ -280,31 +315,38 @@ export default function ConsumerChannelPage() {
   }, [session, status, router]);
 
   //fetch posts
-  useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        const res = await axios.get("/api/posts", {
-          withCredentials: true,
-        });
-        console.log("Response of fetching posts: ", res);
-        if (res.status === 200) {
-          const posts = res.data.posts;
-          setpost(posts);
-
-          // Initialize liked posts state
-          const likedPostIds = posts
-            .filter((post: Post) => post.isLiked)
-            .map((post: Post) => post.id);
-          setLikedPosts(new Set(likedPostIds));
-        } else if (res.status === 500) {
-          console.log("Error in fetching post with status code 500");
-        }
-      } catch (error) {
-        console.log("Error in fetching post: ", error);
+  const fetchPost = async () => {
+    try {
+      const token = (session as Session & { accessToken?: string })
+        ?.accessToken;
+      if (!token) {
+        console.error("No authentication token found");
+        return;
       }
-    };
+
+      const res = await axios.get("/api/posts", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log("Response of fetching posts: ", res);
+      if (res.status === 200) {
+        const posts = res.data.posts;
+        setpost(posts);
+
+        // Initialize liked posts state
+        const likedPostIds = posts
+          .filter((post: Post) => post.isLiked)
+          .map((post: Post) => post.id);
+        setLikedPosts(new Set(likedPostIds));
+      } else if (res.status === 500) {
+        console.log("Error in fetching post with status code 500");
+      }
+    } catch (error) {
+      console.log("Error in fetching post: ", error);
+    }
+  };
+  useEffect(() => {
     fetchPost();
-  }, []);
+  }, [session]);
 
   // Fetch top creators
   useEffect(() => {
@@ -334,8 +376,15 @@ export default function ConsumerChannelPage() {
   const fetchComments = async (postId: string) => {
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
     try {
+      const token = (session as Session & { accessToken?: string })
+        ?.accessToken;
+      if (!token) {
+        console.error("No authentication token found");
+        return;
+      }
+
       const res = await axios.get(`/api/posts/${postId}/comment`, {
-        withCredentials: true,
+        headers: { Authorization: `Bearer ${token}` },
       });
       setComments((prev) => ({ ...prev, [postId]: res.data.comments }));
       setComentCount((prev) => ({
@@ -412,27 +461,19 @@ export default function ConsumerChannelPage() {
 
   const handleLikeToggle = async (postId: string) => {
     try {
-      // Get the session token
-      const sessionResponse = await axios.get("/api/auth/session");
-      const sessionData = await sessionResponse.data;
-      console.log("Session data:", sessionData);
-
-      // Extract user ID from session
-      const userId = sessionData.user?.id;
-      console.log("User ID from session:", userId);
-
-      if (!userId) {
-        console.error("No user ID found in session");
+      // Use the session token from NextAuth
+      const token = (session as Session & { accessToken?: string })
+        ?.accessToken;
+      if (!token) {
+        console.error("No authentication token found");
         return;
       }
 
       const response = await axios.post(
         `/api/posts/${postId}/like`,
+        {},
         {
-          userId: userId,
-        },
-        {
-          withCredentials: true,
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -484,8 +525,25 @@ export default function ConsumerChannelPage() {
       setTipInput("");
       setShowTipModal({ postId: null });
       // Optionally, update UI with new total tip amount
-    } catch (err: any) {
-      setTipError(err.response?.data?.message || "Failed to send tip.");
+    } catch (err: unknown) {
+      if (
+        err &&
+        typeof err === "object" &&
+        "response" in err &&
+        err.response &&
+        typeof err.response === "object" &&
+        "data" in err.response &&
+        err.response.data &&
+        typeof err.response.data === "object" &&
+        "message" in err.response.data
+      ) {
+        setTipError(
+          (err.response as { data: { message: string } }).data.message ||
+            "Failed to send tip."
+        );
+      } else {
+        setTipError("Failed to send tip.");
+      }
     } finally {
       setTipLoading(false);
     }
@@ -502,7 +560,178 @@ export default function ConsumerChannelPage() {
     return matchesSearch && matchesType;
   });
 
+  const fetchAllCreators = async () => {
+    try {
+      const res = await axios.get("/api/creators/all");
+      console.log("Response of fetching all creators: ", res);
+      setAllCreator(res.data.creators);
+    } catch (error) {
+      console.log("Error in fetching all creators: ", error);
+    }
+  }
+
+  const fetchLiveCreators = async () => {
+    try {
+      const res = await axios.get("/api/creators/live");
+      console.log("Live creators response: ", res);
+      setLiveCreators(res.data);
+    } catch (error) {
+      console.log("Error in fetching live creators: ", error);
+    }
+  }
+
+  useEffect(() => {
+    try {
+      if (activeTab === "feed") {
+        fetchPost();
+      }
+      if (activeTab === "store") {
+
+      }
+      if (activeTab === "products") {
+      }
+      if (activeTab === "subscriptions") {
+      }
+      if (activeTab === "Live Creators") {
+        fetchLiveCreators();
+      }
+      if (activeTab === "creators") {
+        fetchAllCreators();
+      }
+      if (activeTab === "chats") {
+      }
+      if (activeTab === "settings") {
+      }
+    } catch (error) {
+      console.log("Error in useEffect change by active Tab: ", error);
+    }
+  }, [activeTab]);
+
   // Store component
+  const renderCreatorsContent = () => (
+    <div className="space-y-8">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-yellow-400 mb-4">
+          Discover Creators
+        </h1>
+        <p className="text-gray-400 text-lg">
+          Find and follow amazing creators
+        </p>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search creators..."
+            value={creatorSearchTerm}
+            onChange={(e) => setCreatorSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-2xl text-gray-100 placeholder-gray-400 focus:outline-none focus:border-yellow-500/50"
+          />
+        </div>
+        <select
+          value={creatorCategory}
+          onChange={(e) => setCreatorCategory(e.target.value)}
+          className="px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-2xl text-gray-100 focus:outline-none focus:border-yellow-500/50"
+        >
+          <option value="all">All Categories</option>
+          <option value="art">Art & Design</option>
+          <option value="tech">Technology</option>
+          <option value="music">Music</option>
+          <option value="fitness">Fitness</option>
+          <option value="education">Education</option>
+        </select>
+      </div>
+
+      {/* Creators Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loadingCreators
+          ? // Loading skeleton
+            Array.from({ length: 6 }).map((_, i) => (
+              <Card
+                key={i}
+                className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40"
+              >
+                <CardContent className="p-6">
+                  <div className="animate-pulse">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-16 h-16 bg-gray-700 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-700 rounded mb-2"></div>
+                        <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                      </div>
+                    </div>
+                    <div className="h-3 bg-gray-700 rounded mb-2"></div>
+                    <div className="h-3 bg-gray-700 rounded w-4/5"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          : allCreator.map((creator) => (
+              <Card
+                key={creator.id}
+                className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 cursor-pointer group"
+                onClick={() => handleCreatorClick(creator.id)}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Avatar className="w-16 h-16 ring-2 ring-yellow-400/50 group-hover:ring-yellow-400 transition-all duration-300">
+                      <AvatarImage src={creator.avatar} alt={creator.name} />
+                      <AvatarFallback className="bg-gray-700 text-white text-xl">
+                        {creator.name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors">
+                        {creator.name}
+                      </h3>
+                      <p className="text-gray-400 text-sm">@{creator.handle}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                        <span className="text-gray-300 text-sm">
+                          {creator.subscriberCount} subscribers
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {creator.bio && (
+                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                      {creator.bio}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    {creator.subscribed ? (
+                      <Badge className="bg-green-600/20 text-green-400 border border-green-500/30">
+                        Subscribed
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Handle follow action here
+                        }}
+                      >
+                        Follow
+                      </Button>
+                    )}
+                    <div className="text-right">
+                      <div className="text-gray-400 text-xs">Posts</div>
+                      <div className="text-gray-200 font-semibold">24</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+      </div>
+    </div>
+  );
+
   const renderStoreContent = () => (
     <div className="space-y-6">
       {/* Store Header */}
@@ -579,9 +808,10 @@ export default function ConsumerChannelPage() {
               <div className="relative">
                 {/* Product Image */}
                 <div className="relative h-48 overflow-hidden rounded-t-lg">
-                  <img
+                  <Image
                     src={product.thumbnail}
                     alt={product.title}
+                    fill
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                   />
 
@@ -657,6 +887,50 @@ export default function ConsumerChannelPage() {
     </div>
   );
 
+  const renderLiveCreatorsContent = () => (
+    <div className="space-y-8">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-yellow-400 mb-4">Live Creators</h1>
+        <p className="text-gray-400 text-lg">Join a livestream from any creator</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {(liveCreators.length > 0 ? allCreator : topCreators)
+          .map((creator) => (
+            <Card
+              key={creator.id}
+              className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 cursor-pointer group"
+              onClick={() => router.push(`/livestream/${creator.id}`)}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <Avatar className="w-16 h-16 ring-2 ring-yellow-400/50 group-hover:ring-yellow-400 transition-all duration-300">
+                    <AvatarImage src={creator.avatar} alt={creator.name} />
+                    <AvatarFallback className="bg-gray-700 text-white text-xl">
+                      {creator.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors">
+                      {creator.name}
+                    </h3>
+                    <p className="text-gray-400 text-sm">@{creator.handle}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-semibold">LIVE</span>
+                    </div>
+                  </div>
+                </div>
+                {creator.bio && (
+                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                    {creator.bio}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+      </div>
+    </div>
+  );
+
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-blue-900 flex items-center justify-center">
@@ -678,6 +952,8 @@ export default function ConsumerChannelPage() {
     { id: "store", label: "Product Store", icon: Store },
     { id: "products", label: "My Products", icon: Package },
     { id: "subscriptions", label: "Manage Subscriptions", icon: CreditCard },
+    { id: "livecreators", label: "Live Creators", icon: Users },
+    { id: "creators", label: "Creators", icon: Users },
     { id: "chats", label: "Chats", icon: MessageCircle },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -846,11 +1122,21 @@ export default function ConsumerChannelPage() {
       >
         <div
           className={`${
-            activeTab === "store" ? "max-w-6xl" : "max-w-2xl"
+            activeTab === "store"
+              ? "max-w-6xl"
+              : activeTab === "creators"
+              ? "max-w-7xl"
+              : activeTab === "livecreators"
+              ? "max-w-7xl"
+              : "max-w-2xl"
           } mx-auto px-6 md:px-4 lg:px-6`}
         >
           {activeTab === "store" ? (
             renderStoreContent()
+          ) : activeTab === "creators" ? (
+            renderCreatorsContent()
+          ) : activeTab === "livecreators" ? (
+            renderLiveCreatorsContent()
           ) : (
             <div className="space-y-8 md:space-y-6 lg:space-y-8">
               {post.map((post) => (
@@ -1046,7 +1332,7 @@ export default function ConsumerChannelPage() {
                                 key={comment.id}
                                 className="flex items-start gap-2 text-sm group"
                               >
-                                <img
+                                <Image
                                   src={
                                     comment.user?.profile?.avatarUrl ||
                                     `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -1054,6 +1340,8 @@ export default function ConsumerChannelPage() {
                                     )}`
                                   }
                                   alt={comment.user?.name || "User"}
+                                  width={28}
+                                  height={28}
                                   className="w-7 h-7 rounded-full object-cover border border-gray-700"
                                 />
                                 <div className="flex-1">
@@ -1067,7 +1355,7 @@ export default function ConsumerChannelPage() {
                                 {/* Delete button for own comment */}
                                 {session?.user &&
                                   comment.userId ===
-                                    (session.user as any).id && (
+                                    (session.user as SessionUser).id && (
                                     <button
                                       className="ml-2 text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
                                       title="Delete comment"

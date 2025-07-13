@@ -1,20 +1,24 @@
 import prisma from '@/lib/prisma'
-// For now, use a hardcoded user for development
-const defaultUserId = 'test-user-id'
+import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // Simulate authentication (replace with real auth in production)
-  const user = { id: defaultUserId }
+  // Extract user from NextAuth JWT
+  const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+  if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const userId = jwtUser.id;
 
-  const creator = await prisma.creatorProfile.findUnique({
-    where: { id: id },
-    include: {
-      subscribers: true,
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      creatorId: id,
+      userId: userId,
     },
-  })
+  });
 
-  const isSubscribed = creator?.subscribers.some(sub => sub.userId === user?.id)
+  const isSubscribed = !!subscription;
 
   const posts = await prisma.post.findMany({
     where: {
@@ -24,5 +28,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     orderBy: { createdAt: 'desc' },
   })
 
-  return Response.json({ posts, isSubscribed })
+  return NextResponse.json({ posts, isSubscribed })
 } 

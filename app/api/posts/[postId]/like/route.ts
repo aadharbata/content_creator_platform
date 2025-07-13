@@ -1,33 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getToken } from "next-auth/jwt";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/route";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { postId: string } }
-) {
+export async function POST(req: NextRequest, { params }: { params: { postId: string } }) {
+  const { postId } = params;
   try {
-    console.log("Like API called for post:", params.postId);
+    console.log("Like API called for post:", postId);
     
+    // Try to get user from session (cookie-based auth)
     const session = await getServerSession(authOptions);
-    console.log("Session from getServerSession:", session);
-    
     let userId: string | null = null;
     
-    // Try to get user ID from session first
     if (session?.user) {
-      userId = (session.user as { id: string }).id;
+      const sessionUser = session.user as { id?: string; role?: string };
+      userId = sessionUser.id || null;
       console.log("User ID from session:", userId);
     } else {
-      // Fallback: try to get user ID from request body
-      try {
-        const body = await req.json();
-        userId = body.userId;
-        console.log("User ID from request body:", userId);
-      } catch {
-        console.log("Could not parse request body");
+      // Fallback to Authorization header (token-based auth)
+      const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      if (!token) {
+        return NextResponse.json({ error: "Missing authentication token." }, { status: 401 });
       }
+      const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+      if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+        return NextResponse.json({ error: "Invalid or expired token." }, { status: 401 });
+      }
+      userId = jwtUser.id;
+      console.log("User ID from token:", userId);
     }
     
     if (!userId) {
@@ -37,7 +39,6 @@ export async function POST(
         { status: 401 }
       );
     }
-    const postId = await params.postId;
 
     // Check if user already liked this post
     const existingLike = await prisma.like.findUnique({

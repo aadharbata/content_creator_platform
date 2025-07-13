@@ -6,7 +6,8 @@ generator client {
 datasource db {
   provider = "postgresql"
   // url      = env("DATABASE_URL")
-  url      = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  // url      = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  url      = "postgresql://neondb_owner:npg_bhP6US0NldOK@ep-curly-credit-a11rtnuc-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 }
 
 model User {
@@ -409,6 +410,7 @@ model CreatorProfile {
   user              User    @relation(fields: [userId], references: [id])
   userId            String  @unique
   isPaid            Boolean @default(false)
+  IsLive            Boolean @default(false)
   subscriptionPrice Int?
   posts             Post[]
 }
