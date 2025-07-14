@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getToken } from "next-auth/jwt";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/route";
 
@@ -9,7 +8,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
     const { postId } = await params;
     console.log("Postid from params: ", postId);
     
-    // Try to get user from session (cookie-based auth)
+    // Get user from session (cookie-based auth)
     const session = await getServerSession(authOptions);
     let userId: string | null = null;
     
@@ -17,26 +16,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
       const sessionUser = session.user as { id?: string; role?: string };
       userId = sessionUser.id || null;
       console.log("User ID from session:", userId);
-    } else {
-      // Fallback to Authorization header (token-based auth)
-      const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-      console.log("AuthHeadrs in tipping: ", authHeader);
-      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-      if (!token) {
-        return NextResponse.json({ error: "Missing authentication token." }, { status: 401 });
-      }
-      const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
-      if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
-        return NextResponse.json({ error: "Invalid or expired token." }, { status: 401 });
-      }
-      userId = jwtUser.id;
-      console.log("User ID from token:", userId);
     }
     
     if (!userId) {
-      console.log("No user ID found");
+      console.log("No user ID found - user not authenticated");
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: "Unauthorized. Please log in to tip creators." },
         { status: 401 }
       );
     }

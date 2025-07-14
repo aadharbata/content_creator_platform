@@ -4,8 +4,8 @@ import { getToken } from "next-auth/jwt";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/route";
 
-export async function POST(req: NextRequest, { params }: { params: { postId: string } }) {
-  const { postId } = params;
+export async function POST(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
+  const { postId } = await params;
   try {
     console.log("Like API called for post:", postId);
     
