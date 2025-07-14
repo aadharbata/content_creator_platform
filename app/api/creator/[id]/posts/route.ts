@@ -1,32 +1,79 @@
 import prisma from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // Extract user from NextAuth JWT
-  const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
-  if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+  
+  // Try to get user from session first (cookie-based auth)
+  const session = await getServerSession(authOptions);
+  let userId: string | null = null;
+  
+  if (session?.user) {
+    const sessionUser = session.user as { id?: string; role?: string };
+    userId = sessionUser.id || null;
+  }
+  
+  // If no session, try JWT token (fallback)
+  if (!userId) {
+    const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+    if (jwtUser && typeof jwtUser.id === 'string' && jwtUser.id) {
+      userId = jwtUser.id;
+    }
+  }
+  
+  // Check if the requesting user is the creator themselves
+  const isOwnPosts = userId === id;
+  
+  // If it's the creator viewing their own posts, allow access without authentication
+  // Otherwise, require authentication for subscription checks
+  if (!isOwnPosts && !userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const userId = jwtUser.id;
 
-  const subscription = await prisma.subscription.findFirst({
-    where: {
-      creatorId: id,
-      userId: userId,
-    },
-  });
-
-  const isSubscribed = !!subscription;
+  let isSubscribed = false;
+  
+  // Only check subscription if it's not the creator's own posts
+  if (!isOwnPosts && userId) {
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        creatorId: id,
+        userId: userId,
+      },
+    });
+    isSubscribed = !!subscription;
+  }
 
   const posts = await prisma.post.findMany({
     where: {
       creatorId: id,
-      isPaidOnly: isSubscribed ? undefined : false,
+      // If it's the creator viewing their own posts, show all posts
+      // Otherwise, filter based on subscription status
+      isPaidOnly: isOwnPosts ? undefined : (isSubscribed ? undefined : false),
+    },
+    include: {
+      media: true,
+      likes: true,
+      comments: {
+        include: {
+          user: {
+            select: {
+              name: true
+            }
+          }
+        }
+      },
+      _count: {
+        select: {
+          likes: true,
+          comments: true
+        }
+      }
     },
     orderBy: { createdAt: 'desc' },
   })
 
-  return NextResponse.json({ posts, isSubscribed })
+  return NextResponse.json({ posts, isSubscribed: isOwnPosts ? true : isSubscribed })
 } 
