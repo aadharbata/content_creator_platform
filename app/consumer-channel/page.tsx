@@ -36,7 +36,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import axios from "axios";
 import Image from "next/image";
-// import { number } from "zod";
 
 interface SessionUser {
   id: string;
@@ -53,13 +52,12 @@ interface TopCreator {
   bio?: string;
   subscriberCount: number;
   subscribed: boolean;
-  IsLive?: boolean; // Added IsLive to TopCreator interface
+  IsLive?: boolean;
 }
 
 interface Post {
   id: string;
   creator: {
-    id: string;
     name: string;
     handle: string;
     avatar: string;
@@ -72,6 +70,7 @@ interface Post {
   likes: number;
   comments: number;
   isLiked?: boolean;
+  isUnlocked?: boolean;
 }
 
 interface Product {
@@ -98,8 +97,6 @@ interface Product {
   rating: number;
   sales: number;
 }
-
-// Products will be fetched from API
 
 const TYPE_ICONS = {
   image: LucideImage,
@@ -132,6 +129,7 @@ export default function ConsumerChannelPage() {
   const [loadingCreators, setLoadingCreators] = useState(true);
   const [post, setpost] = useState<Post[]>([]);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  
   // Store state
   const [storeSearchTerm, setStoreSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -140,16 +138,6 @@ export default function ConsumerChannelPage() {
   const [creatorCategory, setCreatorCategory] = useState("all");
   const [allCreator, setAllCreator] = useState<TopCreator[]>([]);
   const [liveCreators, setLiveCreators] = useState<TopCreator[]>([]);
-
-  // const navItems = [
-  //   { id: "feed", label: "Feed", icon: Home },
-  //   { id: "store", label: "Product Store", icon: Store },
-  //   { id: "products", label: "My Products", icon: Package },
-  //   { id: "subscriptions", label: "Manage Subscriptions", icon: CreditCard },
-  //   { id: "creators", label: "Creators", icon: Users },
-  //   { id: "chats", label: "Chats", icon: MessageCircle },
-  //   { id: "settings", label: "Settings", icon: Settings },
-  // ];
 
   // Comments state
   const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
@@ -178,10 +166,9 @@ export default function ConsumerChannelPage() {
     null
   );
 
-  //Tip State
-  // const [tipAmount, setTipAmount] = useState<number>(0);
-  // Removed JWT token dependency - now using NextAuth sessions
-  console.log("Using NextAuth session-based authentication");
+  // For API calls that require auth, use:
+  const token = (session as Session & { accessToken?: string })?.accessToken;
+  console.log("Token sent for authorization: ", token);
 
   // Tip modal state
   const [showTipModal, setShowTipModal] = useState<{ postId: string | null }>({
@@ -215,7 +202,6 @@ export default function ConsumerChannelPage() {
       });
       await fetchComments(postId);
     } catch (error) {
-      // Optionally show error
       console.log("Error in deleting the comments: ", error);
     }
   };
@@ -229,20 +215,44 @@ export default function ConsumerChannelPage() {
     }
   }, [session, status, router]);
 
-  //fetch posts
-  const fetchPost = async () => {
+  // Helper to check unlock status for a post
+  const checkUnlockStatus = async (postId: string) => {
+    try {
+      const token = (session as Session & { accessToken?: string })?.accessToken;
+      if (!token) return false;
+      const res = await axios.post(
+        "/api/payment/check-unlock-media",
+        { postId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return res.data && res.data.unlocked;
+    } catch {
+      return false;
+    }
+  };
+
+  // After fetching posts, check unlock status for each paid post
+  const fetchAndSetPosts = async () => {
     try {
       // Using cookie-based authentication (NextAuth session cookies)
       const res = await axios.get("/api/posts", {
         withCredentials: true,
       });
-      console.log("Response of fetching posts: ", res);
       if (res.status === 200) {
         const posts = res.data.posts;
-        setpost(posts);
-
+        // For each paid post, check unlock status
+        const updatedPosts = await Promise.all(
+          posts.map(async (post: Post) => {
+            if (post.isPaid) {
+              const unlocked = await checkUnlockStatus(post.id);
+              return { ...post, isUnlocked: unlocked };
+            }
+            return post;
+          })
+        );
+        setpost(updatedPosts);
         // Initialize liked posts state
-        const likedPostIds = posts
+        const likedPostIds = updatedPosts
           .filter((post: Post) => post.isLiked)
           .map((post: Post) => post.id);
         setLikedPosts(new Set(likedPostIds));
@@ -253,9 +263,18 @@ export default function ConsumerChannelPage() {
       console.log("Error in fetching post: ", error);
     }
   };
+
+  // Replace fetchPost with fetchAndSetPosts everywhere
   useEffect(() => {
-    fetchPost();
+    fetchAndSetPosts();
   }, [session]);
+
+  useEffect(() => {
+    if (localStorage.getItem('refreshFeed')) {
+      fetchAndSetPosts();
+      localStorage.removeItem('refreshFeed');
+    }
+  }, []);
 
   // Fetch top creators
   useEffect(() => {
@@ -319,21 +338,21 @@ export default function ConsumerChannelPage() {
     if (!content) return;
     setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
     try {
-      // await axios.post(`/api/posts/${postId}/comment`, { content }, { withCredentials: true });
       const res = await axios.post(
         `/api/posts/${postId}/comment`,
         {
           content,
         },
         {
-          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
       console.log("Response of posting comment: ", res);
       setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
       await fetchComments(postId);
     } catch (error) {
-      // Optionally show error
       console.log("Error in commentsubmit: ", error);
     } finally {
       setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
@@ -345,7 +364,6 @@ export default function ConsumerChannelPage() {
     post.forEach((p) => {
       fetchComments(p.id);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.length]);
 
   const handleCreatorClick = (creatorId: string) => {
@@ -409,16 +427,17 @@ export default function ConsumerChannelPage() {
     setTipError("");
     setTipSuccess("");
     try {
+      const token = (session as Session & { accessToken?: string })
+        ?.accessToken;
       const res = await axios.post(
         `/api/posts/${postId}/tip`,
         { tipAmount: Number(tipInput) },
-        { withCredentials: true }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log("Tip response: ", res);
       setTipSuccess("Tip sent! 🎉");
       setTipInput("");
       setShowTipModal({ postId: null });
-      // Optionally, update UI with new total tip amount
     } catch (err: unknown) {
       if (
         err &&
@@ -516,31 +535,30 @@ export default function ConsumerChannelPage() {
     } catch (error) {
       console.log("Error in fetching all creators: ", error);
     }
-  }
+  };
 
   const fetchLiveCreators = async () => {
     try {
       const res = await axios.get("/api/creators/live");
       console.log("Live creators response: ", res);
-      setLiveCreators(res.data);
+      setLiveCreators(res.data.creators);
     } catch (error) {
       console.log("Error in fetching live creators: ", error);
     }
-  }
+  };
 
   useEffect(() => {
     try {
       if (activeTab === "feed") {
-        fetchPost();
+        fetchAndSetPosts();
       }
       if (activeTab === "store") {
-
       }
       if (activeTab === "products") {
       }
       if (activeTab === "subscriptions") {
       }
-      if (activeTab === "Live Creators") {
+      if (activeTab === "livecreators") {
         fetchLiveCreators();
       }
       if (activeTab === "creators") {
@@ -553,6 +571,22 @@ export default function ConsumerChannelPage() {
     } catch (error) {
       console.log("Error in useEffect change by active Tab: ", error);
     }
+  }, [activeTab]);
+
+  // Add refetch on tab visibility
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "visible" &&
+        activeTab === "Live Creators"
+      ) {
+        fetchLiveCreators();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [activeTab]);
 
   // Store component
@@ -1039,43 +1073,48 @@ export default function ConsumerChannelPage() {
   const renderLiveCreatorsContent = () => (
     <div className="space-y-8">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-yellow-400 mb-4">Live Creators</h1>
-        <p className="text-gray-400 text-lg">Join a livestream from any creator</p>
+        <h1 className="text-4xl font-bold text-yellow-400 mb-4">
+          Live Creators
+        </h1>
+        <p className="text-gray-400 text-lg">
+          Join a livestream from any creator
+        </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(liveCreators.length > 0 ? allCreator : topCreators)
-          .map((creator) => (
-            <Card
-              key={creator.id}
-              className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 cursor-pointer group"
-              onClick={() => router.push(`/livestream/${creator.id}`)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <Avatar className="w-16 h-16 ring-2 ring-yellow-400/50 group-hover:ring-yellow-400 transition-all duration-300">
-                    <AvatarImage src={creator.avatar} alt={creator.name} />
-                    <AvatarFallback className="bg-gray-700 text-white text-xl">
-                      {creator.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors">
-                      {creator.name}
-                    </h3>
-                    <p className="text-gray-400 text-sm">@{creator.handle}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-semibold">LIVE</span>
-                    </div>
+        {liveCreators.map((creator) => (
+          <Card
+            key={creator.id}
+            className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 cursor-pointer group"
+            onClick={() => router.push(`/livestream/${creator.id}`)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <Avatar className="w-16 h-16 ring-2 ring-yellow-400/50 group-hover:ring-yellow-400 transition-all duration-300">
+                  <AvatarImage src={creator.avatar} alt={creator.name} />
+                  <AvatarFallback className="bg-gray-700 text-white text-xl">
+                    {creator.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors">
+                    {creator.name}
+                  </h3>
+                  <p className="text-gray-400 text-sm">@{creator.handle}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-semibold">
+                      LIVE
+                    </span>
                   </div>
                 </div>
-                {creator.bio && (
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                    {creator.bio}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+              {creator.bio && (
+                <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                  {creator.bio}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
@@ -1306,17 +1345,14 @@ export default function ConsumerChannelPage() {
                             {post.creator.name.charAt(1)}
                           </AvatarFallback>
                         </Avatar>
-                                              <div>
-                        <div 
-                          className="font-bold text-yellow-400 text-lg cursor-pointer hover:text-yellow-300 transition-colors"
-                          onClick={() => handleCreatorClick(post.creator.id)}
-                        >
-                          {post.creator.name}
+                        <div>
+                          <div className="font-bold text-yellow-400 text-lg">
+                            {post.creator.name}
+                          </div>
+                          <div className="text-gray-400 text-sm">
+                            {post.time}
+                          </div>
                         </div>
-                        <div className="text-gray-400 text-sm">
-                          {post.time}
-                        </div>
-                      </div>
                       </div>
                       <Button
                         size="sm"
@@ -1342,7 +1378,7 @@ export default function ConsumerChannelPage() {
                         />
 
                         {/* Paywall Overlay */}
-                        {post.isPaid && (
+                        {post.isPaid && !post.isUnlocked && (
                           <div className="absolute inset-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-transparent rounded-2xl flex flex-col items-center justify-center text-center backdrop-blur-sm">
                             <Lock className="w-12 h-12 text-yellow-400 mb-4" />
                             <div className="text-gray-100 mb-6 text-lg md:text-base lg:text-lg">
@@ -1352,7 +1388,7 @@ export default function ConsumerChannelPage() {
                                 Unlock for {post.price}
                               </span>
                             </div>
-                            <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-semibold">
+                            <Button onClick={()=>router.push(`/consumer-channel/${post.id}/media-payment`)} className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-semibold">
                               Unlock Now
                             </Button>
                           </div>
