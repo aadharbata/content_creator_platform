@@ -1,31 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
+import { getToken } from "next-auth/jwt";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   const { postId } = await params;
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  const jwtSecret = process.env.JWT_SECRET || 'Ishan';
-  let userId: string | null = null;
+  if (!token) {
+    return NextResponse.json({ error: 'Missing authentication token.' }, { status: 401 });
+  }
+  const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+  if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+    return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
+  }
+  const userId: string = jwtUser.id;
   let content: string | undefined = undefined;
   let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {}
-  // Only allow JWT
-  if (token) {
-    try {
-      const jwtUser = jwt.verify(token, jwtSecret) as { userId: string; role?: string };
-      userId = jwtUser.userId;
-    } catch (error) {
-      console.error('Error in jwtuser verify:', error);
-      if (error instanceof jwt.TokenExpiredError) {
-        return NextResponse.json({ error: 'JWT expired' }, { status: 401 });
-      }
-      return NextResponse.json({ error: 'Invalid JWT' }, { status: 401 });
-    }
-  }
   content = body.content as string;
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -85,26 +78,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ post
 export async function DELETE(req: NextRequest) {
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  const jwtSecret = process.env.JWT_SECRET || 'Ishan';
-  let userId: string | null = null;
+  if (!token) {
+    return NextResponse.json({ error: 'Missing authentication token.' }, { status: 401 });
+  }
+  const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+  if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+    return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
+  }
+  const userId: string = jwtUser.id;
   let commentId: string | undefined = undefined;
   let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {}
-  // Only allow JWT
-  if (token) {
-    try {
-      const jwtUser = jwt.verify(token, jwtSecret) as { userId: string; role?: string };
-      userId = jwtUser.userId;
-    } catch (error) {
-      console.error('Error in jwtuser verify:', error);
-      if (error instanceof jwt.TokenExpiredError) {
-        return NextResponse.json({ error: 'JWT expired' }, { status: 401 });
-      }
-      return NextResponse.json({ error: 'Invalid JWT' }, { status: 401 });
-    }
-  }
   commentId = body.commentId as string;
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

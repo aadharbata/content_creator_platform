@@ -1,43 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma";
+import { getToken } from "next-auth/jwt";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../../auth/[...nextauth]/route";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ postId: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const { postId } = await params;
     console.log("Postid from params: ", postId);
-    const authHeader =
-      req.headers.get("authorization") ||
-      req.headers.get("Authorization") ||
-      "";
-    console.log("AuthHeadrs in tipping: ", authHeader);
-    // const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    console.log("Token from authheader: ", token);
-    const jwtSecret = process.env.jwtsecret || "Ishan";
-    let userId: string | null | undefined = undefined;
-    if (token) {
-      try {
-        const jwtUser = jwt.verify(token, jwtSecret) as {
-          userId: string;
-          role?: string;
-        };
-        userId = jwtUser.userId;
-        console.log("UserId from jwtUser: ", userId);
-      } catch (error) {
-        console.log("Error in jwtuser verify:", error);
-        if (error instanceof jwt.TokenExpiredError) {
-          return NextResponse.json({ error: "JWT expired" }, { status: 401 });
-        }
-        return NextResponse.json({ error: "Invalid JWT" }, { status: 401 });
+    
+    // Try to get user from session (cookie-based auth)
+    const session = await getServerSession(authOptions);
+    let userId: string | null = null;
+    
+    if (session?.user) {
+      const sessionUser = session.user as { id?: string; role?: string };
+      userId = sessionUser.id || null;
+      console.log("User ID from session:", userId);
+    } else {
+      // Fallback to Authorization header (token-based auth)
+      const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+      console.log("AuthHeadrs in tipping: ", authHeader);
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      if (!token) {
+        return NextResponse.json({ error: "Missing authentication token." }, { status: 401 });
       }
+      const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+      if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+        return NextResponse.json({ error: "Invalid or expired token." }, { status: 401 });
+      }
+      userId = jwtUser.id;
+      console.log("User ID from token:", userId);
     }
-
+    
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.log("No user ID found");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();

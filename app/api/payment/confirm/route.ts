@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import Razorpay from 'razorpay';
 import axios from 'axios';
+import { getToken } from "next-auth/jwt";
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -10,6 +11,13 @@ const razorpay = new Razorpay({
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract user from NextAuth JWT
+    const jwtUser = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+    if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = jwtUser.id;
+
     const { paymentId, creatorId } = await request.json();
 
     // Validate required fields
@@ -50,10 +58,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Update payment record with converted amount
+    const paymentRecord = await prisma.payment.findFirst({
+      where: { paymentId: payment.order_id }
+    });
+
+    if (!paymentRecord) {
+      return NextResponse.json(
+        { error: 'Payment record not found' },
+        { status: 404 }
+      );
+    }
+
+    // Verify the payment belongs to the authenticated user
+    if (paymentRecord.userId !== userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - payment does not belong to you' },
+        { status: 403 }
+      );
+    }
+
     await prisma.payment.updateMany({
       where: { paymentId: payment.order_id },
       data: { 
-        convertedAmount: convertedINR,
+        amount: convertedINR,
         status: 'SUCCEEDED'
       },
     });

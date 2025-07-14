@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { isHighlyShareable } from "@/lib/content-delivery"
+import { getToken } from "next-auth/jwt";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ contentId: string }> }
 ) {
   try {
-    const { contentId } = await params
-    
-    // TODO: Extract actual user ID from JWT token
-    // For now, using a temp user ID
-    const userId = "temp-user-id" // This should come from authentication
+    const { contentId } = await params;
+    // Extract user ID from NextAuth JWT
+    const authHeader = request.headers.get("authorization") || request.headers.get("Authorization") || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      return NextResponse.json({ error: "Missing authentication token." }, { status: 401 });
+    }
+    const jwtUser = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
+    if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
+      return NextResponse.json({ error: "Invalid or expired token." }, { status: 401 });
+    }
+    const userId: string = jwtUser.id;
     
     // Get content with course information
     const content = await prisma.content.findUnique({
@@ -119,19 +127,15 @@ function generateSecureToken(contentId: string, userId: string): string {
 }
 
 // Optional: Add token validation endpoint
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    const { token, contentId } = await request.json()
-    
     // Validate token and return access status
     // This would verify JWT signature and expiration in production
-    
     return NextResponse.json({
       valid: true,
       expiresAt: new Date(Date.now() + 3600000).toISOString()
     })
-    
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Invalid token" },
       { status: 401 }

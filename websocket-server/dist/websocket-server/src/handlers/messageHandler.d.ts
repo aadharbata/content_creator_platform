@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { AuthenticatedSocket } from '../middleware/auth';
 export declare class MessageHandler {
     private io;
+    private profanityFilter;
     constructor(io: Server);
     handleAutoJoinCommunities(socket: AuthenticatedSocket): Promise<void>;
     handleSendMessage(socket: AuthenticatedSocket, data: unknown): Promise<void>;

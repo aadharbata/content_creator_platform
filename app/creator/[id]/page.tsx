@@ -308,7 +308,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
-      if (!session?.user) {
+      if (!session?.user?.id) {
         setIsSubscribed(false);
         setLoadingSubscription(false);
         return;
@@ -337,7 +337,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       setLoadingSubscription(false);
     }
     checkSubscription();
-  }, [id, session])
+  }, [id, session?.user?.id])
   // --- Backend subscription logic end ---
 
   // Fetch all creator data
