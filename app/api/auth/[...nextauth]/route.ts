@@ -10,7 +10,7 @@ import { JWT } from "next-auth/jwt";
 import jwt from "jsonwebtoken";
 
 export const authOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "Ishan-super-secret-jwt-key-32-chars-minimum-length",
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -57,7 +57,7 @@ export const authOptions = {
       }
       // For credentials provider, always sign a JWT and set as accessToken
       if (account && account.provider === 'credentials') {
-        const secret = process.env.NEXTAUTH_SECRET || 'Ishan';
+        const secret = process.env.NEXTAUTH_SECRET || "Ishan-super-secret-jwt-key-32-chars-minimum-length";
         const payload = {
           id: (token as { id?: string }).id,
           role: (token as { role?: string }).role,

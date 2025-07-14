@@ -3,31 +3,32 @@
 import { useState, useEffect, use, useRef } from "react"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { socketManager } from "@/lib/socket"
-import { useSession } from "next-auth/react"
-import { 
-  DashboardMessage, 
-  DashboardConversation, 
-  convertWebSocketToDashboard, 
-  isValidMessage 
+import { useSession, signOut } from "next-auth/react"
+import {
+  DashboardMessage,
+  DashboardConversation,
+  convertWebSocketToDashboard,
+  isValidMessage
 } from "@/lib/types/shared"
 import Link from "next/link"
-import { 
-  BookOpen, 
-  TrendingUp, 
-  DollarSign, 
-  Users, 
-  MessageCircle, 
+import {
+  BookOpen,
+  TrendingUp,
+  DollarSign,
+  Users,
+  MessageCircle,
   Settings,
   Languages,
   Edit3,
   Upload,
   BarChart3,
   User,
-  Star, 
+  Star,
   Send,
   Crown,
   Calendar,
-  Search
+  Search,
+  LogOut
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -36,7 +37,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { useSession } from "next-auth/react";
 import Image from 'next/image';
 import { Session } from 'next-auth';
 import { useRouter } from "next/navigation";
@@ -123,7 +123,7 @@ const formatDate = (timestamp: string): string => {
       month: 'short',
       day: 'numeric'
     })
-  } catch {}
+  } catch { }
   return '';
 }
 
@@ -161,7 +161,7 @@ const formatMessageTime = (timestamp: string): string => {
       month: '2-digit',
       year: 'numeric'
     })
-  } catch {}
+  } catch { }
   return timestamp
 }
 
@@ -183,16 +183,16 @@ function CourseCard({ course, t }: { course: Course; t: Record<string, string> }
           </Badge>
         </div>
       </div>
-      
+
       <CardContent className="p-4 flex flex-col flex-grow">
         <h3 className="font-semibold mb-2 group-hover:text-blue-600 transition-colors min-h-[3rem] line-clamp-2">
           {course.title}
         </h3>
-        
+
         <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-grow min-h-[2.5rem]">
           {course.description}
         </p>
-        
+
         <div className="flex justify-between items-end mt-auto pt-4 text-sm">
           <div className="space-y-2">
             <div>
@@ -231,7 +231,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   const { data: session } = useSession();
   const [goLiveLoading, setGoLiveLoading] = useState(false);
   const creatorId = (session?.user as any)?.id;
-  
+
   // Validate UUID
   if (!validateUUID(id)) {
     return (
@@ -306,6 +306,17 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut({ 
+        callbackUrl: 'http://localhost:3000',
+        redirect: true 
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   // Fetch all creator data
   useEffect(() => {
     let isMounted = true
@@ -314,7 +325,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
       try {
         setLoading(true)
         setError(null)
-        
+
         // Fetch all data in parallel
         const [creatorResponse, coursesResponse, statsResponse, activityResponse] = await Promise.all([
           fetch(`/api/creator/${id}`),
@@ -333,22 +344,22 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           }
           throw new ApiError('Failed to fetch creator data', creatorResponse.status, `/api/creator/${id}`)
         }
-        
+
         if (!coursesResponse.ok) {
           throw new ApiError('Failed to fetch courses', coursesResponse.status, `/api/creator/${id}/courses`)
         }
-        
+
         if (!statsResponse.ok) {
           throw new ApiError('Failed to fetch stats', statsResponse.status, `/api/creator/${id}/stats`)
         }
-        
+
         if (!activityResponse.ok) {
           throw new ApiError('Failed to fetch activity', activityResponse.status, `/api/creator/${id}/activity`)
         }
 
         const [creatorData, coursesData, statsData, activityData] = await Promise.all([
           creatorResponse.json(),
-          coursesResponse.json(), 
+          coursesResponse.json(),
           statsResponse.json(),
           activityResponse.json()
         ])
@@ -452,12 +463,12 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
       try {
         // Check if user was at bottom before updating
         const container = messagesContainerRef.current
-        const wasAtBottom = container ? 
+        const wasAtBottom = container ?
           Math.abs(container.scrollTop + container.clientHeight - container.scrollHeight) < 50 : true
 
         // Convert WebSocket message data using shared converter
         const message = convertWebSocketToDashboard.message(messageData)
-        
+
         // Validate the converted message
         if (!isValidMessage(message)) {
           console.error('Invalid message data received:', messageData)
@@ -486,7 +497,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     socketManager.onMessageSent((messageData) => {
       try {
         setSendingMessage(false)
-        
+
         // Optionally add the sent message to the list if not already there
         const message = convertWebSocketToDashboard.message(messageData)
         if (isValidMessage(message)) {
@@ -496,7 +507,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
             return exists ? prev : [...prev, message]
           })
         }
-        
+
         // Scroll to bottom after sending
         setTimeout(() => {
           const container = messagesContainerRef.current
@@ -517,13 +528,13 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     socketManager.onConversationUpdated((updateData) => {
       try {
         const convertedUpdate = convertWebSocketToDashboard.conversationUpdate(updateData)
-        
-        setConversations(prev => prev.map(conv => 
-          conv.id === updateData.conversationId 
-            ? { 
-                ...conv, 
-                ...convertedUpdate
-              }
+
+        setConversations(prev => prev.map(conv =>
+          conv.id === updateData.conversationId
+            ? {
+              ...conv,
+              ...convertedUpdate
+            }
             : conv
         ))
       } catch (error) {
@@ -535,8 +546,8 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     socketManager.onMessagesReadUpdate((readUpdate) => {
       try {
         // Update conversation unread count
-        setConversations(prev => prev.map(conv => 
-          conv.id === readUpdate.conversationId 
+        setConversations(prev => prev.map(conv =>
+          conv.id === readUpdate.conversationId
             ? { ...conv, unreadCount: readUpdate.unreadCount }
             : conv
         ))
@@ -568,23 +579,18 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     if (selectedConversation) {
       fetchMessages(selectedConversation.id)
       setNewMessage("")
-      
+
       // Join the conversation room (server auto-marks messages as read)
       socketManager.joinConversation(selectedConversation.id)
-      
+
       // Update local unread count immediately since server marks as read
-      setConversations(prev => prev.map(conv => 
-        conv.id === selectedConversation.id 
+      setConversations(prev => prev.map(conv =>
+        conv.id === selectedConversation.id
           ? { ...conv, unreadCount: 0 }
           : conv
       ))
     }
   }, [selectedConversation, id])
-
-  // Filter conversations based on search
-  const filteredConversations = conversations.filter(conv =>
-    conv.fan.name.toLowerCase().includes(conversationSearch.toLowerCase())
-  )
 
   // Loading state
   if (loading) {
@@ -654,8 +660,8 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
       socketManager.joinConversation(selectedConversation?.id || '');
 
       // Update local unread count immediately since server marks as read
-      setConversations(prev => prev.map(conv => 
-        conv.id === selectedConversation?.id 
+      setConversations(prev => prev.map(conv =>
+        conv.id === selectedConversation?.id
           ? { ...conv, unreadCount: 0 }
           : conv
       ));
@@ -692,9 +698,9 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   <SelectItem value="hi">हि</SelectItem>
                 </SelectContent>
               </Select>
-              
-              <Button 
-                asChild 
+
+              <Button
+                asChild
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
                 <Link href="/upload">
@@ -711,6 +717,9 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   {t.uploadContent}
                 </Link>
               </Button>
+              <Button onClick={handleGoLive} disabled={goLiveLoading} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg">
+                {goLiveLoading ? "Going Live..." : "Go Live"}
+              </Button>
             </div>
           </div>
         </div>
@@ -725,13 +734,13 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                 {/* Profile Section */}
                 <div className="text-center mb-6">
                   <div className="relative mb-4">
-                    <Avatar 
+                    <Avatar
                       className="w-24 h-24 mx-auto ring-4 ring-white shadow-lg cursor-pointer hover:ring-blue-300 transition-all"
                       onClick={handleProfileClick}
                     >
-                      <AvatarImage 
-                        src={creator.profile?.avatarUrl || `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face`} 
-                        alt={creator.name} 
+                      <AvatarImage
+                        src={creator.profile?.avatarUrl || `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face`}
+                        alt={creator.name}
                       />
                       <AvatarFallback className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white">
                         {creator.name.split(" ").map(n => n[0]).join("")}
@@ -741,12 +750,12 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                       <Crown className="w-8 h-8 text-yellow-500" aria-hidden="true" />
                     </div>
                   </div>
-                  
+
                   <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white mb-3">
                     {t.creator || 'Top Creator'}
                   </Badge>
-                  
-                  <h2 
+
+                  <h2
                     className="text-xl font-bold mb-2 cursor-pointer hover:text-blue-600 transition-colors"
                     onClick={handleProfileClick}
                   >
@@ -781,13 +790,16 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                     { id: "analytics", icon: TrendingUp, label: t.analytics },
                     { id: "messages", icon: MessageCircle, label: t.messages },
                     { id: "profile", icon: User, label: "Profile" },
-                    { id: "settings", icon: Settings, label: t.settings }
+                    { id: "settings", icon: Settings, label: t.settings },
+                    { id: "logout", icon: LogOut, label: "Logout" }
                   ].map((item) => (
                     <button
                       key={item.id}
                       onClick={() => {
                         if (item.id === 'profile') {
                           handleProfileClick();
+                        } else if (item.id === 'logout') {
+                          handleLogout();
                         } else {
                           setActiveTab(item.id);
                         }
@@ -863,7 +875,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                           <p className="text-sm text-gray-600">{t.averageRating}</p>
                           <p className="text-2xl font-bold text-yellow-600">{stats.averageRating.toFixed(1)}</p>
                           <div className="flex items-center space-x-1" role="img" aria-label={`Average rating: ${stats.averageRating.toFixed(1)} out of 5 stars`}>
-                            {[1,2,3,4,5].map((star) => (
+                            {[1, 2, 3, 4, 5].map((star) => (
                               <Star key={star} className="w-3 h-3 text-yellow-400 fill-current" aria-hidden="true" />
                             ))}
                           </div>
@@ -952,7 +964,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                     <div className="p-4 bg-white h-[73px] flex items-center border-b border-gray-200">
                       <h2 className="text-xl font-bold text-gray-800">{t.conversations}</h2>
                     </div>
-                    
+
                     {/* Search */}
                     <div className="p-3 bg-white h-[69px] flex items-center border-b border-gray-200">
                       <div className="relative w-full">
@@ -965,7 +977,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                         />
                       </div>
                     </div>
-                    
+
                     {/* Conversations List */}
                     <div className="flex-1 overflow-y-auto bg-white">
                       {filteredConversations.length === 0 ? (
@@ -985,7 +997,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                             )}
                           >
                             <div className="flex items-start space-x-3">
-                              <Avatar 
+                              <Avatar
                                 className="w-11 h-11 flex-shrink-0 cursor-pointer ring-2 ring-transparent hover:ring-blue-300 transition-all"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -999,7 +1011,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1">
-                                  <p 
+                                  <p
                                     className="text-sm font-semibold text-gray-900 truncate hover:text-blue-600 cursor-pointer transition-colors"
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1043,7 +1055,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                             const conversation = conversations.find(c => c.id === selectedConversation.id)
                             return conversation ? (
                               <div className="flex items-center space-x-3">
-                                <Avatar 
+                                <Avatar
                                   className="w-10 h-10 cursor-pointer ring-2 ring-transparent hover:ring-blue-300 transition-all"
                                   onClick={() => handleCreatorClick(conversation.fan.id)}
                                 >
@@ -1053,7 +1065,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <p 
+                                  <p
                                     className="font-semibold text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
                                     onClick={() => handleCreatorClick(conversation.fan.id)}
                                   >
@@ -1064,7 +1076,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                             ) : null
                           })()}
                         </div>
-                        
+
                         {/* Messages Area */}
                         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30">
                           {messagesLoading ? (
@@ -1079,15 +1091,15 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                                 className={cn("flex", message.isFromCreator ? "justify-end" : "justify-start")}
                               >
                                 <div className={cn("max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
-                                    message.isFromCreator
-                                      ? "bg-blue-500 text-white rounded-br-md"
-                                      : "bg-white text-gray-900 border border-gray-100 rounded-bl-md"
-                                  )}
+                                  message.isFromCreator
+                                    ? "bg-blue-500 text-white rounded-br-md"
+                                    : "bg-white text-gray-900 border border-gray-100 rounded-bl-md"
+                                )}
                                 >
                                   <p className="text-sm leading-relaxed">{message.content}</p>
                                   <p className={cn("text-xs mt-2 text-right",
-                                      message.isFromCreator ? "text-blue-100" : "text-gray-500"
-                                    )}
+                                    message.isFromCreator ? "text-blue-100" : "text-gray-500"
+                                  )}
                                   >
                                     {formatMessageTime(message.createdAt)}
                                   </p>
@@ -1097,7 +1109,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                           )}
                           <div ref={messagesEndRef} />
                         </div>
-                        
+
                         {/* Message Input */}
                         <div className="p-4 bg-white h-[69px] flex items-center border-t border-gray-200">
                           <div className="flex space-x-3 w-full">
@@ -1135,7 +1147,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                         <div className="p-4 bg-white h-[73px] flex items-center border-b border-gray-200">
                           <h2 className="text-xl font-bold text-gray-800">{t.selectConversation}</h2>
                         </div>
-                        
+
                         {/* Empty State Content */}
                         <div className="flex-1 flex items-center justify-center bg-gray-50/30">
                           <div className="text-center text-gray-500">
@@ -1144,7 +1156,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                             <p className="text-sm text-gray-500 mt-1">Choose a conversation to start messaging</p>
                           </div>
                         </div>
-                        
+
                         {/* Empty State Footer */}
                         <div className="p-4 bg-white h-[69px] flex items-center border-t border-gray-200">
                           <div className="flex space-x-3 w-full opacity-50">
@@ -1220,12 +1232,6 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
             </Tabs>
           </div>
         </div>
-      </div>
-      {/* Go Live Button at the top */}
-      <div className="flex justify-end mb-6">
-        <Button onClick={handleGoLive} disabled={goLiveLoading} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg">
-          {goLiveLoading ? "Going Live..." : "Go Live"}
-        </Button>
       </div>
     </div>
   )
