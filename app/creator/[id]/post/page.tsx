@@ -125,7 +125,7 @@ export default function CreatePost() {
       
       console.log("Post created successfully: ", res);
       if (res.status === 200) {
-        router.push(`/creator/${creatorId}/feed`);
+        router.push(`/creator/${creatorId}/dashboard?tab=posts`);
       } else {
         alert("Failed to create post");
       }

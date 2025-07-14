@@ -4,6 +4,7 @@ import { useState, useEffect, use, useRef } from "react"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
 import { socketManager } from "@/lib/socket"
 import { useSession, signOut } from "next-auth/react"
+import { useSearchParams } from "next/navigation"
 import {
   DashboardMessage,
   DashboardConversation,
@@ -73,6 +74,33 @@ interface Course {
     views: number
     likes: number
   }[]
+}
+
+interface Post {
+  id: string
+  title: string
+  content: string
+  isPaidOnly: boolean
+  createdAt: string
+  media?: {
+    id: string
+    url: string
+    type: string
+  }[]
+  likes: {
+    id: string
+    userId: string
+  }[]
+  comments: {
+    id: string
+    content: string
+    userId: string
+    createdAt: string
+  }[]
+  _count?: {
+    likes: number
+    comments: number
+  }
 }
 
 interface Creator {
@@ -229,6 +257,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   const { language, setLanguage, translations } = useLanguage()
   const router = useRouter();
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
   const [goLiveLoading, setGoLiveLoading] = useState(false);
   const creatorId = (session?.user as any)?.id;
 
@@ -249,6 +278,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   // State for real data (move all useState calls here, before any conditional logic)
   const [creator, setCreator] = useState<Creator | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
+  const [posts, setPosts] = useState<Post[]>([])
   const [stats, setStats] = useState<CreatorStats | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -260,7 +290,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   const [sendingMessage, setSendingMessage] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("overview")
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview")
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -327,11 +357,12 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
         setError(null)
 
         // Fetch all data in parallel
-        const [creatorResponse, coursesResponse, statsResponse, activityResponse] = await Promise.all([
-          fetch(`/api/creator/${id}`),
-          fetch(`/api/creator/${id}/courses`),
-          fetch(`/api/creator/${id}/stats`),
-          fetch(`/api/creator/${id}/activity`)
+        const [creatorResponse, coursesResponse, postsResponse, statsResponse, activityResponse] = await Promise.all([
+          fetch(`/api/creator/${id}`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/courses`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/posts`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/stats`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/activity`, { credentials: 'include' })
         ])
 
         // Check if component is still mounted
@@ -349,6 +380,10 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           throw new ApiError('Failed to fetch courses', coursesResponse.status, `/api/creator/${id}/courses`)
         }
 
+        if (!postsResponse.ok) {
+          throw new ApiError('Failed to fetch posts', postsResponse.status, `/api/creator/${id}/posts`)
+        }
+
         if (!statsResponse.ok) {
           throw new ApiError('Failed to fetch stats', statsResponse.status, `/api/creator/${id}/stats`)
         }
@@ -357,9 +392,10 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           throw new ApiError('Failed to fetch activity', activityResponse.status, `/api/creator/${id}/activity`)
         }
 
-        const [creatorData, coursesData, statsData, activityData] = await Promise.all([
+        const [creatorData, coursesData, postsData, statsData, activityData] = await Promise.all([
           creatorResponse.json(),
           coursesResponse.json(),
+          postsResponse.json(),
           statsResponse.json(),
           activityResponse.json()
         ])
@@ -367,6 +403,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
         if (isMounted) {
           setCreator(creatorData)
           setCourses(coursesData)
+          setPosts(postsData.posts || postsData)
           setStats(statsData)
           setActivities(activityData)
         }
@@ -398,7 +435,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     if (activeTab !== 'messages') return;
     const fetchConversations = async () => {
       try {
-        const response = await fetch(`/api/creator/${id}/conversations`)
+        const response = await fetch(`/api/creator/${id}/conversations`, { credentials: 'include' })
         if (response.ok) {
           const data = await response.json()
           setConversations(data)
@@ -416,7 +453,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     const fetchMessages = async (conversationId: string) => {
       try {
         setMessagesLoading(true)
-        const response = await fetch(`/api/creator/${id}/conversations/${conversationId}/messages`)
+        const response = await fetch(`/api/creator/${id}/conversations/${conversationId}/messages`, { credentials: 'include' })
         if (response.ok) {
           const data = await response.json()
           setMessages(data)
@@ -640,6 +677,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
 
     try {
       const response = await fetch(`/api/creator/${id}/conversations/${selectedConversation?.id}/messages`, {
+        credentials: 'include',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -787,6 +825,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   {[
                     { id: "overview", icon: BarChart3, label: t.overview },
                     { id: "courses", icon: BookOpen, label: t.courses },
+                    { id: "posts", icon: Edit3, label: "Posts" },
                     { id: "analytics", icon: TrendingUp, label: t.analytics },
                     { id: "messages", icon: MessageCircle, label: t.messages },
                     { id: "profile", icon: User, label: "Profile" },
@@ -1198,6 +1237,109 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                         <CourseCard key={course.id} course={course} t={t} />
                       ))}
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="posts">
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xl font-bold">My Posts</CardTitle>
+                      <Button asChild className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600">
+                        <Link href={`/creator/${id}/post`}>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Create Post
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {posts.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Edit3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600 mb-4">No posts yet</p>
+                        <Button asChild className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600">
+                          <Link href={`/creator/${id}/post`}>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Create Your First Post
+                          </Link>
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {posts.map((post) => (
+                          <Card key={post.id} className="bg-white border-0 shadow-md hover:shadow-lg transition-all">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <CardTitle className="text-lg font-semibold text-gray-800 line-clamp-2">
+                                    {post.title}
+                                  </CardTitle>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    {formatDate(post.createdAt)}
+                                  </p>
+                                </div>
+                                {post.isPaidOnly && (
+                                  <Crown className="w-5 h-5 text-yellow-500 flex-shrink-0 ml-2" />
+                                )}
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <p className="text-gray-600 text-sm line-clamp-3 mb-4">
+                                {post.content}
+                              </p>
+                              
+                              {post.media && post.media.length > 0 && (
+                                <div className="grid grid-cols-2 gap-2 mb-4">
+                                  {post.media.slice(0, 4).map((media, index) => (
+                                    <div key={media.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                                      {media.type === 'image' || media.type === 'photo' ? (
+                                        <Image
+                                          src={media.url}
+                                          alt={`Post media ${index + 1}`}
+                                          fill
+                                          className="object-cover"
+                                        />
+                                      ) : (
+                                        <video
+                                          src={media.url}
+                                          className="w-full h-full object-cover"
+                                          muted
+                                        />
+                                      )}
+                                      {index === 3 && post.media && post.media.length > 4 && (
+                                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                          <span className="text-white font-semibold">
+                                            +{post.media.length - 4}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              <div className="flex items-center justify-between text-sm text-gray-500">
+                                <div className="flex items-center space-x-4">
+                                  <div className="flex items-center space-x-1">
+                                    <Star className="w-4 h-4" />
+                                    <span>{post._count?.likes || post.likes.length}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <MessageCircle className="w-4 h-4" />
+                                    <span>{post._count?.comments || post.comments.length}</span>
+                                  </div>
+                                </div>
+                                <Badge variant={post.isPaidOnly ? "default" : "secondary"}>
+                                  {post.isPaidOnly ? "Premium" : "Free"}
+                                </Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
