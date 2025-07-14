@@ -5,8 +5,8 @@ generator client {
 datasource db {
   provider = "postgresql"
   // url      = env("DATABASE_URL")
-  // url      = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-  url      = "postgresql://neondb_owner:npg_bhP6US0NldOK@ep-curly-credit-a11rtnuc-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  url      = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  // url      = "postgresql://neondb_owner:npg_bhP6US0NldOK@ep-curly-credit-a11rtnuc-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 }
 model User {
   id                   String            @id @default(uuid())
@@ -107,6 +107,7 @@ model Course {
   reviews           Review[]
   courseAccess      CourseAccess[]
   contentDeliveries ContentDelivery[]
+  payments Payment[]
 
   @@index([title])
   @@index([description])
@@ -143,12 +144,17 @@ model Payment {
   amount         Float
   currency       String        @default("INR")
   status         PaymentStatus
-  paymentvia     String
+  paymentVia     String
   paymentId      String
+  type PaymentType
   createdAt      DateTime      @default(now())
-  subscriptionId String
+  subscriptionId String?
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  postmediaId String? 
+  postmedia PostMedia? @relation(fields: [postmediaId], references: [id])
+  courseId String?
+  course Course? @relation(fields: [courseId], references: [id])
   userId         String
-  subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
   user           User          @relation(fields: [userId], references: [id])
 }
 
@@ -252,6 +258,12 @@ enum NotificationType {
   CONTENT
   SUBSCRIPTION
   COMMUNITY
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  POST_MEDIA_UNLOCK
+  COURSE
 }
 
 model Community {
@@ -450,6 +462,7 @@ model PostMedia {
   post       Post     @relation(fields: [postId], references: [id])
   postId     String
   createdAt  DateTime @default(now())
+  payments Payment[]
 }
 
 model Like {

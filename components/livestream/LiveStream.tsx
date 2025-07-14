@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 
 // const SOCKET_URL = "http://10.145.137.71:4000/stream";
 // const SOCKET_URL = "http://localhost:4000/stream";
-const SOCKET_URL = "http://10.145.151.34:4000/stream";
+const SOCKET_URL = "http://10.145.170.231:4000/stream";
 
 interface LiveStreamProps {
   role: "creator" | "audience";

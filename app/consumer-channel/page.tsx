@@ -58,7 +58,6 @@ interface TopCreator {
 interface Post {
   id: string;
   creator: {
-    id: string;
     name: string;
     handle: string;
     avatar: string;
@@ -71,12 +70,12 @@ interface Post {
   likes: number;
   comments: number;
   isLiked?: boolean;
+  isUnlocked?: boolean; // Added isUnlocked to Post interface
 }
 
 interface Product {
   id: string;
   title: string;
-  description?: string;
   price: number;
   type:
     | "image"
@@ -97,7 +96,104 @@ interface Product {
   sales: number;
 }
 
-// Products will be fetched from API
+const STORE_PRODUCTS: Product[] = [
+  {
+    id: "1",
+    title: "Neon Abstract Patterns",
+    price: 299,
+    type: "image",
+    creator: {
+      name: "Alex Chen",
+      avatar:
+        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face",
+      verified: true,
+    },
+    thumbnail:
+      "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
+    rating: 4.9,
+    sales: 847,
+  },
+  {
+    id: "2",
+    title: "City Skyline 4K",
+    price: 149,
+    type: "video",
+    creator: {
+      name: "Sarah Williams",
+      avatar:
+        "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=40&h=40&fit=crop&crop=face",
+      verified: true,
+    },
+    thumbnail:
+      "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=500&h=300&fit=crop",
+    rating: 4.8,
+    sales: 623,
+  },
+  {
+    id: "3",
+    title: "UI Design Kit",
+    price: 79,
+    type: "template",
+    creator: {
+      name: "Lisa Chang",
+      avatar:
+        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=40&h=40&fit=crop&crop=face",
+      verified: true,
+    },
+    thumbnail:
+      "https://images.unsplash.com/photo-1561070791-2526d30994b5?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+    rating: 4.8,
+    sales: 756,
+  },
+  {
+    id: "4",
+    title: "Motion Graphics Course",
+    price: 299,
+    type: "course",
+    creator: {
+      name: "Jake Miller",
+      avatar:
+        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face",
+      verified: true,
+    },
+    thumbnail:
+      "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&h=300&fit=crop",
+    rating: 4.9,
+    sales: 1234,
+  },
+  {
+    id: "5",
+    title: "Minimalist Icons",
+    price: 49,
+    type: "template",
+    creator: {
+      name: "Chris Lee",
+      avatar:
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop&crop=face",
+      verified: false,
+    },
+    thumbnail:
+      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=300&fit=crop",
+    rating: 4.4,
+    sales: 223,
+  },
+  {
+    id: "6",
+    title: "Creative T-Shirt",
+    price: 499,
+    type: "physical",
+    creator: {
+      name: "Emily Stone",
+      avatar:
+        "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=40&h=40&fit=crop&crop=face",
+      verified: false,
+    },
+    thumbnail:
+      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
+    rating: 4.6,
+    sales: 312,
+  },
+];
 
 const TYPE_ICONS = {
   image: LucideImage,
@@ -167,15 +263,11 @@ export default function ConsumerChannelPage() {
     {}
   );
 
-  // Products state
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [productsError, setProductsError] = useState<string | null>(null);
-
   //Tip State
   // const [tipAmount, setTipAmount] = useState<number>(0);
-  // Removed JWT token dependency - now using NextAuth sessions
-  console.log("Using NextAuth session-based authentication");
+  // For API calls that require auth, use:
+  const token = (session as Session & { accessToken?: string })?.accessToken;
+  console.log("Token sent for authorization: ", token);
 
   // Tip modal state
   const [showTipModal, setShowTipModal] = useState<{ postId: string | null }>({
@@ -223,26 +315,48 @@ export default function ConsumerChannelPage() {
     }
   }, [session, status, router]);
 
-  //fetch posts
-  const fetchPost = async () => {
+  // Helper to check unlock status for a post
+  const checkUnlockStatus = async (postId: string) => {
     try {
-      const token = (session as Session & { accessToken?: string })
-        ?.accessToken;
+      const token = (session as Session & { accessToken?: string })?.accessToken;
+      if (!token) return false;
+      const res = await axios.post(
+        "/api/payment/check-unlock-media",
+        { postId },
+        { headers: { Authorization: `Bearer${token}` } }
+      );
+      return res.data && res.data.unlocked;
+    } catch {
+      return false;
+    }
+  };
+
+  // After fetching posts, check unlock status for each paid post
+  const fetchAndSetPosts = async () => {
+    try {
+      const token = (session as Session & { accessToken?: string })?.accessToken;
       if (!token) {
         console.error("No authentication token found");
         return;
       }
-
       const res = await axios.get("/api/posts", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log("Response of fetching posts: ", res);
       if (res.status === 200) {
         const posts = res.data.posts;
-        setpost(posts);
-
+        // For each paid post, check unlock status
+        const updatedPosts = await Promise.all(
+          posts.map(async (post: Post) => {
+            if (post.isPaid) {
+              const unlocked = await checkUnlockStatus(post.id);
+              return { ...post, isUnlocked: unlocked };
+            }
+            return post;
+          })
+        );
+        setpost(updatedPosts);
         // Initialize liked posts state
-        const likedPostIds = posts
+        const likedPostIds = updatedPosts
           .filter((post: Post) => post.isLiked)
           .map((post: Post) => post.id);
         setLikedPosts(new Set(likedPostIds));
@@ -253,9 +367,18 @@ export default function ConsumerChannelPage() {
       console.log("Error in fetching post: ", error);
     }
   };
+
+  // Replace fetchPost with fetchAndSetPosts everywhere
   useEffect(() => {
-    fetchPost();
+    fetchAndSetPosts();
   }, [session]);
+
+  useEffect(() => {
+    if (localStorage.getItem('refreshFeed')) {
+      fetchAndSetPosts();
+      localStorage.removeItem('refreshFeed');
+    }
+  }, []);
 
   // Fetch top creators
   useEffect(() => {
@@ -333,7 +456,10 @@ export default function ConsumerChannelPage() {
           content,
         },
         {
-          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          // withCredentials: true,
         }
       );
       console.log("Response of posting comment: ", res);
@@ -424,10 +550,12 @@ export default function ConsumerChannelPage() {
     setTipError("");
     setTipSuccess("");
     try {
+      const token = (session as Session & { accessToken?: string })
+        ?.accessToken;
       const res = await axios.post(
         `/api/posts/${postId}/tip`,
         { tipAmount: Number(tipInput) },
-        { withCredentials: true }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log("Tip response: ", res);
       setTipSuccess("Tip sent! 🎉");
@@ -458,65 +586,16 @@ export default function ConsumerChannelPage() {
     }
   };
 
-  // Fetch products from API
-  const fetchProducts = async () => {
-    try {
-      setLoadingProducts(true);
-      setProductsError(null);
-      
-      const params = new URLSearchParams({
-        search: storeSearchTerm,
-        type: selectedType,
-        page: '1',
-        limit: '50',
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
-      
-      const response = await axios.get(`/api/products?${params}`);
-      
-      if (response.data.success) {
-        setProducts(response.data.products);
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (error: any) {
-      console.error('Error fetching products:', error);
-      
-      // Handle different types of errors
-      if (error.response) {
-        // Server responded with error status
-        const status = error.response.status;
-        if (status === 400) {
-          setProductsError('Invalid search parameters. Please try again.');
-        } else if (status === 404) {
-          setProductsError('Products not found.');
-        } else if (status >= 500) {
-          setProductsError('Server error. Please try again later.');
-        } else {
-          setProductsError('Failed to load products. Please try again.');
-        }
-      } else if (error.request) {
-        // Network error
-        setProductsError('Network error. Please check your connection and try again.');
-      } else {
-        // Other errors
-        setProductsError('An unexpected error occurred. Please try again.');
-      }
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
-
-  // Fetch products on component mount and when filters change
-  useEffect(() => {
-    if (activeTab === 'store') {
-      fetchProducts();
-    }
-  }, [activeTab, storeSearchTerm, selectedType]);
-
-  // Store filtering logic (now done on the server side)
-  const filteredProducts = products;
+  // Store filtering logic
+  const filteredProducts = STORE_PRODUCTS.filter((product) => {
+    const matchesSearch =
+      product.title.toLowerCase().includes(storeSearchTerm.toLowerCase()) ||
+      product.creator.name
+        .toLowerCase()
+        .includes(storeSearchTerm.toLowerCase());
+    const matchesType = selectedType === "all" || product.type === selectedType;
+    return matchesSearch && matchesType;
+  });
 
   const fetchAllCreators = async () => {
     try {
@@ -526,31 +605,40 @@ export default function ConsumerChannelPage() {
     } catch (error) {
       console.log("Error in fetching all creators: ", error);
     }
-  }
+  };
 
   const fetchLiveCreators = async () => {
     try {
       const res = await axios.get("/api/creators/live");
       console.log("Live creators response: ", res);
-      setLiveCreators(res.data);
+      setLiveCreators(res.data.creators);
     } catch (error) {
       console.log("Error in fetching live creators: ", error);
     }
-  }
+  };
+
+  // const PayLockContent = async () => {
+  //   try {
+  //     const res = await axios.get("");
+  //     console.log("Response of lock content payment: ", res);
+
+  //   } catch (error) {
+  //     console.log("Error in LockContent Payment: ", error);
+  //   }
+  // }
 
   useEffect(() => {
     try {
       if (activeTab === "feed") {
-        fetchPost();
+        fetchAndSetPosts();
       }
       if (activeTab === "store") {
-
       }
       if (activeTab === "products") {
       }
       if (activeTab === "subscriptions") {
       }
-      if (activeTab === "Live Creators") {
+      if (activeTab === "livecreators") {
         fetchLiveCreators();
       }
       if (activeTab === "creators") {
@@ -563,6 +651,22 @@ export default function ConsumerChannelPage() {
     } catch (error) {
       console.log("Error in useEffect change by active Tab: ", error);
     }
+  }, [activeTab]);
+
+  // Add refetch on tab visibility
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "visible" &&
+        activeTab === "Live Creators"
+      ) {
+        fetchLiveCreators();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [activeTab]);
 
   // Store component
@@ -754,177 +858,92 @@ export default function ConsumerChannelPage() {
         </div>
       </div>
 
-      {/* Loading State */}
-      {loadingProducts && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="bg-gray-800/50 border-gray-700/40 animate-pulse">
-              <div className="h-48 bg-gray-700 rounded-t-lg"></div>
-              <CardContent className="p-4">
-                <div className="h-4 bg-gray-700 rounded mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded mb-2"></div>
-                <div className="flex items-center justify-between">
-                  <div className="h-6 w-6 bg-gray-700 rounded-full"></div>
-                  <div className="h-4 w-8 bg-gray-700 rounded"></div>
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProducts.map((product) => {
+          const IconComponent = TYPE_ICONS[product.type];
+          return (
+            <Card
+              key={product.id}
+              className="group cursor-pointer bg-gray-800/50 border-gray-700/40 hover:bg-gray-700/40 transition-all duration-200"
+            >
+              <div className="relative">
+                {/* Product Image */}
+                <div className="relative h-48 overflow-hidden rounded-t-lg">
+                  <Image
+                    src={product.thumbnail}
+                    alt={product.title}
+                    fill
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+
+                  {/* Type indicator */}
+                  <div className="absolute top-2 right-2">
+                    <div className="bg-black/60 rounded-full p-1.5">
+                      <IconComponent className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+
+                  {/* Video play indicator */}
+                  {product.type === "video" && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="bg-black/60 rounded-full p-3">
+                        <Play className="h-6 w-6 text-white fill-current" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Price overlay */}
+                  <div className="absolute top-2 left-2">
+                    <div className="bg-yellow-500 text-black font-bold px-2 py-1 rounded-full text-sm">
+                      ₹{product.price}
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
+
+                {/* Product Info */}
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-100 text-base line-clamp-1 flex-1 mr-2">
+                      {product.title}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarImage
+                          src={product.creator.avatar}
+                          alt={product.creator.name}
+                        />
+                        <AvatarFallback className="bg-gray-700 text-white text-xs">
+                          {product.creator.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-gray-300 truncate">
+                        {product.creator.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                      <span className="text-gray-300">{product.rating}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </div>
             </Card>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      {/* Error State */}
-      {productsError && !loadingProducts && (
+      {/* No products found */}
+      {filteredProducts.length === 0 && (
         <div className="text-center py-16">
-          <div className="text-6xl mb-4">⚠️</div>
-          <h3 className="text-2xl font-bold mb-2 text-gray-400">
-            {productsError}
-          </h3>
-          <p className="text-gray-500 mb-6">
-            We couldn't load the products. Please check your connection and try again.
-          </p>
-          <button
-            onClick={fetchProducts}
-            className="bg-yellow-500 text-black px-6 py-3 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!loadingProducts && !productsError && filteredProducts.length === 0 && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">📦</div>
+          <div className="text-6xl mb-4">🔍</div>
           <h3 className="text-2xl font-bold mb-2 text-gray-400">
             No products found
           </h3>
-          <p className="text-gray-500 mb-6">
-            {storeSearchTerm || selectedType !== 'all' 
-              ? 'Try adjusting your search or filters.'
-              : 'No products are available at the moment.'
-            }
-          </p>
-          {(storeSearchTerm || selectedType !== 'all') && (
-            <button
-              onClick={() => {
-                setStoreSearchTerm('');
-                setSelectedType('all');
-              }}
-              className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Products Grid */}
-      {!loadingProducts && !productsError && filteredProducts.length > 0 && (
-        <div className="space-y-6">
-          {/* Results Summary */}
-          <div className="text-sm text-gray-400">
-            Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
-            {(storeSearchTerm || selectedType !== 'all') && (
-              <span> for your search</span>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product: Product) => {
-              const IconComponent = TYPE_ICONS[product.type as keyof typeof TYPE_ICONS];
-              return (
-                <Card
-                  key={product.id}
-                  className="group cursor-pointer bg-gray-800/50 border-gray-700/40 hover:bg-gray-700/40 transition-all duration-200 hover:shadow-lg"
-                >
-                  <div className="relative">
-                    {/* Product Image */}
-                    <div className="relative h-48 overflow-hidden rounded-t-lg">
-                      <img
-                        src={product.thumbnail}
-                        alt={product.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'https://via.placeholder.com/400x300/374151/9CA3AF?text=Product+Image';
-                        }}
-                      />
-
-                      {/* Type indicator */}
-                      <div className="absolute top-2 right-2">
-                        <div className="bg-black/60 rounded-full p-1.5">
-                          <IconComponent className="h-4 w-4 text-white" />
-                        </div>
-                      </div>
-
-                      {/* Video play indicator */}
-                      {product.type === "video" && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="bg-black/60 rounded-full p-3">
-                            <Play className="h-6 w-6 text-white fill-current" />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Price overlay */}
-                      <div className="absolute top-2 left-2">
-                        <div className="bg-yellow-500 text-black font-bold px-2 py-1 rounded-full text-sm">
-                          ₹{product.price}
-                        </div>
-                      </div>
-
-                      {/* Sales badge */}
-                      {product.sales > 100 && (
-                        <div className="absolute bottom-2 left-2">
-                          <Badge className="bg-green-500 text-white text-xs">
-                            {product.sales}+ sold
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Product Info */}
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-gray-100 text-base line-clamp-2 flex-1 mr-2">
-                          {product.title}
-                        </h3>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <div className="flex items-center space-x-2">
-                          <Avatar className="w-6 h-6">
-                            <AvatarImage
-                              src={product.creator.avatar}
-                              alt={product.creator.name}
-                            />
-                            <AvatarFallback className="bg-gray-700 text-white text-xs">
-                              {product.creator.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-gray-300 truncate">
-                            {product.creator.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                          <span className="text-gray-300">{product.rating}</span>
-                        </div>
-                      </div>
-
-                      {/* Product description */}
-                      {product.description && (
-                        <p className="text-gray-400 text-xs line-clamp-2 mb-2">
-                          {product.description}
-                        </p>
-                      )}
-                    </CardContent>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+          <p className="text-gray-500">Try adjusting your search or filters</p>
         </div>
       )}
     </div>
@@ -933,43 +952,48 @@ export default function ConsumerChannelPage() {
   const renderLiveCreatorsContent = () => (
     <div className="space-y-8">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-yellow-400 mb-4">Live Creators</h1>
-        <p className="text-gray-400 text-lg">Join a livestream from any creator</p>
+        <h1 className="text-4xl font-bold text-yellow-400 mb-4">
+          Live Creators
+        </h1>
+        <p className="text-gray-400 text-lg">
+          Join a livestream from any creator
+        </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(liveCreators.length > 0 ? allCreator : topCreators)
-          .map((creator) => (
-            <Card
-              key={creator.id}
-              className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 cursor-pointer group"
-              onClick={() => router.push(`/livestream/${creator.id}`)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <Avatar className="w-16 h-16 ring-2 ring-yellow-400/50 group-hover:ring-yellow-400 transition-all duration-300">
-                    <AvatarImage src={creator.avatar} alt={creator.name} />
-                    <AvatarFallback className="bg-gray-700 text-white text-xl">
-                      {creator.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors">
-                      {creator.name}
-                    </h3>
-                    <p className="text-gray-400 text-sm">@{creator.handle}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-semibold">LIVE</span>
-                    </div>
+        {liveCreators.map((creator) => (
+          <Card
+            key={creator.id}
+            className="bg-gradient-to-br from-gray-800/50 to-gray-900/70 backdrop-blur-sm border border-gray-700/40 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 cursor-pointer group"
+            onClick={() => router.push(`/livestream/${creator.id}`)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <Avatar className="w-16 h-16 ring-2 ring-yellow-400/50 group-hover:ring-yellow-400 transition-all duration-300">
+                  <AvatarImage src={creator.avatar} alt={creator.name} />
+                  <AvatarFallback className="bg-gray-700 text-white text-xl">
+                    {creator.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors">
+                    {creator.name}
+                  </h3>
+                  <p className="text-gray-400 text-sm">@{creator.handle}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-semibold">
+                      LIVE
+                    </span>
                   </div>
                 </div>
-                {creator.bio && (
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                    {creator.bio}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+              {creator.bio && (
+                <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                  {creator.bio}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
@@ -1200,17 +1224,14 @@ export default function ConsumerChannelPage() {
                             {post.creator.name.charAt(1)}
                           </AvatarFallback>
                         </Avatar>
-                                              <div>
-                        <div 
-                          className="font-bold text-yellow-400 text-lg cursor-pointer hover:text-yellow-300 transition-colors"
-                          onClick={() => handleCreatorClick(post.creator.id)}
-                        >
-                          {post.creator.name}
+                        <div>
+                          <div className="font-bold text-yellow-400 text-lg">
+                            {post.creator.name}
+                          </div>
+                          <div className="text-gray-400 text-sm">
+                            {post.time}
+                          </div>
                         </div>
-                        <div className="text-gray-400 text-sm">
-                          {post.time}
-                        </div>
-                      </div>
                       </div>
                       <Button
                         size="sm"
@@ -1236,7 +1257,7 @@ export default function ConsumerChannelPage() {
                         />
 
                         {/* Paywall Overlay */}
-                        {post.isPaid && (
+                        {post.isPaid && !post.isUnlocked && (
                           <div className="absolute inset-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-transparent rounded-2xl flex flex-col items-center justify-center text-center backdrop-blur-sm">
                             <Lock className="w-12 h-12 text-yellow-400 mb-4" />
                             <div className="text-gray-100 mb-6 text-lg md:text-base lg:text-lg">
@@ -1246,7 +1267,7 @@ export default function ConsumerChannelPage() {
                                 Unlock for {post.price}
                               </span>
                             </div>
-                            <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-semibold">
+                            <Button onClick={()=>router.push(`/consumer-channel/${post.id}/media-payment`)} className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-semibold">
                               Unlock Now
                             </Button>
                           </div>

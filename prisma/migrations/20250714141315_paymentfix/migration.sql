@@ -5,6 +5,9 @@ CREATE TYPE "Role" AS ENUM ('ADMIN', 'CREATOR', 'CONSUMER');
 CREATE TYPE "ContentType" AS ENUM ('VIDEO', 'ARTICLE', 'PODCAST', 'COURSE', 'TEMPLATE', 'SOFTWARE', 'EBOOK', 'AUDIO', 'IMAGE', 'OTHER');
 
 -- CreateEnum
+CREATE TYPE "ProductType" AS ENUM ('IMAGE', 'VIDEO', 'COURSE', 'TEMPLATE', 'SOFTWARE', 'EBOOK', 'AUDIO', 'PHYSICAL', 'OTHER');
+
+-- CreateEnum
 CREATE TYPE "ContentStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
 
 -- CreateEnum
@@ -15,6 +18,12 @@ CREATE TYPE "PaymentStatus" AS ENUM ('SUCCEEDED', 'PENDING', 'FAILED', 'REFUNDED
 
 -- CreateEnum
 CREATE TYPE "NotificationType" AS ENUM ('SYSTEM', 'PAYMENT', 'CONTENT', 'SUBSCRIPTION', 'COMMUNITY');
+
+-- CreateEnum
+CREATE TYPE "PaymentType" AS ENUM ('SUBSCRIPTION', 'POST_MEDIA_UNLOCK', 'COURSE');
+
+-- CreateEnum
+CREATE TYPE "ProductStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -119,10 +128,13 @@ CREATE TABLE "Payment" (
     "amount" DOUBLE PRECISION NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'INR',
     "status" "PaymentStatus" NOT NULL,
-    "paymentvia" TEXT NOT NULL,
+    "paymentVia" TEXT NOT NULL,
     "paymentId" TEXT NOT NULL,
+    "type" "PaymentType" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "subscriptionId" TEXT NOT NULL,
+    "subscriptionId" TEXT,
+    "postmediaId" TEXT,
+    "courseId" TEXT,
     "userId" TEXT NOT NULL,
 
     CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
@@ -306,6 +318,7 @@ CREATE TABLE "CreatorProfile" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "isPaid" BOOLEAN NOT NULL DEFAULT false,
+    "IsLive" BOOLEAN NOT NULL DEFAULT false,
     "subscriptionPrice" INTEGER,
 
     CONSTRAINT "CreatorProfile_pkey" PRIMARY KEY ("id")
@@ -364,6 +377,60 @@ CREATE TABLE "Tip" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Tip_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Product" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "price" DOUBLE PRECISION NOT NULL,
+    "type" "ProductType" NOT NULL,
+    "thumbnail" TEXT,
+    "status" "ProductStatus" NOT NULL DEFAULT 'DRAFT',
+    "rating" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "salesCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "creatorId" TEXT NOT NULL,
+    "categoryId" TEXT,
+
+    CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ProductCategory" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ProductCategory_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ProductReview" (
+    "id" TEXT NOT NULL,
+    "rating" INTEGER NOT NULL,
+    "comment" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "productId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "ProductReview_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ProductSale" (
+    "id" TEXT NOT NULL,
+    "amount" DOUBLE PRECISION NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'INR',
+    "status" "PaymentStatus" NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "productId" TEXT NOT NULL,
+    "buyerId" TEXT NOT NULL,
+
+    CONSTRAINT "ProductSale_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -462,6 +529,33 @@ CREATE INDEX "Tip_postId_idx" ON "Tip"("postId");
 -- CreateIndex
 CREATE INDEX "Tip_userId_idx" ON "Tip"("userId");
 
+-- CreateIndex
+CREATE INDEX "Product_creatorId_idx" ON "Product"("creatorId");
+
+-- CreateIndex
+CREATE INDEX "Product_type_idx" ON "Product"("type");
+
+-- CreateIndex
+CREATE INDEX "Product_status_idx" ON "Product"("status");
+
+-- CreateIndex
+CREATE INDEX "Product_rating_idx" ON "Product"("rating");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ProductCategory_name_key" ON "ProductCategory"("name");
+
+-- CreateIndex
+CREATE INDEX "ProductReview_productId_idx" ON "ProductReview"("productId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ProductReview_userId_productId_key" ON "ProductReview"("userId", "productId");
+
+-- CreateIndex
+CREATE INDEX "ProductSale_productId_idx" ON "ProductSale"("productId");
+
+-- CreateIndex
+CREATE INDEX "ProductSale_buyerId_idx" ON "ProductSale"("buyerId");
+
 -- AddForeignKey
 ALTER TABLE "UserProfile" ADD CONSTRAINT "UserProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -490,7 +584,13 @@ ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_userId_fkey" FOREIGN KEY
 ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Payment" ADD CONSTRAINT "Payment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Payment" ADD CONSTRAINT "Payment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Payment" ADD CONSTRAINT "Payment_postmediaId_fkey" FOREIGN KEY ("postmediaId") REFERENCES "PostMedia"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Payment" ADD CONSTRAINT "Payment_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Payment" ADD CONSTRAINT "Payment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -578,3 +678,21 @@ ALTER TABLE "Tip" ADD CONSTRAINT "Tip_userId_fkey" FOREIGN KEY ("userId") REFERE
 
 -- AddForeignKey
 ALTER TABLE "Tip" ADD CONSTRAINT "Tip_postId_fkey" FOREIGN KEY ("postId") REFERENCES "Post"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Product" ADD CONSTRAINT "Product_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Product" ADD CONSTRAINT "Product_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "ProductCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProductReview" ADD CONSTRAINT "ProductReview_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProductReview" ADD CONSTRAINT "ProductReview_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProductSale" ADD CONSTRAINT "ProductSale_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProductSale" ADD CONSTRAINT "ProductSale_buyerId_fkey" FOREIGN KEY ("buyerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
