@@ -9,12 +9,16 @@ import type { AdapterUser } from "next-auth/adapters";
 import { JWT } from "next-auth/jwt";
 import jwt from "jsonwebtoken";
 
+// Ensure we have a consistent secret - use a longer, more secure secret
+const secret = process.env.NEXTAUTH_SECRET || "Ishan-super-secret-jwt-key-32-chars-minimum-length-for-production-use-and-development-environment";
+
 export const authOptions = {
-  secret: process.env.NEXTAUTH_SECRET || "Ishan-super-secret-jwt-key-32-chars-minimum-length",
+  secret,
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || "dummy-google-client-id",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "dummy-google-client-secret",
     }),
     CredentialsProvider({
       name: "Credentials",
@@ -39,6 +43,43 @@ export const authOptions = {
   ],
   session: {
     strategy: "jwt" as SessionStrategy,
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours - refresh session every 24 hours
+  },
+  jwt: {
+    secret,
+    maxAge: 30 * 24 * 60 * 60, // 30 days - consistent with session
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
   },
   callbacks: {
     async session({ session, token }: { session: Session; token: JWT }) {
@@ -57,14 +98,13 @@ export const authOptions = {
       }
       // For credentials provider, always sign a JWT and set as accessToken
       if (account && account.provider === 'credentials') {
-        const secret = process.env.NEXTAUTH_SECRET || "Ishan-super-secret-jwt-key-32-chars-minimum-length";
         const payload = {
           id: (token as { id?: string }).id,
           role: (token as { role?: string }).role,
           name: (token as { name?: string }).name,
           email: (token as { email?: string }).email,
         };
-        (token as { accessToken?: string }).accessToken = jwt.sign(payload, secret, { expiresIn: '7d' });
+        (token as { accessToken?: string }).accessToken = jwt.sign(payload, secret, { expiresIn: '30d' });
       }
       if (account && (account as { access_token?: string }).access_token) {
         (token as { accessToken?: string }).accessToken = (account as { access_token?: string }).access_token || '';
@@ -74,6 +114,21 @@ export const authOptions = {
   },
   pages: {
     signIn: "/login", // Custom login page
+  },
+  // Add event handlers for better session management
+  events: {
+    async signIn({ user, account, profile }: { user: User; account: Account | null; profile?: any }) {
+      console.log('🔐 User signed in:', { userId: user.id, provider: account?.provider });
+    },
+    async signOut({ session, token }: { session: any; token: any }) {
+      console.log('🔓 User signed out:', { userId: token?.sub });
+    },
+    async session({ session, token }: { session: Session; token: JWT }) {
+      // This runs every time a session is checked
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Session checked:', { userId: token?.sub, expires: session.expires });
+      }
+    },
   },
 };
 

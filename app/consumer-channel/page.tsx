@@ -28,6 +28,7 @@ import {
   Grid3X3,
   Users,
   DollarSign,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,6 +89,7 @@ interface Product {
     | "audio"
     | "physical";
   creator: {
+    id: string;
     name: string;
     avatar: string;
     verified: boolean;
@@ -171,6 +173,10 @@ export default function ConsumerChannelPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
+  // Selected product for full-page view
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(
+    null
+  );
 
   //Tip State
   // const [tipAmount, setTipAmount] = useState<number>(0);
@@ -226,15 +232,9 @@ export default function ConsumerChannelPage() {
   //fetch posts
   const fetchPost = async () => {
     try {
-      const token = (session as Session & { accessToken?: string })
-        ?.accessToken;
-      if (!token) {
-        console.error("No authentication token found");
-        return;
-      }
-
+      // Using cookie-based authentication (NextAuth session cookies)
       const res = await axios.get("/api/posts", {
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       console.log("Response of fetching posts: ", res);
       if (res.status === 200) {
@@ -285,15 +285,8 @@ export default function ConsumerChannelPage() {
   const fetchComments = async (postId: string) => {
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
     try {
-      const token = (session as Session & { accessToken?: string })
-        ?.accessToken;
-      if (!token) {
-        console.error("No authentication token found");
-        return;
-      }
-
       const res = await axios.get(`/api/posts/${postId}/comment`, {
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       setComments((prev) => ({ ...prev, [postId]: res.data.comments }));
       setComentCount((prev) => ({
@@ -370,19 +363,11 @@ export default function ConsumerChannelPage() {
 
   const handleLikeToggle = async (postId: string) => {
     try {
-      // Use the session token from NextAuth
-      const token = (session as Session & { accessToken?: string })
-        ?.accessToken;
-      if (!token) {
-        console.error("No authentication token found");
-        return;
-      }
-
       const response = await axios.post(
         `/api/posts/${postId}/like`,
         {},
         {
-          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
         }
       );
 
@@ -476,9 +461,14 @@ export default function ConsumerChannelPage() {
       const response = await axios.get(`/api/products?${params}`);
       
       if (response.data.success) {
-        setProducts(response.data.products);
+        // Ensure product types are always lowercase to match TYPE_ICONS keys
+        const normalizedProducts = response.data.products.map((p: any) => ({
+          ...p,
+          type: typeof p.type === "string" ? p.type.toLowerCase() : p.type,
+        }));
+        setProducts(normalizedProducts);
       } else {
-        throw new Error('Invalid response format');
+        throw new Error("Invalid response format");
       }
     } catch (error: any) {
       console.error('Error fetching products:', error);
@@ -692,240 +682,356 @@ export default function ConsumerChannelPage() {
 
   const renderStoreContent = () => (
     <div className="space-y-6">
-      {/* Store Header */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-2xl font-bold text-gray-100">Product Store</h2>
-          <nav className="flex items-center space-x-2 bg-gray-800/50 p-1 rounded-full">
-            <button
-              onClick={() => setStoreActiveTab("top")}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                storeActiveTab === "top"
-                  ? "bg-yellow-500 text-black shadow-sm"
-                  : "text-gray-300 hover:text-white"
-              }`}
-            >
-              <TrendingUp className="h-4 w-4" />
-              <span>Top Products</span>
-            </button>
-            <button
-              onClick={() => setStoreActiveTab("following")}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                storeActiveTab === "following"
-                  ? "bg-yellow-500 text-black shadow-sm"
-                  : "text-gray-300 hover:text-white"
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              <span>Following</span>
-            </button>
-          </nav>
-        </div>
-
-        <div className="flex items-center bg-gray-800/50 p-1 rounded-full space-x-2">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={storeSearchTerm}
-              onChange={(e) => setStoreSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-48 bg-transparent focus:outline-none text-gray-100 placeholder-gray-400 text-sm"
-            />
-          </div>
-
-          {/* Type Selector */}
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="bg-gray-700/50 py-2 pl-4 pr-8 rounded-full text-sm focus:outline-none text-gray-100 border border-gray-600"
-          >
-            <option value="all">All Types</option>
-            <option value="image">Images</option>
-            <option value="video">Videos</option>
-            <option value="course">Courses</option>
-            <option value="template">Templates</option>
-            <option value="software">Software</option>
-            <option value="ebook">E-books</option>
-            <option value="audio">Audio</option>
-            <option value="physical">Physical</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Loading State */}
-      {loadingProducts && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="bg-gray-800/50 border-gray-700/40 animate-pulse">
-              <div className="h-48 bg-gray-700 rounded-t-lg"></div>
-              <CardContent className="p-4">
-                <div className="h-4 bg-gray-700 rounded mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded mb-2"></div>
-                <div className="flex items-center justify-between">
-                  <div className="h-6 w-6 bg-gray-700 rounded-full"></div>
-                  <div className="h-4 w-8 bg-gray-700 rounded"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Error State */}
-      {productsError && !loadingProducts && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">⚠️</div>
-          <h3 className="text-2xl font-bold mb-2 text-gray-400">
-            {productsError}
-          </h3>
-          <p className="text-gray-500 mb-6">
-            We couldn't load the products. Please check your connection and try again.
-          </p>
-          <button
-            onClick={fetchProducts}
-            className="bg-yellow-500 text-black px-6 py-3 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!loadingProducts && !productsError && filteredProducts.length === 0 && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">📦</div>
-          <h3 className="text-2xl font-bold mb-2 text-gray-400">
-            No products found
-          </h3>
-          <p className="text-gray-500 mb-6">
-            {storeSearchTerm || selectedType !== 'all' 
-              ? 'Try adjusting your search or filters.'
-              : 'No products are available at the moment.'
-            }
-          </p>
-          {(storeSearchTerm || selectedType !== 'all') && (
-            <button
-              onClick={() => {
-                setStoreSearchTerm('');
-                setSelectedType('all');
-              }}
-              className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Products Grid */}
-      {!loadingProducts && !productsError && filteredProducts.length > 0 && (
+      {/* Detail view */}
+      {selectedProduct && (
         <div className="space-y-6">
-          {/* Results Summary */}
-          <div className="text-sm text-gray-400">
-            Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
-            {(storeSearchTerm || selectedType !== 'all') && (
-              <span> for your search</span>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product: Product) => {
-              const IconComponent = TYPE_ICONS[product.type as keyof typeof TYPE_ICONS];
-              return (
-                <Card
-                  key={product.id}
-                  className="group cursor-pointer bg-gray-800/50 border-gray-700/40 hover:bg-gray-700/40 transition-all duration-200 hover:shadow-lg"
+          <Button
+            variant="ghost"
+            className="flex items-center gap-2 text-gray-300 hover:text-white"
+            onClick={() => setSelectedProduct(null)}
+          >
+            <ChevronLeft className="w-4 h-4" /> Back to products
+          </Button>
+
+          <Card className="bg-gray-800/70 border-gray-700/40 max-w-4xl mx-auto">
+            <div className="relative h-96 w-full overflow-hidden rounded-t-lg">
+              <img
+                src={selectedProduct.thumbnail}
+                alt={selectedProduct.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const t = e.target as HTMLImageElement;
+                  t.src =
+                    "https://via.placeholder.com/800x600/374151/9CA3AF?text=Product+Image";
+                }}
+              />
+            </div>
+            <CardContent className="p-6 space-y-4">
+              <h2 className="text-3xl font-bold text-gray-100">
+                {selectedProduct.title}
+              </h2>
+              {selectedProduct.description && (
+                <p className="text-gray-300 max-w-prose">
+                  {selectedProduct.description}
+                </p>
+              )}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Avatar 
+                    className="w-8 h-8 cursor-pointer hover:ring-2 hover:ring-yellow-400/50 transition-all duration-200"
+                    onClick={() => handleCreatorClick(selectedProduct.creator.id)}
+                  >
+                    <AvatarImage
+                      src={selectedProduct.creator.avatar}
+                      alt={selectedProduct.creator.name}
+                    />
+                    <AvatarFallback>{selectedProduct.creator.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <span 
+                    className="cursor-pointer hover:text-yellow-400 transition-colors"
+                    onClick={() => handleCreatorClick(selectedProduct.creator.id)}
+                  >
+                    {selectedProduct.creator.name}
+                  </span>
+                </div>
+                <span className="bg-yellow-500 text-black font-bold px-3 py-1 rounded-full">
+                  ₹{selectedProduct.price}
+                </span>
+              </div>
+
+              {/* Buy Now Button for Selected Product */}
+              <div className="flex justify-center">
+                <button 
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-8 py-3 rounded-lg font-bold text-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none min-w-[200px]"
+                  disabled
+                  onClick={() => {
+                    // TODO: Implement buy functionality
+                  }}
                 >
-                  <div className="relative">
-                    {/* Product Image */}
-                    <div className="relative h-48 overflow-hidden rounded-t-lg">
-                      <img
-                        src={product.thumbnail}
-                        alt={product.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'https://via.placeholder.com/400x300/374151/9CA3AF?text=Product+Image';
-                        }}
-                      />
-
-                      {/* Type indicator */}
-                      <div className="absolute top-2 right-2">
-                        <div className="bg-black/60 rounded-full p-1.5">
-                          <IconComponent className="h-4 w-4 text-white" />
-                        </div>
-                      </div>
-
-                      {/* Video play indicator */}
-                      {product.type === "video" && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="bg-black/60 rounded-full p-3">
-                            <Play className="h-6 w-6 text-white fill-current" />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Price overlay */}
-                      <div className="absolute top-2 left-2">
-                        <div className="bg-yellow-500 text-black font-bold px-2 py-1 rounded-full text-sm">
-                          ₹{product.price}
-                        </div>
-                      </div>
-
-                      {/* Sales badge */}
-                      {product.sales > 100 && (
-                        <div className="absolute bottom-2 left-2">
-                          <Badge className="bg-green-500 text-white text-xs">
-                            {product.sales}+ sold
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Product Info */}
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-gray-100 text-base line-clamp-2 flex-1 mr-2">
-                          {product.title}
-                        </h3>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <div className="flex items-center space-x-2">
-                          <Avatar className="w-6 h-6">
-                            <AvatarImage
-                              src={product.creator.avatar}
-                              alt={product.creator.name}
-                            />
-                            <AvatarFallback className="bg-gray-700 text-white text-xs">
-                              {product.creator.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-gray-300 truncate">
-                            {product.creator.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                          <span className="text-gray-300">{product.rating}</span>
-                        </div>
-                      </div>
-
-                      {/* Product description */}
-                      {product.description && (
-                        <p className="text-gray-400 text-xs line-clamp-2 mb-2">
-                          {product.description}
-                        </p>
-                      )}
-                    </CardContent>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                  Buy Now - ₹{selectedProduct.price}
+                </button>
+              </div>
+              
+              <div className="text-center mt-2">
+                <p className="text-gray-400 text-sm">Payment functionality coming soon</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
+      )}
+
+      {/* Standard grid view – hidden when a product is selected */}
+      {!selectedProduct && (
+        <>
+          {/* Store Header */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-2xl font-bold text-gray-100">Product Store</h2>
+              <nav className="flex items-center space-x-2 bg-gray-800/50 p-1 rounded-full">
+                <button
+                  onClick={() => setStoreActiveTab("top")}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    storeActiveTab === "top"
+                      ? "bg-yellow-500 text-black shadow-sm"
+                      : "text-gray-300 hover:text-white"
+                  }`}
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  <span>Top Products</span>
+                </button>
+                <button
+                  onClick={() => setStoreActiveTab("following")}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    storeActiveTab === "following"
+                      ? "bg-yellow-500 text-black shadow-sm"
+                      : "text-gray-300 hover:text-white"
+                  }`}
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Following</span>
+                </button>
+              </nav>
+            </div>
+
+            <div className="flex items-center bg-gray-800/50 p-1 rounded-full space-x-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={storeSearchTerm}
+                  onChange={(e) => setStoreSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-48 bg-transparent focus:outline-none text-gray-100 placeholder-gray-400 text-sm"
+                />
+              </div>
+
+              {/* Type Selector */}
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="bg-gray-700/50 py-2 pl-4 pr-8 rounded-full text-sm focus:outline-none text-gray-100 border border-gray-600"
+              >
+                <option value="all">All Types</option>
+                <option value="image">Images</option>
+                <option value="video">Videos</option>
+                <option value="course">Courses</option>
+                <option value="template">Templates</option>
+                <option value="software">Software</option>
+                <option value="ebook">E-books</option>
+                <option value="audio">Audio</option>
+                <option value="physical">Physical</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Loading State */}
+          {loadingProducts && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i} className="bg-gray-800/50 border-gray-700/40 animate-pulse">
+                  <div className="h-48 bg-gray-700 rounded-t-lg"></div>
+                  <CardContent className="p-4">
+                    <div className="h-4 bg-gray-700 rounded mb-2"></div>
+                    <div className="h-3 bg-gray-700 rounded mb-2"></div>
+                    <div className="flex items-center justify-between">
+                      <div className="h-6 w-6 bg-gray-700 rounded-full"></div>
+                      <div className="h-4 w-8 bg-gray-700 rounded"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Error State */}
+          {productsError && !loadingProducts && (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h3 className="text-2xl font-bold mb-2 text-gray-400">
+                {productsError}
+              </h3>
+              <p className="text-gray-500 mb-6">
+                We couldn't load the products. Please check your connection and try again.
+              </p>
+              <button
+                onClick={fetchProducts}
+                className="bg-yellow-500 text-black px-6 py-3 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loadingProducts && !productsError && filteredProducts.length === 0 && (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">📦</div>
+              <h3 className="text-2xl font-bold mb-2 text-gray-400">
+                No products found
+              </h3>
+              <p className="text-gray-500 mb-6">
+                {storeSearchTerm || selectedType !== 'all' 
+                  ? 'Try adjusting your search or filters.'
+                  : 'No products are available at the moment.'
+                }
+              </p>
+              {(storeSearchTerm || selectedType !== 'all') && (
+                <button
+                  onClick={() => {
+                    setStoreSearchTerm('');
+                    setSelectedType('all');
+                  }}
+                  className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Products Grid */}
+          {!loadingProducts && !productsError && filteredProducts.length > 0 && (
+            <div className="space-y-6">
+              {/* Results Summary */}
+              <div className="text-sm text-gray-400">
+                Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
+                {(storeSearchTerm || selectedType !== 'all') && (
+                  <span> for your search</span>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredProducts.map((product: Product) => {
+                  const IconComponent =
+                    TYPE_ICONS[
+                      (product.type as string).toLowerCase() as keyof typeof TYPE_ICONS
+                    ] || LucideImage;
+                  return (
+                    <Card
+                      key={product.id}
+                      className="group cursor-pointer bg-gray-800/50 border-gray-700/40 hover:bg-gray-700/40 transition-all duration-200 hover:shadow-lg"
+                      onClick={() => setSelectedProduct(product)}
+                    >
+                      <div className="relative">
+                        {/* Product Image */}
+                        <div className="relative h-48 overflow-hidden rounded-t-lg">
+                          <img
+                            src={product.thumbnail}
+                            alt={product.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = 'https://via.placeholder.com/400x300/374151/9CA3AF?text=Product+Image';
+                            }}
+                          />
+
+                          {/* Type indicator */}
+                          <div className="absolute top-2 right-2">
+                            <div className="bg-black/60 rounded-full p-1.5">
+                              <IconComponent className="h-4 w-4 text-white" />
+                            </div>
+                          </div>
+
+                          {/* Video play indicator */}
+                          {product.type === "video" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="bg-black/60 rounded-full p-3">
+                                <Play className="h-6 w-6 text-white fill-current" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Price overlay */}
+                          <div className="absolute top-2 left-2">
+                            <div className="bg-yellow-500 text-black font-bold px-2 py-1 rounded-full text-sm">
+                              ₹{product.price}
+                            </div>
+                          </div>
+
+                          {/* Sales badge */}
+                          {product.sales > 100 && (
+                            <div className="absolute bottom-2 left-2">
+                              <Badge className="bg-green-500 text-white text-xs">
+                                {product.sales}+ sold
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Product Info */}
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-semibold text-gray-100 text-base line-clamp-2 flex-1 mr-2">
+                              {product.title}
+                            </h3>
+                          </div>
+
+                          <div className="flex items-center justify-between text-sm mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Avatar 
+                                className="w-6 h-6 cursor-pointer hover:ring-2 hover:ring-yellow-400/50 transition-all duration-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreatorClick(product.creator.id);
+                                }}
+                              >
+                                <AvatarImage
+                                  src={product.creator.avatar}
+                                  alt={product.creator.name}
+                                />
+                                <AvatarFallback className="bg-gray-700 text-white text-xs">
+                                  {product.creator.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span 
+                                className="text-gray-300 truncate cursor-pointer hover:text-yellow-400 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreatorClick(product.creator.id);
+                                }}
+                              >
+                                {product.creator.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                              <span className="text-gray-300">{product.rating}</span>
+                            </div>
+                          </div>
+
+                          {/* Product description */}
+                          {product.description && (
+                            <p className="text-gray-400 text-xs line-clamp-2 mb-3">
+                              {product.description}
+                            </p>
+                          )}
+
+                          {/* Price and Buy Now Button */}
+                          <div className="flex items-center justify-between mt-4">
+                            <span className="text-2xl font-bold text-white">
+                              ₹{product.price}
+                            </span>
+                            <button 
+                              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                              disabled
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // TODO: Implement buy functionality
+                              }}
+                            >
+                              Buy Now
+                            </button>
+                          </div>
+                        </CardContent>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
