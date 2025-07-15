@@ -34,6 +34,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { StarRating } from "@/components/ui/star-rating";
+import { ReviewModal } from "@/components/ReviewModal";
 import axios from "axios";
 import Image from "next/image";
 
@@ -96,6 +98,11 @@ interface Product {
   thumbnail: string;
   rating: number;
   sales: number;
+  hasReview?: boolean;
+  userReview?: {
+    rating: number;
+    comment?: string;
+  } | null;
 }
 
 const TYPE_ICONS = {
@@ -161,6 +168,18 @@ export default function ConsumerChannelPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
+  
+  // My Products state
+  const [myProducts, setMyProducts] = useState<Product[]>([]);
+  const [loadingMyProducts, setLoadingMyProducts] = useState(true);
+  const [myProductsError, setMyProductsError] = useState<string | null>(null);
+  const [myProductsSearchTerm, setMyProductsSearchTerm] = useState("");
+  const [selectedMyProductType, setSelectedMyProductType] = useState<string>("all");
+  
+  // Review modal state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedProductForReview, setSelectedProductForReview] = useState<Product | null>(null);
+  
   // Selected product for full-page view
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(
     null
@@ -517,12 +536,81 @@ export default function ConsumerChannelPage() {
     }
   };
 
+  // Fetch my products
+  const fetchMyProducts = async () => {
+    try {
+      setLoadingMyProducts(true);
+      setMyProductsError(null);
+      
+      const params = new URLSearchParams({
+        search: myProductsSearchTerm,
+        type: selectedMyProductType,
+        page: '1',
+        limit: '50'
+      });
+      
+      const response = await axios.get(`/api/my-products?${params}`, {
+        withCredentials: true
+      });
+      
+      if (response.data.success) {
+        setMyProducts(response.data.products);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error: any) {
+      console.error('Error fetching my products:', error);
+      
+      if (error.response) {
+        const status = error.response.status;
+        if (status === 401) {
+          setMyProductsError('Please log in to view your products.');
+        } else if (status === 400) {
+          setMyProductsError('Invalid search parameters. Please try again.');
+        } else if (status >= 500) {
+          setMyProductsError('Server error. Please try again later.');
+        } else {
+          setMyProductsError('Failed to load your products. Please try again.');
+        }
+      } else if (error.request) {
+        setMyProductsError('Network error. Please check your connection and try again.');
+      } else {
+        setMyProductsError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setLoadingMyProducts(false);
+    }
+  };
+
   // Fetch products on component mount and when filters change
   useEffect(() => {
     if (activeTab === 'store') {
       fetchProducts();
     }
   }, [activeTab, storeSearchTerm, selectedType]);
+
+  // Fetch my products when tab changes
+  useEffect(() => {
+    if (activeTab === 'products') {
+      fetchMyProducts();
+    }
+  }, [activeTab, myProductsSearchTerm, selectedMyProductType]);
+
+  // Review handlers
+  const handleReviewProduct = (product: Product) => {
+    setSelectedProductForReview(product);
+    setReviewModalOpen(true);
+  };
+
+  const handleReviewSubmitted = () => {
+    // Refresh the products list to show updated review status
+    fetchMyProducts();
+  };
+
+  const handleReviewModalClose = () => {
+    setReviewModalOpen(false);
+    setSelectedProductForReview(null);
+  };
 
   // Store filtering logic (now done on the server side)
   const filteredProducts = products;
@@ -553,8 +641,10 @@ export default function ConsumerChannelPage() {
         fetchAndSetPosts();
       }
       if (activeTab === "store") {
+        fetchProducts();
       }
       if (activeTab === "products") {
+        fetchMyProducts();
       }
       if (activeTab === "subscriptions") {
       }
@@ -711,6 +801,259 @@ export default function ConsumerChannelPage() {
               </Card>
             ))}
       </div>
+    </div>
+  );
+
+  // My Products component with horizontal cards
+  const renderMyProductsContent = () => (
+    <div className="space-y-6">
+      {/* My Products Header */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h2 className="text-2xl font-bold text-gray-100">My Products</h2>
+          <Badge className="bg-green-500/20 text-green-400 border border-green-500/30">
+            {myProducts.length} Purchased
+          </Badge>
+        </div>
+
+        <div className="flex items-center bg-gray-800/50 p-1 rounded-full space-x-2">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search your products..."
+              value={myProductsSearchTerm}
+              onChange={(e) => setMyProductsSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 w-48 bg-transparent focus:outline-none text-gray-100 placeholder-gray-400 text-sm"
+            />
+          </div>
+
+          {/* Type Selector */}
+          <select
+            value={selectedMyProductType}
+            onChange={(e) => setSelectedMyProductType(e.target.value)}
+            className="bg-gray-700/50 py-2 pl-4 pr-8 rounded-full text-sm focus:outline-none text-gray-100 border border-gray-600"
+          >
+            <option value="all">All Types</option>
+            <option value="image">Images</option>
+            <option value="video">Videos</option>
+            <option value="course">Courses</option>
+            <option value="template">Templates</option>
+            <option value="software">Software</option>
+            <option value="ebook">E-books</option>
+            <option value="audio">Audio</option>
+            <option value="physical">Physical</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {loadingMyProducts && (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="bg-gray-800/50 border-gray-700/40 animate-pulse">
+              <div className="flex items-center p-4">
+                <div className="w-20 h-20 bg-gray-700 rounded-lg mr-4"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-700 rounded mb-2"></div>
+                  <div className="h-3 bg-gray-700 rounded mb-2"></div>
+                  <div className="flex items-center justify-between">
+                    <div className="h-6 w-6 bg-gray-700 rounded-full"></div>
+                    <div className="h-4 w-8 bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Error State */}
+      {myProductsError && !loadingMyProducts && (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h3 className="text-2xl font-bold mb-2 text-gray-400">
+            {myProductsError}
+          </h3>
+          <p className="text-gray-500 mb-6">
+            We couldn't load your products. Please check your connection and try again.
+          </p>
+          <button
+            onClick={fetchMyProducts}
+            className="bg-yellow-500 text-black px-6 py-3 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loadingMyProducts && !myProductsError && myProducts.length === 0 && (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">📦</div>
+          <h3 className="text-2xl font-bold mb-2 text-gray-400">
+            No products purchased yet
+          </h3>
+          <p className="text-gray-500 mb-6">
+            {myProductsSearchTerm || selectedMyProductType !== 'all' 
+              ? 'Try adjusting your search or filters.'
+              : 'Start exploring the product store to find amazing content!'
+            }
+          </p>
+          {(myProductsSearchTerm || selectedMyProductType !== 'all') && (
+            <button
+              onClick={() => {
+                setMyProductsSearchTerm('');
+                setSelectedMyProductType('all');
+              }}
+              className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium mr-4"
+            >
+              Clear Filters
+            </button>
+          )}
+          <button
+            onClick={() => setActiveTab('store')}
+            className="bg-yellow-500 text-black px-6 py-3 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+          >
+            Browse Store
+          </button>
+        </div>
+      )}
+
+      {/* My Products List - Horizontal Cards */}
+      {!loadingMyProducts && !myProductsError && myProducts.length > 0 && (
+        <div className="space-y-4">
+          {/* Results Summary */}
+          <div className="text-sm text-gray-400">
+            Showing {myProducts.length} purchased product{myProducts.length !== 1 ? 's' : ''}
+            {(myProductsSearchTerm || selectedMyProductType !== 'all') && (
+              <span> for your search</span>
+            )}
+          </div>
+          
+          <div className="space-y-3 max-w-6xl mx-auto">
+            {myProducts.map((product: Product) => {
+              const IconComponent = TYPE_ICONS[product.type as keyof typeof TYPE_ICONS];
+              return (
+                <Card
+                  key={product.id}
+                  className="group cursor-pointer bg-gray-800/50 border-gray-700/40 hover:bg-gray-700/40 transition-all duration-200 hover:shadow-lg w-full"
+                >
+                  <div className="flex items-center p-6">
+                    {/* Product Image */}
+                    <div className="relative w-24 h-24 mr-6 flex-shrink-0">
+                      <img
+                        src={product.thumbnail}
+                        alt={product.title}
+                        className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform duration-200"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'https://via.placeholder.com/96x96/374151/9CA3AF?text=Product';
+                        }}
+                      />
+                      
+                      {/* Type indicator */}
+                      <div className="absolute -top-1 -right-1">
+                        <div className="bg-black/60 rounded-full p-1">
+                          <IconComponent className="h-3 w-3 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-100 text-base truncate">
+                            {product.title}
+                          </h3>
+                          {product.description && (
+                            <p className="text-gray-400 text-sm line-clamp-1 mt-1">
+                              {product.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Avatar className="w-5 h-5">
+                            <AvatarImage
+                              src={product.creator.avatar}
+                              alt={product.creator.name}
+                            />
+                            <AvatarFallback className="bg-gray-700 text-white text-xs">
+                              {product.creator.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-gray-300 truncate">
+                            {product.creator.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-1">
+                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                            <span className="text-gray-300">{product.rating}</span>
+                          </div>
+                          {product.hasReview && product.userReview && (
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs text-yellow-400 font-medium">You rated it {product.userReview.rating} star{product.userReview.rating !== 1 ? 's' : ''}!</span>
+                            </div>
+                          )}
+                          <div className="text-gray-400 text-sm">
+                            ₹{product.price}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center space-x-3 ml-6">
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Handle download/view action
+                        }}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={product.hasReview 
+                          ? "border-yellow-600 text-yellow-400 hover:bg-yellow-600/20" 
+                          : "border-green-600 text-green-400 hover:bg-green-600/20"
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReviewProduct(product);
+                        }}
+                      >
+                        {product.hasReview ? "View Review" : "Review"}
+                      </Button>
+
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {selectedProductForReview && (
+        <ReviewModal
+          isOpen={reviewModalOpen}
+          onClose={handleReviewModalClose}
+          productId={selectedProductForReview.id}
+          productTitle={selectedProductForReview.title}
+          onReviewSubmitted={handleReviewSubmitted}
+        />
+      )}
     </div>
   );
 
@@ -1312,6 +1655,8 @@ export default function ConsumerChannelPage() {
           className={`${
             activeTab === "store"
               ? "max-w-6xl"
+              : activeTab === "products"
+              ? "max-w-5xl"
               : activeTab === "creators"
               ? "max-w-7xl"
               : activeTab === "livecreators"
@@ -1319,13 +1664,15 @@ export default function ConsumerChannelPage() {
               : "max-w-2xl"
           } mx-auto px-6 md:px-4 lg:px-6`}
         >
-          {activeTab === "store" ? (
-            renderStoreContent()
-          ) : activeTab === "creators" ? (
-            renderCreatorsContent()
-          ) : activeTab === "livecreators" ? (
-            renderLiveCreatorsContent()
-          ) : (
+                      {activeTab === "store" ? (
+              renderStoreContent()
+            ) : activeTab === "products" ? (
+              renderMyProductsContent()
+            ) : activeTab === "creators" ? (
+              renderCreatorsContent()
+            ) : activeTab === "livecreators" ? (
+              renderLiveCreatorsContent()
+            ) : (
             <div className="space-y-8 md:space-y-6 lg:space-y-8">
               {post.map((post) => (
                 <Card
