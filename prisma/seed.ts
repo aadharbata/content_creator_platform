@@ -284,6 +284,31 @@ async function main() {
     console.log(`  • Created product: ${product.title} by ${creator.name}`);
   }
 
+  // Create some product sales for testing "My Products"
+  console.log('🌱  Creating product sales for testing...');
+  const productSales = [];
+  for (let i = 0; i < 5; i++) {
+    const product = await prisma.product.findFirst({
+      skip: i,
+      orderBy: { createdAt: 'desc' }
+    });
+    const buyer = fans[i % fans.length];
+    
+    if (product && buyer) {
+      const sale = await prisma.productSale.create({
+        data: {
+          productId: product.id,
+          buyerId: buyer.id,
+          amount: product.price,
+          currency: 'INR',
+          status: 'SUCCEEDED'
+        }
+      });
+      productSales.push(sale);
+      console.log(`  • Created sale: ${buyer.name} purchased ${product.title}`);
+    }
+  }
+
   console.log('\n🌱  Seeded Creator Accounts (use password "testing")');
   creators.forEach((c) => console.log(`  • ${c.email}`));
 
