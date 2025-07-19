@@ -112,17 +112,50 @@ export const generateOTP = (): string => {
 }
 
 export const isValidPhoneNumber = (phone: string): boolean => {
-  // Indian phone number validation
-  const phoneRegex = /^[6-9]\d{9}$/
-  return phoneRegex.test(phone.replace(/\s+/g, ''))
+  // Remove all non-digit characters
+  const cleaned = phone.replace(/\D/g, '')
+  
+  // Check if it's a 10-digit Indian number (without country code)
+  if (cleaned.length === 10) {
+    const phoneRegex = /^[6-9]\d{9}$/
+    return phoneRegex.test(cleaned)
+  }
+  
+  // Check if it's a 12-digit number with country code (91XXXXXXXXXX)
+  if (cleaned.length === 12) {
+    const phoneRegex = /^91[6-9]\d{9}$/
+    return phoneRegex.test(cleaned)
+  }
+  
+  // Check if it's a 13-digit number with country code (919XXXXXXXXX) - some edge cases
+  if (cleaned.length === 13) {
+    const phoneRegex = /^91[6-9]\d{10}$/
+    return phoneRegex.test(cleaned)
+  }
+  
+  return false
 }
 
 export const formatPhoneNumber = (phone: string): string => {
-  // Format to +91XXXXXXXXXX
+  // Remove all non-digit characters
   const cleaned = phone.replace(/\D/g, '')
+  
+  // If it's already 12 digits with country code (91XXXXXXXXXX)
+  if (cleaned.length === 12 && cleaned.startsWith('91')) {
+    return `+${cleaned}`
+  }
+  
+  // If it's 10 digits, add +91
   if (cleaned.length === 10) {
     return `+91${cleaned}`
   }
+  
+  // If it already has + sign, return as is
+  if (phone.startsWith('+')) {
+    return phone
+  }
+  
+  // Return original if we can't format
   return phone
 }
 

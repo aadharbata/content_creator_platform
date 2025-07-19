@@ -7,7 +7,7 @@ import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { signIn, useSession, signOut } from "next-auth/react";
 
 const Login = () => {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -18,20 +18,24 @@ const Login = () => {
 
   // Handle redirect after successful login
   useEffect(() => {
+    console.log("🔍 Login page - Session status:", status);
+    console.log("🔍 Login page - Session data:", session);
+    
     if (status === 'authenticated' && session?.user) {
       const userRole = (session.user as any).role;
       const userId = (session.user as any).id;
       
-      console.log("Session authenticated, redirecting...", { userRole, userId });
+      console.log("✅ Session authenticated, redirecting...", { userRole, userId });
       
+      // Redirect to appropriate dashboard based on role
       if (userRole === 'CREATOR' && userId) {
-        console.log("Directing to creator dashboard!");
+        console.log("👨‍💻 Directing to creator dashboard!");
         router.push(`/creator/${userId}/dashboard`);
       } else if (userRole === 'CONSUMER') {
-        console.log("Directing to consumer channel!");
+        console.log("👤 Directing to consumer channel!");
         router.push('/consumer-channel');
       } else {
-        console.log("Unknown role, directing to home");
+        console.log("❓ Unknown role, directing to home");
         router.push('/');
       }
     }
@@ -50,14 +54,19 @@ const Login = () => {
     try {
       const result = await signIn("credentials", {
         redirect: false,
-        email: form.email,
+        identifier: form.identifier,
         password: form.password,
       });
 
       console.log("Result of login: ", result);
 
       if (result?.error) {
-        setError(result.error);
+        // Handle specific error cases
+        if (result.error === "CredentialsSignin") {
+          setError(language === 'hi' ? "गलत ईमेल/फोन या पासवर्ड।" : "Invalid email/phone or password.");
+        } else {
+          setError(result.error);
+        }
       } else if (result?.ok) {
         setSuccess(language === 'hi' ? "लॉगिन सफल! पुनर्निर्देशित कर रहे हैं..." : "Login successful! Redirecting...");
         console.log("Login successful, waiting for session to update...");
@@ -87,32 +96,40 @@ const Login = () => {
             CP
           </span>
         </div>
-        <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-blue-900 font-poppins">
+        <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-white font-poppins shadow-sm">
           {language === 'hi' ? 'लॉगिन' : 'Login'}
         </h1>
-        <p className="text-md text-gray-700 mb-6">
+        <p className="text-md text-white/90 mb-6 font-medium">
           {language === 'hi' 
             ? 'वापसी पर स्वागत है! कृपया अपने खाते में लॉगिन करें।' 
             : 'Welcome back! Please login to your account.'
           }
         </p>
+        
         <form
           className="w-full flex flex-col gap-4 text-left"
           onSubmit={handleSubmit}
         >
-          <label className="font-semibold text-gray-800">
-            {language === 'hi' ? 'ईमेल' : 'Email'}
+          <label className="font-semibold text-white">
+            {language === 'hi' ? 'ईमेल या फोन' : 'Email or Phone'}
             <input
-              name="email"
-              type="email"
-              value={form.email}
+              name="identifier"
+              type="text"
+              value={form.identifier}
               onChange={handleChange}
-              placeholder={language === 'hi' ? 'आप@email.com' : 'you@email.com'}
+              placeholder={language === 'hi' ? 'आप@email.com या 9876543210' : 'you@email.com or 9876543210'}
               required
-              className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
+              className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none bg-white text-gray-800 shadow-sm transition-all duration-200 hover:shadow-md"
             />
+            <div className="text-xs text-gray-200 mt-1 bg-black/20 p-2 rounded-lg backdrop-blur-sm">
+              {language === 'hi' 
+                ? 'फोन नंबर के लिए: केवल 10 अंक (जैसे 9876543210)'
+                : 'For phone: 10 digits only (e.g., 9876543210)'
+              }
+            </div>
           </label>
-          <label className="font-semibold text-gray-800">
+          
+          <label className="font-semibold text-white">
             {language === 'hi' ? 'पासवर्ड' : 'Password'}
             <input
               name="password"
@@ -121,12 +138,23 @@ const Login = () => {
               onChange={handleChange}
               placeholder={language === 'hi' ? 'पासवर्ड' : 'Password'}
               required
-              className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
+              className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none bg-white text-gray-800 shadow-sm transition-all duration-200 hover:shadow-md"
             />
           </label>
+          
+          {/* Forgot Password Link */}
+          <div className="text-right">
+            <a
+              href="/forgot-password"
+              className="text-sm text-yellow-300 hover:text-yellow-100 hover:underline transition-colors duration-200"
+            >
+              {language === 'hi' ? 'पासवर्ड भूल गए?' : 'Forgot Password?'}
+            </a>
+          </div>
+          
           <button
             type="submit"
-            className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
+            className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 hover:shadow-xl transition-all transform duration-200"
             disabled={loading}
           >
             {loading 
@@ -135,28 +163,38 @@ const Login = () => {
             }
           </button>
         </form>
+        
         {/* Google Login Button */}
         <button
           onClick={() => signIn('google', { redirect: false })}
-          className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-2xl py-3 shadow hover:bg-gray-100 transition-colors text-gray-800 font-semibold"
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-2xl py-3 shadow-md hover:bg-gray-50 hover:shadow-lg transition-all duration-200 text-gray-800 font-semibold"
           type="button"
         >
           <img src="/google.svg" alt="Google" className="w-5 h-5" />
           {language === 'hi' ? 'Google से लॉगिन करें' : 'Login with Google'}
         </button>
-        {error && <p className="mt-4 text-red-600 font-semibold">{error}</p>}
+        
+        {error && <p className="mt-4 text-red-300 font-semibold bg-red-900/30 p-3 rounded-xl border border-red-400">{error}</p>}
         {success && (
-          <p className="mt-4 text-green-600 font-semibold">{success}</p>
+          <p className="mt-4 text-green-300 font-semibold bg-green-900/30 p-3 rounded-xl border border-green-400">{success}</p>
         )}
-        <p className="mt-6 text-sm text-gray-600">
+        
+        <p className="mt-6 text-sm text-white">
           {language === 'hi' ? "खाता नहीं है?" : "Don't have an account?"}{" "}
           <a
             href="/signup"
-            className="text-orange-500 font-semibold hover:underline"
+            className="text-yellow-300 font-bold hover:text-yellow-100 hover:underline transition-colors duration-200"
           >
             {language === 'hi' ? "साइन अप करें" : "Sign up"}
           </a>
         </p>
+        
+        <div className="mt-4 text-xs text-white/80 text-center bg-black/10 p-3 rounded-xl backdrop-blur-sm">
+          {language === 'hi' 
+            ? 'फोन नंबर के बिना +91 लिखें। ईमेल या फोन दोनों से लॉगिन कर सकते हैं।'
+            : 'Enter phone number without +91. You can login with either email or phone.'
+          }
+        </div>
       </main>
       <style jsx global>{`
         .font-inter {
@@ -167,11 +205,11 @@ const Login = () => {
           font-family: "Poppins", sans-serif;
         }
         .glass {
-          background: rgba(255, 255, 255, 0.8);
-          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-          backdrop-filter: blur(8px);
+          background: rgba(0, 0, 0, 0.4);
+          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+          backdrop-filter: blur(20px);
           border-radius: 2rem;
-          border: 1px solid rgba(255, 255, 255, 0.18);
+          border: 1px solid rgba(255, 255, 255, 0.2);
         }
       `}</style>
     </div>
