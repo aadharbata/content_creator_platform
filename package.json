@@ -49,6 +49,7 @@
     "semver": "^7.7.2",
     "socket.io-client": "^4.8.1",
     "tailwind-merge": "^3.3.1",
+    "twilio": "^5.7.3",
     "zod": "^3.25.75"
   },
   "devDependencies": {
@@ -58,7 +59,7 @@
     "@types/bad-words": "^3.0.1",
     "@types/express": "^5.0.3",
     "@types/node": "^20",
-    "@types/nodemailer": "^6.4.14",
+    "@types/nodemailer": "^6.4.17",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "dotenv": "^17.0.1",

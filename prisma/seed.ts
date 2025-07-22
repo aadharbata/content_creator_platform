@@ -118,8 +118,15 @@ async function main() {
 
   console.log('\n🌱  Creating subscription communities...');
   for (const creator of creators) {
-    const community = await prisma.community.create({
-      data: {
+    const community = await prisma.community.upsert({
+      where: {
+        creatorId_type: {
+          creatorId: creator.id,
+          type: 'SUBSCRIPTION_COMMUNITY'
+        }
+      },
+      update: {},
+      create: {
         name: `${creator.name}'s Community`,
         description: `Community for fans of ${creator.name}`,
         type: 'SUBSCRIPTION_COMMUNITY',
@@ -141,8 +148,10 @@ async function main() {
       skipDuplicates: true,
     });
 
-    await prisma.communityConversation.create({
-      data: { communityId: community.id },
+    await prisma.communityConversation.upsert({
+      where: { communityId: community.id },
+      update: {},
+      create: { communityId: community.id },
     });
 
     console.log(`  • Created community for ${creator.name} with ${memberData.length} members`);

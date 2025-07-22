@@ -30,7 +30,7 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "passwordHash" TEXT NOT NULL,
+    "passwordHash" TEXT,
     "phone" TEXT,
     "phoneVerified" BOOLEAN NOT NULL DEFAULT false,
     "role" "Role" NOT NULL DEFAULT 'CREATOR',

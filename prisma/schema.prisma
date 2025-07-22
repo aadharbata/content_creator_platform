@@ -4,13 +4,15 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // url      = env("DATABASE_URL")
+  // url      = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  url      = "postgresql://neondb_owner:npg_aWB7qIgko9lZ@ep-gentle-sea-aegbro31-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 }
 model User {
   id                   String            @id @default(uuid())
   email                String            @unique
   name                 String
-  passwordHash         String
+  passwordHash         String?
   phone                String?           @unique // For WhatsApp delivery
   phoneVerified        Boolean           @default(false) // OTP verification status
   role                 Role              @default(CREATOR)
