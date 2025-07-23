@@ -307,6 +307,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   const [showWelcomePopup, setShowWelcomePopup] = useState(false)
   const [hasActiveTrial, setHasActiveTrial] = useState(false)
   const [trialButtonLoading, setTrialButtonLoading] = useState(false)
+  const [trialExpired, setTrialExpired] = useState(false) // New state to track trial expiration
+  const [trialExpiresAt, setTrialExpiresAt] = useState<string | null>(null) // Store trial expiration time for auto-refresh
   
   // Add subscription settings state
   const [subscriptionSettings, setSubscriptionSettings] = useState<{
@@ -317,6 +319,37 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   } | null>(null)
   const [loadingSettings, setLoadingSettings] = useState(true)
 
+  // Auto-refresh when trial expires
+  useEffect(() => {
+    if (!trialExpiresAt || !hasActiveTrial) return
+
+    const expiresAt = new Date(trialExpiresAt).getTime()
+    const now = Date.now()
+    const timeUntilExpiry = expiresAt - now
+
+    console.log('⏰ [AUTO-REFRESH] Setting up auto-refresh timer:', {
+      expiresAt: new Date(trialExpiresAt).toLocaleString(),
+      timeUntilExpiry: Math.round(timeUntilExpiry / 1000) + ' seconds'
+    })
+
+    if (timeUntilExpiry > 0) {
+      const timer = setTimeout(() => {
+        console.log('🔄 [AUTO-REFRESH] Trial expired - refreshing page automatically')
+        window.location.reload()
+      }, timeUntilExpiry)
+
+      // Cleanup timer on component unmount or dependency change
+      return () => {
+        console.log('🧹 [AUTO-REFRESH] Cleaning up auto-refresh timer')
+        clearTimeout(timer)
+      }
+    } else {
+      // Trial already expired, refresh immediately
+      console.log('🔄 [AUTO-REFRESH] Trial already expired - refreshing page immediately')
+      window.location.reload()
+    }
+  }, [trialExpiresAt, hasActiveTrial])
+
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
@@ -324,6 +357,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
       if (!currentUserId) {
         setIsSubscribed(false);
         setHasActiveTrial(false);
+        setTrialExpired(false);
+        setTrialExpiresAt(null);
         setLoadingSubscription(false);
         return;
       }
@@ -333,6 +368,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
         console.log('🔍 Creator viewing own profile - auto-subscribing');
         setIsSubscribed(true);
         setHasActiveTrial(false);
+        setTrialExpired(false);
+        setTrialExpiresAt(null);
         setLoadingSubscription(false);
         return;
       }
@@ -350,6 +387,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
             console.log('✅ User has regular subscription');
             setIsSubscribed(true);
             setHasActiveTrial(false);
+            setTrialExpired(false);
+            setTrialExpiresAt(null);
             setLoadingSubscription(false);
             return;
           }
@@ -360,6 +399,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           console.log('✅ Creator offers free content - auto-subscribing');
           setIsSubscribed(true);
           setHasActiveTrial(false);
+          setTrialExpired(false);
+          setTrialExpiresAt(null);
           setLoadingSubscription(false);
           return;
         }
@@ -385,12 +426,24 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
               console.log('✅ [SUB-CHECK] User has active trial - granting immediate access (like paid)');
               setIsSubscribed(true);  // Grant immediate access like paid subscriptions
               setHasActiveTrial(true);
+              setTrialExpired(false);
+              setTrialExpiresAt(trialData.expiresAt); // Store expiration time for auto-refresh
+              setLoadingSubscription(false);
+              return;
+            } else if (trialData.expired) {
+              console.log('⏰ [SUB-CHECK] Trial has expired - will show paid subscription box');
+              setIsSubscribed(false);
+              setHasActiveTrial(false);
+              setTrialExpired(true); // Set trial expired state
+              setTrialExpiresAt(null);
               setLoadingSubscription(false);
               return;
             } else {
               console.log('❌ [SUB-CHECK] No active trial - showing trial button');
               setIsSubscribed(false);  // Show trial button
               setHasActiveTrial(false);
+              setTrialExpired(false);
+              setTrialExpiresAt(null);
               setLoadingSubscription(false);
               return;
             }
@@ -398,6 +451,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
             console.log('💥 [SUB-CHECK] Trial check failed - showing trial button as fallback');
             setIsSubscribed(false);
             setHasActiveTrial(false);
+            setTrialExpired(false);
+            setTrialExpiresAt(null);
             setLoadingSubscription(false);
             return;
           }
@@ -407,12 +462,16 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
         console.log('❌ No subscription found - user needs to subscribe');
         setIsSubscribed(false);
         setHasActiveTrial(false);
+        setTrialExpired(false);
+        setTrialExpiresAt(null);
         setLoadingSubscription(false);
 
       } catch (error) {
         console.error('❌ Error checking subscription:', error);
         setIsSubscribed(false);
         setHasActiveTrial(false);
+        setTrialExpired(false);
+        setTrialExpiresAt(null);
         setLoadingSubscription(false);
       }
     }
@@ -698,12 +757,17 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
 
-                {/* Premium Membership Card - Only show when creator has paid subscription enabled */}
-                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && (
+                {/* Paid Subscription Box - Show for regular paid creators OR expired trial users */}
+                {!isSubscribed && !loadingSubscription && (
+                  (subscriptionSettings?.subscriptionType === 'paid' || trialExpired) && (
                   <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
                     <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
-                      <div className="text-xl font-bold">Premium Membership</div>
-                      <div className="text-sm opacity-80">Unlock exclusive content & benefits</div>
+                      <div className="text-xl font-bold">
+                        {trialExpired ? '⏰ Trial Expired' : 'Premium Membership'}
+                      </div>
+                      <div className="text-sm opacity-80">
+                        {trialExpired ? 'Continue with premium access' : 'Unlock exclusive content & benefits'}
+                      </div>
                     </div>
                     <div className="text-4xl font-extrabold text-gray-900 mb-2">
                       {subscriptionSettings?.subscriptionPrice ? `₹${subscriptionSettings.subscriptionPrice.toLocaleString()}` : 'N/A'}
@@ -715,6 +779,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Exclusive community access</li>
                       <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
                     </ul>
+                    
                     <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
                       const user = session?.user;
                       // Debug: log userId and creatorId for subscription POST
@@ -732,16 +797,18 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                         console.error('❌ Subscription failed:', response.status);
                       }
                     }}>
-                      Subscribe Now
+                      {trialExpired ? 'Subscribe Now' : 'Subscribe Now'}
                     </Button>
-                    <div className="text-xs text-gray-500 mt-2 text-center">Cancel anytime. No hidden fees.</div>
+                    <div className="text-xs text-gray-500 mt-2 text-center">
+                      {trialExpired ? 'Continue your access with premium subscription.' : 'Cancel anytime. No hidden fees.'}
+                    </div>
                   </div>
-                )}
+                ))}
 
 
 
-                {/* Trial Subscription Box - Show EXACTLY like paid */}
-                {!isSubscribed && !loadingSubscription && !loadingSettings && subscriptionSettings?.subscriptionType === 'trial' && (
+                {/* Trial Subscription Box - Show ONLY when trial is available and NOT expired */}
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'trial' && !trialExpired && (
                   <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-green-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
                     <div className="w-full bg-gradient-to-r from-green-500 to-teal-500 rounded-lg p-4 mb-4 text-white text-center">
                       <div className="text-xl font-bold">🎁 Free Trial Available</div>
@@ -756,6 +823,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                         for {subscriptionSettings.trialDuration === 1 ? '1 minute' : `${subscriptionSettings.trialDuration} days`}
                       </span>
                     </div>
+                    
                     <div className="text-center mb-4">
                       <div className="text-lg text-gray-700">Then ₹{subscriptionSettings.subscriptionPrice}/month</div>
                       <div className="text-sm text-gray-500">
@@ -782,6 +850,7 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                         }
                       </li>
                     </ul>
+                    
                     <Button 
                       disabled={trialButtonLoading}
                       className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2 disabled:opacity-50" 
@@ -827,6 +896,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                               // SUCCESS: Set user as subscribed to show paywall content
                               setIsSubscribed(true);
                               setHasActiveTrial(true);
+                              setTrialExpired(false);
+                              setTrialExpiresAt(data.expiresAt); // Store expiration time for auto-refresh
                               
                               console.log('✅ [TRIAL-BTN] UI state updated - user should now see paywall content');
                               console.log('✅ [TRIAL-BTN] isSubscribed set to:', true);
