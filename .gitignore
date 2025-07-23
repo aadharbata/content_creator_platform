@@ -26,6 +26,17 @@ yarn-error.log*
 
 # -------- environment / secrets --------
 .env
+.env.local
+.env.development
+.env.production
+
+# -------- sensitive documentation --------
+GOOGLE_OAUTH_FIX.md
+GOOGLE_OAUTH_SETUP.md
+SMS_SETUP_GUIDE.md
+
+# -------- test files with secrets --------
+test-google-oauth*.js
 
 # vercel
 .vercel

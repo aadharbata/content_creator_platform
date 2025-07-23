@@ -29,7 +29,8 @@ import {
   Crown,
   Calendar,
   Search,
-  LogOut
+  LogOut,
+  CreditCard
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -47,6 +48,7 @@ import axios from "axios";
 import { cn } from "@/lib/utils"
 import { type Language } from "@/lib/translations"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
+import { SubscriptionManager } from "@/components/SubscriptionManager"
 
 // Professional constants
 const COURSE_BADGES = {
@@ -260,6 +262,27 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   const searchParams = useSearchParams();
   const [goLiveLoading, setGoLiveLoading] = useState(false);
   const creatorId = (session?.user as any)?.id;
+
+  // Redirect if user is trying to access another creator's dashboard
+  useEffect(() => {
+    if (session?.user) {
+      const sessionUserId = (session.user as any)?.id;
+      const userRole = (session.user as any)?.role;
+      
+      // If user is not a creator, redirect to consumer channel
+      if (userRole !== 'CREATOR') {
+        router.push('/consumer-channel');
+        return;
+      }
+      
+      // If user is trying to access another creator's dashboard, redirect to their own
+      if (sessionUserId && sessionUserId !== id) {
+        console.log('🚫 Unauthorized dashboard access. Redirecting to own dashboard.');
+        router.push(`/creator/${sessionUserId}/dashboard`);
+        return;
+      }
+    }
+  }, [session, id, router]);
 
   // Validate UUID
   if (!validateUUID(id)) {
@@ -828,6 +851,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                     { id: "posts", icon: Edit3, label: "Posts" },
                     { id: "analytics", icon: TrendingUp, label: t.analytics },
                     { id: "messages", icon: MessageCircle, label: t.messages },
+                    { id: "subscription", icon: CreditCard, label: "Manage Subscription" },
                     { id: "profile", icon: User, label: "Profile" },
                     { id: "settings", icon: Settings, label: t.settings },
                     { id: "logout", icon: LogOut, label: "Logout" }
@@ -1368,6 +1392,20 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                       <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                       <p className="text-gray-600">{t.settingsSoon}</p>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="subscription">
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <CreditCard className="w-6 h-6" />
+                      Manage Subscription
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <SubscriptionManager creatorId={id} />
                   </CardContent>
                 </Card>
               </TabsContent>
