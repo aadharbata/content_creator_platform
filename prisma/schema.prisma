@@ -40,6 +40,10 @@ model User {
   productReviews       ProductReview[]
   productSales         ProductSale[]
 
+  // Trial subscription relations
+  trialSubscriptions        TrialSubscription[] @relation("UserTrialSubscriptions")
+  creatorTrialSubscriptions TrialSubscription[] @relation("CreatorTrialSubscriptions")
+
   // Community relations
   ownedCommunities     Community[]        @relation("CreatorCommunities")
   communityMemberships CommunityMember[]
@@ -437,6 +441,8 @@ model CreatorProfile {
   isPaid            Boolean @default(false)
   IsLive            Boolean @default(false)
   subscriptionPrice Int?
+  subscriptionType  String  @default("free") // "paid", "free", "trial" - Changed default to "free"
+  trialDuration     Int?    // Trial duration in days (7, 14, 30)
   posts             Post[]
 }
 
@@ -574,4 +580,20 @@ enum ProductStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+model TrialSubscription {
+  id          String   @id @default(uuid())
+  userId      String
+  creatorId   String
+  startedAt   DateTime @default(now())
+  expiresAt   DateTime
+  isExpired   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user    User @relation("UserTrialSubscriptions", fields: [userId], references: [id])
+  creator User @relation("CreatorTrialSubscriptions", fields: [creatorId], references: [id])
+
+  @@unique([userId, creatorId]) // One trial per user per creator
+  @@index([userId, creatorId, expiresAt])
 }

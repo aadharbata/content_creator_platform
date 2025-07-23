@@ -305,39 +305,145 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [loadingSubscription, setLoadingSubscription] = useState(true)
   const [showWelcomePopup, setShowWelcomePopup] = useState(false)
+  const [hasActiveTrial, setHasActiveTrial] = useState(false)
+  const [trialButtonLoading, setTrialButtonLoading] = useState(false)
+  
+  // Add subscription settings state
+  const [subscriptionSettings, setSubscriptionSettings] = useState<{
+    subscriptionType: 'paid' | 'free' | 'trial';
+    isPaid: boolean;
+    subscriptionPrice: number | null;
+    trialDuration: number | null;
+  } | null>(null)
+  const [loadingSettings, setLoadingSettings] = useState(true)
+
   useEffect(() => {
     const checkSubscription = async () => {
       setLoadingSubscription(true)
-      if (!session?.user?.id) {
+      const currentUserId = (session?.user as any)?.id;
+      if (!currentUserId) {
         setIsSubscribed(false);
+        setHasActiveTrial(false);
         setLoadingSubscription(false);
         return;
       }
-      
-      const currentUserId = (session?.user as any)?.id;
-      
-      // Debug: log userId and creatorId for subscription check
-      console.log('Check subscription:', { userId: currentUserId, creatorId: id });
       
       // If the creator is viewing their own profile, they should see it as "subscribed"
       if (currentUserId === id) {
         console.log('🔍 Creator viewing own profile - auto-subscribing');
         setIsSubscribed(true);
+        setHasActiveTrial(false);
         setLoadingSubscription(false);
         return;
       }
-      
+
       try {
-        const res = await fetch(`/api/subscribe/check?creatorId=${id}&userId=${currentUserId}`);
-        const data = await res.json();
-        setIsSubscribed(data.subscribed === true);
-      } catch {
+        // Check if user has a regular subscription first
+        const subscriptionResponse = await fetch(`/api/subscribe/check?creatorId=${id}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (subscriptionResponse.ok) {
+          const subscriptionData = await subscriptionResponse.json();
+          if (subscriptionData.subscribed) {
+            console.log('✅ User has regular subscription');
+            setIsSubscribed(true);
+            setHasActiveTrial(false);
+            setLoadingSubscription(false);
+            return;
+          }
+        }
+
+        // If creator has free subscription type, auto-subscribe
+        if (subscriptionSettings?.subscriptionType === 'free') {
+          console.log('✅ Creator offers free content - auto-subscribing');
+          setIsSubscribed(true);
+          setHasActiveTrial(false);
+          setLoadingSubscription(false);
+          return;
+        }
+
+        // For trial creators: Only grant access if user has ACTIVE trial
+        // Otherwise show "Start Free Trial" button
+        if (subscriptionSettings?.subscriptionType === 'trial') {
+          console.log('🎁 Creator offers trial subscription - checking for active trial');
+          console.log('🔍 USER DEBUG - Current userId:', currentUserId, 'checking creator:', id);
+          
+          const trialResponse = await fetch('/api/subscribe/check-trial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUserId, creatorId: id })
+          });
+
+          if (trialResponse.ok) {
+            const trialData = await trialResponse.json();
+            console.log('🔍 USER DEBUG - Trial API response for user', currentUserId, ':', trialData);
+            if (trialData.hasActiveTrial) {
+              console.log('✅ User', currentUserId, 'has active trial - granting paywall access');
+              setIsSubscribed(true);  // Grant paywall access
+              setHasActiveTrial(true);
+            } else {
+              console.log('❌ User', currentUserId, 'has no active trial - showing trial button');
+              setIsSubscribed(false); // Don't grant paywall access
+              setHasActiveTrial(false); // This will show the trial button
+            }
+          } else {
+            console.log('❌ Trial check failed for user', currentUserId, '- showing trial button');
+            setIsSubscribed(false);
+            setHasActiveTrial(false);
+          }
+          
+          setLoadingSubscription(false);
+          return;
+        }
+
+        // For paid creators: No subscription found
+        console.log('❌ No subscription found - user needs to subscribe');
         setIsSubscribed(false);
+        setHasActiveTrial(false);
+        setLoadingSubscription(false);
+
+      } catch (error) {
+        console.error('❌ Error checking subscription:', error);
+        setIsSubscribed(false);
+        setHasActiveTrial(false);
+        setLoadingSubscription(false);
       }
-      setLoadingSubscription(false);
     }
-    checkSubscription();
-  }, [id, session?.user?.id])
+
+    if (subscriptionSettings && session?.user) {
+      checkSubscription()
+    }
+  }, [id, session?.user, subscriptionSettings])
+
+  // Fetch subscription settings
+  useEffect(() => {
+    const fetchSubscriptionSettings = async () => {
+      try {
+        const response = await fetch(`/api/creator/${id}/public-subscription-settings`)
+        if (response.ok) {
+          const data = await response.json()
+          setSubscriptionSettings(data)
+          console.log('📄 Creator subscription settings:', data)
+        } else {
+          console.log('❌ Failed to fetch subscription settings:', response.status)
+          // Set default settings if fetch fails - new creators default to 'free'
+          setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null })
+        }
+              } catch (error) {
+          console.error('❌ Error fetching subscription settings:', error)
+          // Set default settings if error occurs - new creators default to 'free'
+          setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null })
+      } finally {
+        setLoadingSettings(false)
+        console.log('✅ Subscription settings loading finished')
+      }
+    }
+
+    fetchSubscriptionSettings()
+  }, [id])
+
   // --- Backend subscription logic end ---
 
   // Fetch all creator data
@@ -587,13 +693,17 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
 
-                {!isSubscribed && !loadingSubscription && (
+                {/* Premium Membership Card - Only show when creator has paid subscription enabled */}
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && (
                   <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
                     <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
                       <div className="text-xl font-bold">Premium Membership</div>
                       <div className="text-sm opacity-80">Unlock exclusive content & benefits</div>
                     </div>
-                    <div className="text-4xl font-extrabold text-gray-900 mb-2">$120<span className="text-lg font-medium text-gray-700">/month</span></div>
+                    <div className="text-4xl font-extrabold text-gray-900 mb-2">
+                      {subscriptionSettings?.subscriptionPrice ? `₹${subscriptionSettings.subscriptionPrice.toLocaleString()}` : 'N/A'}
+                      <span className="text-lg font-medium text-gray-700">/month</span>
+                    </div>
                     <ul className="text-gray-700 text-base mb-6 w-full">
                       <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Access to all premium courses</li>
                       <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Weekly live Q&A sessions</li>
@@ -604,18 +714,131 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       const user = session?.user;
                       // Debug: log userId and creatorId for subscription POST
                       console.log('Subscribe POST:', { userId: (user as any)?.id, creatorId: id });
-                      await fetch("/api/subscribe", {
+                      const response = await fetch("/api/subscribe", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ creatorId: id, userId: (user as any)?.id })
+                        body: JSON.stringify({ creatorId: id })
                       });
-                      setIsSubscribed(true);
+                      
+                      if (response.ok) {
+                        setIsSubscribed(true);
+                        console.log('✅ Successfully subscribed');
+                      } else {
+                        console.error('❌ Subscription failed:', response.status);
+                      }
                     }}>
-                      Join Now
+                      Subscribe Now
                     </Button>
                     <div className="text-xs text-gray-500 mt-2 text-center">Cancel anytime. No hidden fees.</div>
                   </div>
                 )}
+
+
+
+                {/* Trial Subscription Card - Shows only when user should start a trial */}
+                {!isSubscribed && !hasActiveTrial && !loadingSubscription && !loadingSettings && subscriptionSettings?.subscriptionType === 'trial' && (
+                  <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-green-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
+                    <div className="w-full bg-gradient-to-r from-green-500 to-teal-500 rounded-lg p-4 mb-4 text-white text-center">
+                      <div className="text-xl font-bold">🎁 Free Trial Available</div>
+                      <div className="text-sm opacity-80">
+                        Get {subscriptionSettings.trialDuration === 1 ? '1 minute' : `${subscriptionSettings.trialDuration} days`} free, then ₹{subscriptionSettings.subscriptionPrice}/month
+                        {subscriptionSettings.trialDuration === 1 && <span className="block mt-1 text-yellow-200 font-medium">(Test Mode)</span>}
+                      </div>
+                    </div>
+                    <div className="text-4xl font-extrabold text-gray-900 mb-2">
+                      FREE
+                      <span className="text-lg font-medium text-gray-700"> 
+                        for {subscriptionSettings.trialDuration === 1 ? '1 minute' : `${subscriptionSettings.trialDuration} days`}
+                      </span>
+                    </div>
+                    <div className="text-center mb-4">
+                      <div className="text-lg text-gray-700">Then ₹{subscriptionSettings.subscriptionPrice}/month</div>
+                      <div className="text-sm text-gray-500">
+                        {subscriptionSettings.trialDuration === 1 
+                          ? 'Cancel anytime during 1-minute trial' 
+                          : 'Cancel anytime during trial'
+                        }
+                      </div>
+                      {subscriptionSettings.trialDuration === 1 && (
+                        <div className="text-xs text-yellow-600 font-medium mt-1">
+                          ⚡ Testing Mode - Trial expires in 1 minute
+                        </div>
+                      )}
+                    </div>
+                    <ul className="text-gray-700 text-base mb-6 w-full">
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Full access during trial</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>All premium content</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Cancel before trial ends</li>
+                      <li className="flex items-center mb-2">
+                        <span className="text-green-500 mr-2">✓</span>
+                        {subscriptionSettings.trialDuration === 1 
+                          ? 'Auto billing after 1 minute' 
+                          : 'Automatic billing after trial'
+                        }
+                      </li>
+                    </ul>
+                    <Button 
+                      disabled={trialButtonLoading}
+                      className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2 disabled:opacity-50" 
+                      onClick={async () => {
+                        const user = session?.user;
+                        console.log('🎬 START TRIAL BUTTON CLICKED!');
+                        
+                        if (!user) {
+                          alert('Please log in to start your free trial');
+                          return;
+                        }
+                        
+                        setTrialButtonLoading(true);
+                        
+                        try {
+                          const response = await fetch("/api/subscribe/check-trial", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ creatorId: id, userId: (user as any)?.id })
+                          });
+                          
+                          if (response.ok) {
+                            const data = await response.json();
+                            console.log('📄 Trial API Response:', data);
+                            
+                            if (data.hasActiveTrial) {
+                              // SUCCESS: Set user as subscribed to show paywall content
+                              setIsSubscribed(true);
+                              setHasActiveTrial(true);
+                              
+                              // Show success message
+                              const durationText = subscriptionSettings.trialDuration === 1 ? '1-minute' : `${subscriptionSettings.trialDuration}-day`;
+                              alert(`🎉 Trial activated! You now have access to all content for ${durationText}!`);
+                            } else {
+                              console.error('❌ Trial creation failed - API returned hasActiveTrial: false');
+                              alert('Trial could not be activated. Please try again.');
+                            }
+                          } else {
+                            const errorText = await response.text();
+                            console.error('❌ Trial creation failed with status:', response.status, errorText);
+                            alert(`Failed to start trial (${response.status}). Please try again.`);
+                          }
+                        } catch (error) {
+                          console.error('❌ Error starting trial:', error);
+                          alert('Network error. Please try again.');
+                        } finally {
+                          setTrialButtonLoading(false);
+                        }
+                      }}
+                    >
+                      {trialButtonLoading ? '🔄 Starting...' : '🎁 Start Free Trial'}
+                    </Button>
+                    <div className="text-xs text-gray-500 mt-2 text-center">
+                      {subscriptionSettings.trialDuration === 1 
+                        ? 'No charges for 1 minute (test mode)' 
+                        : 'No charges until trial ends'
+                      }
+                    </div>
+                  </div>
+                )}
+
+
 
                 {userId && userId !== id && isSubscribed && (
                   <div className="flex items-center md:justify-end w-full md:w-auto">

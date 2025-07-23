@@ -30,4 +30,39 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json({ subscribed: !!subscription });
+}
+
+// Add POST method for frontend compatibility
+export async function POST(req: NextRequest) {
+  try {
+    const { userId, creatorId } = await req.json();
+
+    console.log('🔍 Subscription check POST - userId:', userId, 'creatorId:', creatorId);
+
+    if (!userId || !creatorId) {
+      return NextResponse.json({ error: "Missing userId or creatorId" }, { status: 400 });
+    }
+
+    // If user is checking their own creator profile, they are "subscribed"
+    if (userId === creatorId) {
+      console.log('✅ Creator viewing own profile - auto-subscribed');
+      return NextResponse.json({ subscribed: true });
+    }
+
+    // Check if subscription exists
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        userId,
+        creatorId,
+      },
+    });
+
+    const isSubscribed = !!subscription;
+    console.log('🔍 Subscription found:', isSubscribed ? 'Yes' : 'No');
+
+    return NextResponse.json({ subscribed: isSubscribed });
+  } catch (error) {
+    console.error('❌ Error checking subscription:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 } 

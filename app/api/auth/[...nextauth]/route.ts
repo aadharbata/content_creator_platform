@@ -158,19 +158,10 @@ export const authOptions = {
     async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
       console.log('🔐 Redirect callback:', { url, baseUrl });
       
-      // Handle OAuth callback - redirect will be handled by session callback based on user role
-      if (url === baseUrl || url === `${baseUrl}/` || url.includes('callback')) {
-        console.log('🔐 OAuth completed - will redirect based on user role in session');
-        // Return the callback URLs as specified, role-based redirect will happen in frontend
-        if (url.includes('creator')) {
-          return `${baseUrl}/creator/dashboard`;
-        } else if (url.includes('consumer')) {
-          return `${baseUrl}/consumer-channel`;
-        }
-        
-        // Default redirect to consumer channel 
-        console.log('🔐 Default redirect to consumer channel');
-        return `${baseUrl}/consumer-channel`;
+      // For OAuth callbacks, let the frontend handle the redirect
+      if (url.includes('callback') || url === baseUrl || url === `${baseUrl}/`) {
+        console.log('🔐 OAuth completed - defaulting to login page for frontend redirect');
+        return `${baseUrl}/login`;
       }
       
       // For other redirects, use default behavior  
