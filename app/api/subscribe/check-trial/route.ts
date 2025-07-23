@@ -3,173 +3,54 @@ import prisma from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, creatorId } = await request.json();
+    console.log('🚀 [TRIAL-API] Starting trial check - SIMPLE VERSION (like paid)');
+    
+    const { userId, creatorId, createTrial } = await request.json();
 
-    console.log('🔍 Trial check - userId:', userId, 'creatorId:', creatorId);
+    console.log('🔍 [TRIAL-API] Request data:', { userId, creatorId, createTrial });
 
     if (!userId || !creatorId) {
+      console.error('❌ [TRIAL-API] Missing required fields');
       return NextResponse.json({ error: 'Missing userId or creatorId' }, { status: 400 });
     }
 
-    // Get creator's subscription settings
-    const creatorProfile = await prisma.creatorProfile.findUnique({
-      where: { userId: creatorId },
-      select: {
-        subscriptionType: true,
-        trialDuration: true,
-        subscriptionPrice: true,
-      },
-    });
-
-    console.log('📄 Creator profile:', creatorProfile);
-
-    // If creator doesn't offer trials, return false
-    if (!creatorProfile || creatorProfile.subscriptionType !== 'trial') {
-      console.log('❌ Creator does not offer trial subscriptions');
-      return NextResponse.json({ hasActiveTrial: false });
+    // If user is checking their own creator profile, they have "trial access"
+    if (userId === creatorId) {
+      console.log('✅ [TRIAL-API] Creator viewing own profile - auto-granted trial access');
+      return NextResponse.json({ hasActiveTrial: true });
     }
 
-    // Check if user has an existing trial subscription
-    const existingTrial = await prisma.trialSubscription.findUnique({
+    // Check if trial record exists (EXACTLY like paid subscription check)
+    let trialSubscription = await prisma.trialSubscription.findFirst({
       where: {
-        userId_creatorId: {
-          userId: userId,
-          creatorId: creatorId,
-        },
+        userId,
+        creatorId,
       },
     });
 
-    console.log('🔍 Existing trial:', existingTrial);
-
-    if (!existingTrial) {
-      // No trial exists, create a new one
-      const trialDurationValue = creatorProfile.trialDuration || 1;
-      const expiresAt = new Date();
+    // If createTrial is true and no trial exists, create one (like paid subscription creation)
+    if (createTrial && !trialSubscription) {
+      console.log('🎁 [TRIAL-API] Creating new trial subscription (like paid)');
       
-      // Handle different duration units
-      if (trialDurationValue === 1) {
-        // 1 minute for testing
-        expiresAt.setMinutes(expiresAt.getMinutes() + 1);
-        console.log(`🎁 Creating new trial subscription for 1 minute (testing mode)`);
-      } else {
-        // Days for normal operation (7, 14 or 30)
-        expiresAt.setDate(expiresAt.getDate() + trialDurationValue);
-        console.log(`🎁 Creating new trial subscription for ${trialDurationValue} days`);
-      }
-
-      const newTrial = await prisma.trialSubscription.create({
+      trialSubscription = await prisma.trialSubscription.create({
         data: {
-          userId: userId,
-          creatorId: creatorId,
-          expiresAt: expiresAt,
+          userId,
+          creatorId,
           startedAt: new Date(),
-        },
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year (irrelevant for now)
+          isExpired: false
+        }
       });
-
-      console.log('✅ Created new trial subscription:', newTrial);
-      return NextResponse.json({ 
-        hasActiveTrial: true,
-        isNewTrial: true,
-        trialExpiresAt: newTrial.expiresAt,
-      });
-    }
-
-    // MOVED DURATION MISMATCH CHECK BEFORE EXPIRY CHECK
-    // Check if existing trial duration matches creator's current setting
-    const currentTrialDuration = creatorProfile.trialDuration || 1;
-    
-    // Calculate how long the existing trial was supposed to last (in minutes)
-    const trialStartTime = new Date(existingTrial.startedAt).getTime();
-    const trialEndTime = new Date(existingTrial.expiresAt).getTime();
-    const existingTrialDurationInMinutes = Math.floor((trialEndTime - trialStartTime) / (1000 * 60));
-    
-    // Expected duration based on current creator settings
-    const expectedDurationInMinutes = currentTrialDuration === 1 ? 1 : (currentTrialDuration * 24 * 60);
-    
-    console.log('🔍 Duration check:', {
-      currentTrialDuration,
-      existingTrialDurationInMinutes,
-      expectedDurationInMinutes,
-      shouldDelete: existingTrialDurationInMinutes > expectedDurationInMinutes * 2
-    });
-
-    // If existing trial duration doesn't match current setting (with 2x tolerance), delete it and create new one
-    if (existingTrialDurationInMinutes > expectedDurationInMinutes * 2) {
-      console.log('🔄 Duration mismatch detected - deleting old trial and creating new one');
-      console.log(`Old trial: ${existingTrialDurationInMinutes} minutes, Expected: ${expectedDurationInMinutes} minutes`);
       
-      // Delete the old trial
-      await prisma.trialSubscription.delete({
-        where: { id: existingTrial.id },
-      });
-
-      // Create a new trial with correct duration
-      const expiresAt = new Date();
-      if (currentTrialDuration === 1) {
-        expiresAt.setMinutes(expiresAt.getMinutes() + 1);
-        console.log(`🎁 Creating new 1-minute trial (testing mode)`);
-      } else {
-        expiresAt.setDate(expiresAt.getDate() + currentTrialDuration);
-        console.log(`🎁 Creating new ${currentTrialDuration}-day trial`);
-      }
-
-      const newTrial = await prisma.trialSubscription.create({
-        data: {
-          userId: userId,
-          creatorId: creatorId,
-          expiresAt: expiresAt,
-          startedAt: new Date(),
-        },
-      });
-
-      console.log('✅ Created new trial after duration mismatch:', newTrial);
-      return NextResponse.json({ 
-        hasActiveTrial: true,
-        isNewTrial: true,
-        trialExpiresAt: newTrial.expiresAt,
-      });
+      console.log('✅ [TRIAL-API] Trial created successfully');
     }
 
-    // NOW check if trial is expired
-    const now = new Date();
-    const isExpired = now > existingTrial.expiresAt;
+    const hasActiveTrial = !!trialSubscription;
+    console.log('🔍 [TRIAL-API] Trial found:', hasActiveTrial ? 'Yes' : 'No');
 
-    console.log('🔍 Trial expiry check:', {
-      now: now.toISOString(),
-      expiresAt: existingTrial.expiresAt.toISOString(),
-      isExpired: isExpired,
-    });
-
-    if (isExpired) {
-      // Mark trial as expired if not already marked
-      if (!existingTrial.isExpired) {
-        await prisma.trialSubscription.update({
-          where: { id: existingTrial.id },
-          data: { isExpired: true },
-        });
-        console.log('⏰ Trial marked as expired');
-      }
-
-      console.log('❌ Trial has expired');
-      return NextResponse.json({ 
-        hasActiveTrial: false,
-        trialExpiresAt: existingTrial.expiresAt,
-      });
-    }
-
-    // Trial exists and is still active
-    console.log('✅ Trial is still active');
-    return NextResponse.json({ 
-      hasActiveTrial: true,
-      isNewTrial: false,
-      trialExpiresAt: existingTrial.expiresAt,
-    });
-
+    return NextResponse.json({ hasActiveTrial });
   } catch (error) {
-    console.error('❌ Error checking trial subscription:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('❌ [TRIAL-API] Error checking trial:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

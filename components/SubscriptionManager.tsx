@@ -12,6 +12,7 @@ export const SubscriptionManager = ({ creatorId }: SubscriptionManagerProps) => 
   const [subscriptionType, setSubscriptionType] = useState<'paid' | 'free' | 'trial'>('free'); // Changed from 'paid' to 'free'
   const [subscriptionPrice, setSubscriptionPrice] = useState<number>(0);
   const [trialDuration, setTrialDuration] = useState<1 | 7 | 14 | 30>(1); // Added 7 as valid option
+  const [isTrialDurationLocked, setIsTrialDurationLocked] = useState<boolean>(false); // New state to track if trial duration is locked
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
@@ -26,6 +27,13 @@ export const SubscriptionManager = ({ creatorId }: SubscriptionManagerProps) => 
           setSubscriptionType(data.subscriptionType || 'paid');
           setSubscriptionPrice(data.subscriptionPrice || 0);
           setTrialDuration(data.trialDuration || 7);
+          
+          // Lock trial duration if it was previously set and saved
+          if (data.subscriptionType === 'trial' && data.trialDuration) {
+            setIsTrialDurationLocked(true);
+            console.log('🔒 Trial duration is locked at', data.trialDuration, 'days');
+          }
+          
           console.log('📄 Creator subscription settings:', data);
         } else {
           console.log('❌ Failed to fetch subscription settings:', response.status);
@@ -33,12 +41,14 @@ export const SubscriptionManager = ({ creatorId }: SubscriptionManagerProps) => 
           setSubscriptionType('free'); // Changed from 'paid' to 'free'
           setSubscriptionPrice(0);
           setTrialDuration(1); // Changed from 7 to 1
+          setIsTrialDurationLocked(false);
         }
       } catch (error) {
         console.error('❌ Error fetching subscription settings:', error);
         setSubscriptionType('free'); // Changed from 'paid' to 'free'
         setSubscriptionPrice(0);
         setTrialDuration(1); // Changed from 7 to 1
+        setIsTrialDurationLocked(false);
       } finally {
         setLoading(false);
       }
@@ -65,6 +75,13 @@ export const SubscriptionManager = ({ creatorId }: SubscriptionManagerProps) => 
 
       if (response.ok) {
         console.log('✅ Subscription settings saved successfully');
+        
+        // Lock trial duration after successful save if trial type is selected
+        if (subscriptionType === 'trial') {
+          setIsTrialDurationLocked(true);
+          console.log('🔒 Trial duration locked after save');
+        }
+        
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 3000);
       } else {
@@ -292,6 +309,11 @@ export const SubscriptionManager = ({ creatorId }: SubscriptionManagerProps) => 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Free Trial Duration
+                      {isTrialDurationLocked && (
+                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          🔒 Locked
+                        </span>
+                      )}
                     </label>
                     <div className="flex space-x-3">
                       {[
@@ -303,21 +325,32 @@ export const SubscriptionManager = ({ creatorId }: SubscriptionManagerProps) => 
                         <button
                           key={option.value}
                           type="button"
-                          onClick={() => setTrialDuration(option.value as 1 | 7 | 14 | 30)}
+                          onClick={() => !isTrialDurationLocked && setTrialDuration(option.value as 1 | 7 | 14 | 30)}
+                          disabled={isTrialDurationLocked}
                           className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
                             trialDuration === option.value
-                              ? 'border-green-500 bg-green-500 text-white'
-                              : 'border-gray-200 text-gray-700 hover:border-green-300'
-                          } ${option.testMode ? 'ring-2 ring-yellow-300' : ''}`}
+                              ? isTrialDurationLocked 
+                                ? 'border-orange-400 bg-orange-100 text-orange-800'
+                                : 'border-green-500 bg-green-500 text-white'
+                              : isTrialDurationLocked
+                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'border-gray-200 text-gray-700 hover:border-green-300'
+                          } ${option.testMode && !isTrialDurationLocked ? 'ring-2 ring-yellow-300' : ''}`}
                         >
                           {option.label}
                           {option.testMode && <span className="ml-1 text-xs">(Test)</span>}
+                          {trialDuration === option.value && isTrialDurationLocked && (
+                            <span className="ml-1 text-xs">🔒</span>
+                          )}
                         </button>
                       ))}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       Users get free access for {trialDuration === 1 ? '1 minute' : `${trialDuration} days`}, then need to pay to continue
                       {trialDuration === 1 && <span className="text-yellow-600 font-medium"> (Testing mode)</span>}
+                      {isTrialDurationLocked && (
+                        <span className="text-orange-600 font-medium"> • Duration is locked and cannot be changed</span>
+                      )}
                     </p>
                   </div>
                   

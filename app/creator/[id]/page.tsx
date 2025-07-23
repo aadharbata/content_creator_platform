@@ -364,11 +364,10 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           return;
         }
 
-        // For trial creators: Only grant access if user has ACTIVE trial
-        // Otherwise show "Start Free Trial" button
+        // For trial creators: Check if user already has active trial first
         if (subscriptionSettings?.subscriptionType === 'trial') {
-          console.log('🎁 Creator offers trial subscription - checking for active trial');
-          console.log('🔍 USER DEBUG - Current userId:', currentUserId, 'checking creator:', id);
+          console.log('🎁 [SUB-CHECK] Creator offers trial subscription - checking for existing trial');
+          console.log('🔍 [SUB-CHECK] Current userId:', currentUserId, 'checking creator:', id);
           
           const trialResponse = await fetch('/api/subscribe/check-trial', {
             method: 'POST',
@@ -376,26 +375,32 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
             body: JSON.stringify({ userId: currentUserId, creatorId: id })
           });
 
+          console.log('📨 [SUB-CHECK] Trial API response status:', trialResponse.status);
+
           if (trialResponse.ok) {
             const trialData = await trialResponse.json();
-            console.log('🔍 USER DEBUG - Trial API response for user', currentUserId, ':', trialData);
+            console.log('🔍 [SUB-CHECK] Trial API response:', trialData);
+            
             if (trialData.hasActiveTrial) {
-              console.log('✅ User', currentUserId, 'has active trial - granting paywall access');
-              setIsSubscribed(true);  // Grant paywall access
+              console.log('✅ [SUB-CHECK] User has active trial - granting immediate access (like paid)');
+              setIsSubscribed(true);  // Grant immediate access like paid subscriptions
               setHasActiveTrial(true);
+              setLoadingSubscription(false);
+              return;
             } else {
-              console.log('❌ User', currentUserId, 'has no active trial - showing trial button');
-              setIsSubscribed(false); // Don't grant paywall access
-              setHasActiveTrial(false); // This will show the trial button
+              console.log('❌ [SUB-CHECK] No active trial - showing trial button');
+              setIsSubscribed(false);  // Show trial button
+              setHasActiveTrial(false);
+              setLoadingSubscription(false);
+              return;
             }
           } else {
-            console.log('❌ Trial check failed for user', currentUserId, '- showing trial button');
+            console.log('💥 [SUB-CHECK] Trial check failed - showing trial button as fallback');
             setIsSubscribed(false);
             setHasActiveTrial(false);
+            setLoadingSubscription(false);
+            return;
           }
-          
-          setLoadingSubscription(false);
-          return;
         }
 
         // For paid creators: No subscription found
@@ -735,8 +740,8 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
 
 
 
-                {/* Trial Subscription Card - Shows only when user should start a trial */}
-                {!isSubscribed && !hasActiveTrial && !loadingSubscription && !loadingSettings && subscriptionSettings?.subscriptionType === 'trial' && (
+                {/* Trial Subscription Box - Show EXACTLY like paid */}
+                {!isSubscribed && !loadingSubscription && !loadingSettings && subscriptionSettings?.subscriptionType === 'trial' && (
                   <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-green-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
                     <div className="w-full bg-gradient-to-r from-green-500 to-teal-500 rounded-lg p-4 mb-4 text-white text-center">
                       <div className="text-xl font-bold">🎁 Free Trial Available</div>
@@ -782,48 +787,78 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                       className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2 disabled:opacity-50" 
                       onClick={async () => {
                         const user = session?.user;
-                        console.log('🎬 START TRIAL BUTTON CLICKED!');
+                        console.log('🎬 [TRIAL-BTN] START TRIAL BUTTON CLICKED!');
+                        console.log('🔍 [TRIAL-BTN] User session:', user);
+                        console.log('🔍 [TRIAL-BTN] Creator ID:', id);
+                        console.log('🔍 [TRIAL-BTN] Trial duration:', subscriptionSettings?.trialDuration);
                         
                         if (!user) {
+                          console.error('❌ [TRIAL-BTN] No user session found');
                           alert('Please log in to start your free trial');
                           return;
                         }
                         
+                        console.log('⏳ [TRIAL-BTN] Setting loading state...');
                         setTrialButtonLoading(true);
                         
                         try {
+                          console.log('📡 [TRIAL-BTN] Making API request to /api/subscribe/check-trial...');
                           const response = await fetch("/api/subscribe/check-trial", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ creatorId: id, userId: (user as any)?.id })
+                            body: JSON.stringify({ 
+                              creatorId: id, 
+                              userId: (user as any)?.id,
+                              createTrial: true  // Create trial when button is clicked
+                            })
                           });
+                          
+                          console.log('📨 [TRIAL-BTN] API response status:', response.status);
+                          console.log('📨 [TRIAL-BTN] API response ok:', response.ok);
                           
                           if (response.ok) {
                             const data = await response.json();
-                            console.log('📄 Trial API Response:', data);
+                            console.log('📄 [TRIAL-BTN] Trial API Response:', data);
+                            console.log('🔍 [TRIAL-BTN] hasActiveTrial:', data.hasActiveTrial);
                             
                             if (data.hasActiveTrial) {
+                              console.log('🎉 [TRIAL-BTN] SUCCESS: Trial activated! Setting UI state...');
+                              
                               // SUCCESS: Set user as subscribed to show paywall content
                               setIsSubscribed(true);
                               setHasActiveTrial(true);
                               
+                              console.log('✅ [TRIAL-BTN] UI state updated - user should now see paywall content');
+                              console.log('✅ [TRIAL-BTN] isSubscribed set to:', true);
+                              console.log('✅ [TRIAL-BTN] hasActiveTrial set to:', true);
+                              
                               // Show success message
                               const durationText = subscriptionSettings.trialDuration === 1 ? '1-minute' : `${subscriptionSettings.trialDuration}-day`;
+                              console.log('🎊 [TRIAL-BTN] Showing success alert with duration:', durationText);
                               alert(`🎉 Trial activated! You now have access to all content for ${durationText}!`);
                             } else {
-                              console.error('❌ Trial creation failed - API returned hasActiveTrial: false');
+                              console.error('❌ [TRIAL-BTN] FAILED: API returned hasActiveTrial: false');
+                              console.error('❌ [TRIAL-BTN] Full API response:', data);
                               alert('Trial could not be activated. Please try again.');
                             }
                           } else {
                             const errorText = await response.text();
-                            console.error('❌ Trial creation failed with status:', response.status, errorText);
+                            console.error('💥 [TRIAL-BTN] API request failed!');
+                            console.error('💥 [TRIAL-BTN] Status:', response.status);
+                            console.error('💥 [TRIAL-BTN] Status text:', response.statusText);
+                            console.error('💥 [TRIAL-BTN] Error response:', errorText);
                             alert(`Failed to start trial (${response.status}). Please try again.`);
                           }
                         } catch (error) {
-                          console.error('❌ Error starting trial:', error);
+                          console.error('💥 [TRIAL-BTN] Network/JavaScript error occurred!');
+                          console.error('💥 [TRIAL-BTN] Error name:', (error as Error).name);
+                          console.error('💥 [TRIAL-BTN] Error message:', (error as Error).message);
+                          console.error('💥 [TRIAL-BTN] Full error:', error);
                           alert('Network error. Please try again.');
                         } finally {
+                          console.log('🏁 [TRIAL-BTN] Removing loading state...');
                           setTrialButtonLoading(false);
+                          console.log('🏁 [TRIAL-BTN] Trial button interaction complete');
                         }
                       }}
                     >
