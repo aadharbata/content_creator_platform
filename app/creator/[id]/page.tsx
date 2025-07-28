@@ -316,39 +316,9 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
     isPaid: boolean;
     subscriptionPrice: number | null;
     trialDuration: number | null;
+    enableFreeTrial: boolean; // New field for paid subscription with free trial
   } | null>(null)
   const [loadingSettings, setLoadingSettings] = useState(true)
-
-  // Auto-refresh when trial expires
-  useEffect(() => {
-    if (!trialExpiresAt || !hasActiveTrial) return
-
-    const expiresAt = new Date(trialExpiresAt).getTime()
-    const now = Date.now()
-    const timeUntilExpiry = expiresAt - now
-
-    console.log('⏰ [AUTO-REFRESH] Setting up auto-refresh timer:', {
-      expiresAt: new Date(trialExpiresAt).toLocaleString(),
-      timeUntilExpiry: Math.round(timeUntilExpiry / 1000) + ' seconds'
-    })
-
-    if (timeUntilExpiry > 0) {
-      const timer = setTimeout(() => {
-        console.log('🔄 [AUTO-REFRESH] Trial expired - refreshing page automatically')
-        window.location.reload()
-      }, timeUntilExpiry)
-
-      // Cleanup timer on component unmount or dependency change
-      return () => {
-        console.log('🧹 [AUTO-REFRESH] Cleaning up auto-refresh timer')
-        clearTimeout(timer)
-      }
-    } else {
-      // Trial already expired, refresh immediately
-      console.log('🔄 [AUTO-REFRESH] Trial already expired - refreshing page immediately')
-      window.location.reload()
-    }
-  }, [trialExpiresAt, hasActiveTrial])
 
   useEffect(() => {
     const checkSubscription = async () => {
@@ -405,9 +375,9 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           return;
         }
 
-        // For trial creators: Check if user already has active trial first
-        if (subscriptionSettings?.subscriptionType === 'trial') {
-          console.log('🎁 [SUB-CHECK] Creator offers trial subscription - checking for existing trial');
+        // For paid creators with free trial option: Check if user already has active trial first
+        if (subscriptionSettings?.subscriptionType === 'paid' && subscriptionSettings?.enableFreeTrial) {
+          console.log('🎁 [SUB-CHECK] Creator offers paid subscription with free trial - checking for existing trial');
           console.log('🔍 [SUB-CHECK] Current userId:', currentUserId, 'checking creator:', id);
           
           const trialResponse = await fetch('/api/subscribe/check-trial', {
@@ -431,13 +401,26 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
               setLoadingSubscription(false);
               return;
             } else if (trialData.expired) {
-              console.log('⏰ [SUB-CHECK] Trial has expired - will show paid subscription box');
-              setIsSubscribed(false);
-              setHasActiveTrial(false);
-              setTrialExpired(true); // Set trial expired state
-              setTrialExpiresAt(null);
-              setLoadingSubscription(false);
-              return;
+              console.log('⏰ [SUB-CHECK] Trial has expired - checking if it was manually cancelled');
+              
+              // Check if the trial was manually cancelled (isExpired flag set) vs naturally expired
+              if (trialData.isCancelled) {
+                console.log('❌ [SUB-CHECK] Trial was manually cancelled - showing subscription box');
+                setIsSubscribed(false); // Show subscription box since auto-pay was cancelled
+                setHasActiveTrial(false);
+                setTrialExpired(true); // Show expired state to display subscription box
+                setTrialExpiresAt(null);
+                setLoadingSubscription(false);
+                return;
+              } else {
+                console.log('✅ [SUB-CHECK] Trial naturally expired but auto-pay active - granting access (treating as paid)');
+                setIsSubscribed(true); // Grant access since auto-pay will handle conversion to paid
+                setHasActiveTrial(false);
+                setTrialExpired(false);
+                setTrialExpiresAt(null);
+                setLoadingSubscription(false);
+                return;
+              }
             } else {
               console.log('❌ [SUB-CHECK] No active trial - showing trial button');
               setIsSubscribed(false);  // Show trial button
@@ -450,6 +433,38 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           } else {
             console.log('💥 [SUB-CHECK] Trial check failed - showing trial button as fallback');
             setIsSubscribed(false);
+            setHasActiveTrial(false);
+            setTrialExpired(false);
+            setTrialExpiresAt(null);
+            setLoadingSubscription(false);
+            return;
+          }
+        }
+
+        // For any creator: Check if user has any existing trial (including naturally expired ones)
+        // This handles cases where creators might have changed their settings but user still has trial access
+        console.log('🔍 [SUB-CHECK] Checking for any existing trial regardless of creator settings');
+        const universalTrialResponse = await fetch('/api/subscribe/check-trial', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUserId, creatorId: id })
+        });
+
+        if (universalTrialResponse.ok) {
+          const universalTrialData = await universalTrialResponse.json();
+          console.log('🔍 [SUB-CHECK] Universal trial check response:', universalTrialData);
+          
+          if (universalTrialData.hasActiveTrial) {
+            console.log('✅ [SUB-CHECK] User has active trial - granting access');
+            setIsSubscribed(true);
+            setHasActiveTrial(true);
+            setTrialExpired(false);
+            setTrialExpiresAt(universalTrialData.expiresAt);
+            setLoadingSubscription(false);
+            return;
+          } else if (universalTrialData.expired && !universalTrialData.isCancelled) {
+            console.log('✅ [SUB-CHECK] Trial naturally expired but auto-pay active - granting access');
+            setIsSubscribed(true);
             setHasActiveTrial(false);
             setTrialExpired(false);
             setTrialExpiresAt(null);
@@ -493,12 +508,12 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
         } else {
           console.log('❌ Failed to fetch subscription settings:', response.status)
           // Set default settings if fetch fails - new creators default to 'free'
-          setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null })
+          setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null, enableFreeTrial: false })
         }
               } catch (error) {
           console.error('❌ Error fetching subscription settings:', error)
           // Set default settings if error occurs - new creators default to 'free'
-          setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null })
+          setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null, enableFreeTrial: false })
       } finally {
         setLoadingSettings(false)
         console.log('✅ Subscription settings loading finished')
@@ -757,16 +772,15 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
 
-                {/* Paid Subscription Box - Show for regular paid creators OR expired trial users */}
-                {!isSubscribed && !loadingSubscription && (
-                  (subscriptionSettings?.subscriptionType === 'paid' || trialExpired) && (
+                {/* Paid Subscription Box - Show for regular paid creators ONLY (not for trials) */}
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && !subscriptionSettings?.enableFreeTrial && (
                   <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
                     <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
                       <div className="text-xl font-bold">
-                        {trialExpired ? '⏰ Trial Expired' : 'Premium Membership'}
+                        Premium Membership
                       </div>
                       <div className="text-sm opacity-80">
-                        {trialExpired ? 'Continue with premium access' : 'Unlock exclusive content & benefits'}
+                        Unlock exclusive content & benefits
                       </div>
                     </div>
                     <div className="text-4xl font-extrabold text-gray-900 mb-2">
@@ -797,18 +811,18 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                         console.error('❌ Subscription failed:', response.status);
                       }
                     }}>
-                      {trialExpired ? 'Subscribe Now' : 'Subscribe Now'}
+                      Subscribe Now
                     </Button>
                     <div className="text-xs text-gray-500 mt-2 text-center">
-                      {trialExpired ? 'Continue your access with premium subscription.' : 'Cancel anytime. No hidden fees.'}
+                      Cancel anytime. No hidden fees.
                     </div>
                   </div>
-                ))}
+                )}
 
 
 
                 {/* Trial Subscription Box - Show ONLY when trial is available and NOT expired */}
-                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'trial' && !trialExpired && (
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && subscriptionSettings?.enableFreeTrial && !trialExpired && (
                   <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-green-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
                     <div className="w-full bg-gradient-to-r from-green-500 to-teal-500 rounded-lg p-4 mb-4 text-white text-center">
                       <div className="text-xl font-bold">🎁 Free Trial Available</div>
@@ -878,68 +892,81 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                             body: JSON.stringify({ 
                               creatorId: id, 
                               userId: (user as any)?.id,
-                              createTrial: true  // Create trial when button is clicked
+                              createTrial: true 
                             })
                           });
                           
-                          console.log('📨 [TRIAL-BTN] API response status:', response.status);
-                          console.log('📨 [TRIAL-BTN] API response ok:', response.ok);
+                          console.log('📨 [TRIAL-BTN] Response status:', response.status);
                           
                           if (response.ok) {
                             const data = await response.json();
-                            console.log('📄 [TRIAL-BTN] Trial API Response:', data);
-                            console.log('🔍 [TRIAL-BTN] hasActiveTrial:', data.hasActiveTrial);
+                            console.log('✅ [TRIAL-BTN] Trial created successfully:', data);
                             
-                            if (data.hasActiveTrial) {
-                              console.log('🎉 [TRIAL-BTN] SUCCESS: Trial activated! Setting UI state...');
-                              
-                              // SUCCESS: Set user as subscribed to show paywall content
-                              setIsSubscribed(true);
-                              setHasActiveTrial(true);
-                              setTrialExpired(false);
-                              setTrialExpiresAt(data.expiresAt); // Store expiration time for auto-refresh
-                              
-                              console.log('✅ [TRIAL-BTN] UI state updated - user should now see paywall content');
-                              console.log('✅ [TRIAL-BTN] isSubscribed set to:', true);
-                              console.log('✅ [TRIAL-BTN] hasActiveTrial set to:', true);
-                              
-                              // Show success message
-                              const durationText = subscriptionSettings.trialDuration === 1 ? '1-minute' : `${subscriptionSettings.trialDuration}-day`;
-                              console.log('🎊 [TRIAL-BTN] Showing success alert with duration:', durationText);
-                              alert(`🎉 Trial activated! You now have access to all content for ${durationText}!`);
-                            } else {
-                              console.error('❌ [TRIAL-BTN] FAILED: API returned hasActiveTrial: false');
-                              console.error('❌ [TRIAL-BTN] Full API response:', data);
-                              alert('Trial could not be activated. Please try again.');
-                            }
+                            // Set subscription state directly
+                            setIsSubscribed(true);
+                            setHasActiveTrial(true);
+                            setTrialExpired(false);
+                            setTrialExpiresAt(data.expiresAt);
                           } else {
-                            const errorText = await response.text();
-                            console.error('💥 [TRIAL-BTN] API request failed!');
-                            console.error('💥 [TRIAL-BTN] Status:', response.status);
-                            console.error('💥 [TRIAL-BTN] Status text:', response.statusText);
-                            console.error('💥 [TRIAL-BTN] Error response:', errorText);
-                            alert(`Failed to start trial (${response.status}). Please try again.`);
+                            console.error('❌ [TRIAL-BTN] Failed to create trial:', response.status);
+                            alert('Failed to start trial. Please try again.');
                           }
                         } catch (error) {
-                          console.error('💥 [TRIAL-BTN] Network/JavaScript error occurred!');
-                          console.error('💥 [TRIAL-BTN] Error name:', (error as Error).name);
-                          console.error('💥 [TRIAL-BTN] Error message:', (error as Error).message);
-                          console.error('💥 [TRIAL-BTN] Full error:', error);
-                          alert('Network error. Please try again.');
+                          console.error('❌ [TRIAL-BTN] Error creating trial:', error);
+                          alert('Failed to start trial. Please try again.');
                         } finally {
-                          console.log('🏁 [TRIAL-BTN] Removing loading state...');
                           setTrialButtonLoading(false);
-                          console.log('🏁 [TRIAL-BTN] Trial button interaction complete');
                         }
                       }}
                     >
-                      {trialButtonLoading ? '🔄 Starting...' : '🎁 Start Free Trial'}
+                      {trialButtonLoading ? 'Starting Trial...' : 'Start Free Trial'}
                     </Button>
                     <div className="text-xs text-gray-500 mt-2 text-center">
-                      {subscriptionSettings.trialDuration === 1 
-                        ? 'No charges for 1 minute (test mode)' 
-                        : 'No charges until trial ends'
+                      Cancel anytime during trial period
+                    </div>
+                  </div>
+                )}
+
+                {/* Expired Trial Box - Show when trial has expired and auto-pay was cancelled */}
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && subscriptionSettings?.enableFreeTrial && trialExpired && (
+                  <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
+                    <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
+                      <div className="text-xl font-bold">Premium Membership</div>
+                      <div className="text-sm opacity-80">
+                        Unlock exclusive content & benefits
+                      </div>
+                    </div>
+                    <div className="text-4xl font-extrabold text-gray-900 mb-2">
+                      ₹{subscriptionSettings.subscriptionPrice}/month
+                    </div>
+                    
+                    <ul className="text-gray-700 text-base mb-6 w-full">
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Access to all premium courses</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Weekly live Q&A sessions</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Exclusive community access</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
+                    </ul>
+                    
+                    <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
+                      const user = session?.user;
+                      console.log('Subscribe POST:', { userId: (user as any)?.id, creatorId: id });
+                      const response = await fetch("/api/subscribe", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ creatorId: id })
+                      });
+                      
+                      if (response.ok) {
+                        setIsSubscribed(true);
+                        console.log('✅ Successfully subscribed');
+                      } else {
+                        console.error('❌ Subscription failed:', response.status);
                       }
+                    }}>
+                      Subscribe Now
+                    </Button>
+                    <div className="text-xs text-gray-500 mt-2 text-center">
+                      Cancel anytime. No hidden fees.
                     </div>
                   </div>
                 )}
