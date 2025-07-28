@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch posts with creator, media, likes, and comments
+    // Fetch posts with creator, media, likes, comments, and tips
     const posts = await prisma.post.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -50,10 +50,25 @@ export async function GET(request: NextRequest) {
           where: currentUserId ? { userId: currentUserId } : undefined,
         },
         comments: true,
+        tip: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profile: {
+                  select: { avatarUrl: true },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
         _count: {
           select: {
             likes: true,
             comments: true,
+            tip: true,
           },
         },
       },
@@ -83,6 +98,9 @@ export async function GET(request: NextRequest) {
       // If post is paidOnly and user is not subscribed, show locked
       const shouldShowLocked = post.isPaidOnly && !isSubscribed;
       
+      // Calculate total tip amount for this post
+      const totalTipAmount = post.tip.reduce((sum, tip) => sum + tip.amount, 0);
+      
       return {
         id: post.id,
         creator: {
@@ -103,6 +121,21 @@ export async function GET(request: NextRequest) {
         price: shouldShowLocked ? "₹" : undefined,
         likes: post._count.likes,
         comments: post._count.comments,
+        tips: {
+          count: post._count.tip,
+          totalAmount: totalTipAmount,
+          recent: post.tip.slice(0, 5).map(tip => ({
+            id: tip.id,
+            amount: tip.amount,
+            user: {
+              id: tip.user.id,
+              name: tip.user.name,
+              avatar: tip.user.profile?.avatarUrl || 
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(tip.user.name || "U")}&background=random`,
+            },
+            createdAt: tip.createdAt,
+          })),
+        },
         isLiked: isLiked,
       };
     });

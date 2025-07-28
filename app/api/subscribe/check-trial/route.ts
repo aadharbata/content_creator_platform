@@ -98,26 +98,46 @@ export async function POST(request: NextRequest) {
 
     // If trial exists, check if it's expired
     if (trialSubscription) {
+      // Check if trial has expired
       const now = new Date();
-      const isExpired = now > trialSubscription.expiresAt;
+      const timeExpired = now > trialSubscription.expiresAt;
+      const dbExpired = trialSubscription.isExpired;
+      const isExpired = timeExpired || dbExpired;
       
-      console.log('⏰ [TRIAL-API] Expiry check:', {
-        now: now.toISOString(),
-        expiresAt: trialSubscription.expiresAt.toISOString(),
-        isExpired
-      });
-
-      if (isExpired) {
-        console.log('❌ [TRIAL-API] Trial has expired');
-        
-        // Mark as expired in database
+      // Determine if it was cancelled (manually marked as expired) vs naturally expired
+      const isCancelled = dbExpired && !timeExpired; // If marked as expired but time hasn't passed
+      const isNaturallyExpired = timeExpired; // If time passed, it's naturally expired regardless of db flag
+      
+      // Update isExpired flag in database if trial has naturally expired (for consistency)
+      if (timeExpired && !dbExpired) {
         await prisma.trialSubscription.update({
           where: { id: trialSubscription.id },
           data: { isExpired: true }
         });
-        
-        return NextResponse.json({ hasActiveTrial: false, expired: true });
       }
+
+      console.log('🔍 [CHECK-TRIAL] Trial status:', {
+        timeExpired,
+        dbExpired,
+        isExpired,
+        isCancelled,
+        isNaturallyExpired,
+        expiresAt: trialSubscription.expiresAt,
+        now
+      });
+
+      // For naturally expired trials, treat them as active (auto-pay converts to paid)
+      // For manually cancelled trials, treat them as expired
+      const hasActiveTrial = !isCancelled; // Only cancelled trials are considered inactive
+
+      return NextResponse.json({
+        hasActiveTrial: hasActiveTrial,
+        expired: isCancelled, // Only cancelled trials are considered expired
+        isCancelled: isCancelled,
+        isNaturallyExpired: isNaturallyExpired,
+        expiresAt: trialSubscription.expiresAt,
+        startedAt: trialSubscription.startedAt
+      });
     }
 
     const hasActiveTrial = !!trialSubscription;

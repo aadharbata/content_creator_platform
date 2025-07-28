@@ -29,6 +29,8 @@ import {
   Users,
   DollarSign,
   ArrowLeft,
+  Gift,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,6 +75,20 @@ interface Post {
   comments: number;
   isLiked?: boolean;
   isUnlocked?: boolean;
+  tips?: {
+    count: number;
+    totalAmount: number;
+    recent: {
+      id: string;
+      user: {
+        id: string;
+        name: string;
+        avatar: string;
+      };
+      amount: number;
+      createdAt: string;
+    }[];
+  };
 }
 
 interface Product {
@@ -197,6 +213,12 @@ export default function ConsumerChannelPage() {
   const [tipLoading, setTipLoading] = useState(false);
   const [tipError, setTipError] = useState("");
   const [tipSuccess, setTipSuccess] = useState("");
+
+  // Subscriptions state
+  const [paidSubscriptions, setPaidSubscriptions] = useState<any[]>([]);
+  const [trialSubscriptions, setTrialSubscriptions] = useState<any[]>([]);
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(true);
+  const [subscriptionsError, setSubscriptionsError] = useState<string | null>(null);
 
   // Toggle comments visibility for a post
   const toggleComments = (postId: string) => {
@@ -457,6 +479,9 @@ export default function ConsumerChannelPage() {
       setTipSuccess("Tip sent! 🎉");
       setTipInput("");
       setShowTipModal({ postId: null });
+      
+      // Refresh posts data to show the new tip
+      fetchAndSetPosts();
     } catch (err: unknown) {
       if (
         err &&
@@ -635,6 +660,43 @@ export default function ConsumerChannelPage() {
     }
   };
 
+  const fetchSubscriptions = async () => {
+    try {
+      setLoadingSubscriptions(true);
+      setSubscriptionsError(null);
+      
+      console.log("🔍 [FRONTEND] Fetching subscriptions...");
+      const res = await axios.get("/api/user/subscriptions", {
+        withCredentials: true, // Use cookie-based auth
+      });
+      
+      console.log("✅ [FRONTEND] Subscriptions response:", res.data);
+      setPaidSubscriptions(res.data.paidSubscriptions || []);
+      setTrialSubscriptions(res.data.trialSubscriptions || []);
+    } catch (error: any) {
+      console.error("❌ [FRONTEND] Error fetching subscriptions:", error);
+      
+      let errorMessage = "Failed to load subscriptions. Please try again.";
+      if (error.response) {
+        console.error("Response error:", error.response.data);
+        if (error.response.status === 401) {
+          errorMessage = "Please log in to view your subscriptions.";
+        } else if (error.response.data?.error) {
+          errorMessage = error.response.data.error;
+        }
+      } else if (error.request) {
+        console.error("Request error:", error.request);
+        errorMessage = "Network error. Please check your connection.";
+      }
+      
+      setSubscriptionsError(errorMessage);
+      setPaidSubscriptions([]);
+      setTrialSubscriptions([]);
+    } finally {
+      setLoadingSubscriptions(false);
+    }
+  };
+
   useEffect(() => {
     try {
       if (activeTab === "feed") {
@@ -647,6 +709,7 @@ export default function ConsumerChannelPage() {
         fetchMyProducts();
       }
       if (activeTab === "subscriptions") {
+        fetchSubscriptions();
       }
       if (activeTab === "livecreators") {
         fetchLiveCreators();
@@ -1462,6 +1525,288 @@ export default function ConsumerChannelPage() {
     </div>
   );
 
+  const renderSubscriptionsContent = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-yellow-400 mb-4">
+          Manage Subscriptions
+        </h1>
+        <p className="text-gray-400 text-lg">
+          Your active subscriptions and free trials
+        </p>
+      </div>
+
+      {loadingSubscriptions ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+          <span className="ml-2 text-gray-600">Loading subscriptions...</span>
+        </div>
+      ) : subscriptionsError ? (
+        <div className="text-center py-8">
+          <p className="text-red-400 mb-4">{subscriptionsError}</p>
+          <Button 
+            onClick={fetchSubscriptions}
+            className="bg-yellow-500 hover:bg-yellow-600 text-black"
+          >
+            Try Again
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Paid Subscriptions Column */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-6">
+              <CreditCard className="w-6 h-6 text-blue-400" />
+              <h2 className="text-2xl font-bold text-blue-400">
+                Paid Subscriptions
+              </h2>
+              <span className="bg-blue-500/20 text-blue-300 text-sm px-3 py-1 rounded-full">
+                {paidSubscriptions.length}
+              </span>
+            </div>
+
+            {paidSubscriptions.length === 0 ? (
+              <Card className="bg-gray-800/50 border-gray-700/40 p-8 text-center">
+                <CreditCard className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg mb-2">No paid subscriptions</p>
+                <p className="text-gray-500 text-sm">
+                  Subscribe to creators to see them here
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {paidSubscriptions.map((subscription) => (
+                  <Card 
+                    key={subscription.id} 
+                    className="bg-gradient-to-br from-blue-900/20 to-blue-800/30 border border-blue-700/40 hover:from-blue-800/30 hover:to-blue-700/40 transition-all duration-200"
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="w-12 h-12 ring-2 ring-blue-400/50">
+                            <AvatarImage
+                              src={subscription.creator.avatar}
+                              alt={subscription.creator.name}
+                            />
+                            <AvatarFallback className="bg-blue-700 text-white">
+                              {subscription.creator.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-bold text-blue-200 text-lg">
+                              {subscription.creator.name}
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                              Subscribed since {new Date(subscription.startedAt).toLocaleDateString()}
+                            </p>
+                            {subscription.isFromTrial && (
+                              <p className="text-yellow-400 text-xs">
+                                Converted from trial
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="bg-green-500/20 text-green-300 text-sm px-3 py-1 rounded-full">
+                            ✓ Active
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Free Trials Column */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-6">
+              <Gift className="w-6 h-6 text-green-400" />
+              <h2 className="text-2xl font-bold text-green-400">
+                Free Trials
+              </h2>
+              <span className="bg-green-500/20 text-green-300 text-sm px-3 py-1 rounded-full">
+                {trialSubscriptions.filter(t => t.status === 'active').length}
+              </span>
+            </div>
+
+            {trialSubscriptions.filter(t => t.status === 'active').length === 0 ? (
+              <Card className="bg-gray-800/50 border-gray-700/40 p-8 text-center">
+                <Gift className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg mb-2">No active trials</p>
+                <p className="text-gray-500 text-sm">
+                  Start a free trial to see it here
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {trialSubscriptions.filter(t => t.status === 'active').map((trial) => (
+                  <Card 
+                    key={trial.id} 
+                    className="bg-gradient-to-br from-green-900/20 to-green-800/30 border border-green-700/40"
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="w-12 h-12 ring-2 ring-green-400/50">
+                            <AvatarImage
+                              src={trial.creator.avatar}
+                              alt={trial.creator.name}
+                            />
+                            <AvatarFallback className="bg-green-700 text-white">
+                              {trial.creator.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-bold text-green-200 text-lg">
+                              {trial.creator.name}
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                              Started {new Date(trial.startedAt).toLocaleDateString()}
+                            </p>
+                            {trial.isNaturallyExpired ? (
+                              <p className="text-yellow-400 text-xs">
+                                Trial expired - Auto-pay active
+                              </p>
+                            ) : (
+                              <p className="text-green-400 text-xs">
+                                {trial.remainingTime} remaining
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm px-3 py-1 rounded-full ${
+                            trial.status === 'active' 
+                              ? 'bg-green-500/20 text-green-300'
+                              : 'bg-red-500/20 text-red-300'
+                          }`}>
+                            {trial.status === 'active' ? '🎁 Active' : (trial.isCancelled ? '❌ Cancelled' : '❌ Expired')}
+                          </div>
+                          {trial.status === 'active' && !trial.isNaturallyExpired && (
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  console.log('🔍 [CANCEL-AUTO-PAY] Starting cancellation for trial:', trial.id);
+                                  console.log('🔍 [CANCEL-AUTO-PAY] Creator ID:', trial.creatorId);
+                                  
+                                  const response = await fetch('/api/subscribe/cancel-auto-pay', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ 
+                                      creatorId: trial.creatorId,
+                                      trialId: trial.id 
+                                    })
+                                  });
+                                  
+                                  console.log('📨 [CANCEL-AUTO-PAY] Response status:', response.status);
+                                  
+                                  if (response.ok) {
+                                    const data = await response.json();
+                                    console.log('✅ [CANCEL-AUTO-PAY] Success response:', data);
+                                    alert('Auto-pay cancelled successfully!');
+                                    // Small delay to ensure database update is complete
+                                    setTimeout(() => {
+                                      fetchSubscriptions();
+                                    }, 500);
+                                  } else {
+                                    const errorData = await response.json();
+                                    console.error('❌ [CANCEL-AUTO-PAY] Failed response:', errorData);
+                                    alert(`Failed to cancel auto-pay: ${errorData.error || 'Unknown error'}`);
+                                  }
+                                } catch (error) {
+                                  console.error('❌ [CANCEL-AUTO-PAY] Network error:', error);
+                                  alert('Network error. Please try again.');
+                                }
+                              }}
+                              className="mt-2 bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded"
+                            >
+                              Cancel Auto-pay
+                            </Button>
+                          )}
+                          {trial.status === 'expired' && (
+                            <p className="text-gray-400 text-xs mt-1">
+                              {trial.isCancelled ? 'Cancelled' : 'Expired'} {new Date(trial.expiresAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Cancelled Subscriptions / Payment Failed Column */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-6">
+              <XCircle className="w-6 h-6 text-red-400" />
+              <h2 className="text-2xl font-bold text-red-400">
+                Cancelled/Failed
+              </h2>
+              <span className="bg-red-500/20 text-red-300 text-sm px-3 py-1 rounded-full">
+                {trialSubscriptions.filter(t => t.status === 'expired' && t.isCancelled).length}
+              </span>
+            </div>
+
+            {trialSubscriptions.filter(t => t.status === 'expired' && t.isCancelled).length === 0 ? (
+              <Card className="bg-gray-800/50 border-gray-700/40 p-8 text-center">
+                <XCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg mb-2">No cancelled subscriptions</p>
+                <p className="text-gray-500 text-sm">
+                  Manually cancelled trials appear here
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {trialSubscriptions.filter(t => t.status === 'expired' && t.isCancelled).map((trial) => (
+                  <Card 
+                    key={trial.id} 
+                    className="bg-gradient-to-br from-red-900/20 to-red-800/30 border border-red-700/40"
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="w-12 h-12 ring-2 ring-red-400/50">
+                            <AvatarImage
+                              src={trial.creator.avatar}
+                              alt={trial.creator.name}
+                            />
+                            <AvatarFallback className="bg-red-700 text-white">
+                              {trial.creator.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-bold text-red-200 text-lg">
+                              {trial.creator.name}
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                              Started {new Date(trial.startedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="bg-red-500/20 text-red-300 text-sm px-3 py-1 rounded-full">
+                            ❌ Cancelled
+                          </div>
+                          <p className="text-gray-400 text-xs mt-1">
+                            Cancelled {new Date(trial.expiresAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-blue-900 flex items-center justify-center">
@@ -1657,6 +2002,8 @@ export default function ConsumerChannelPage() {
               ? "max-w-6xl"
               : activeTab === "products"
               ? "max-w-5xl"
+              : activeTab === "subscriptions"
+              ? "max-w-7xl"
               : activeTab === "creators"
               ? "max-w-7xl"
               : activeTab === "livecreators"
@@ -1668,6 +2015,8 @@ export default function ConsumerChannelPage() {
               renderStoreContent()
             ) : activeTab === "products" ? (
               renderMyProductsContent()
+            ) : activeTab === "subscriptions" ? (
+              renderSubscriptionsContent()
             ) : activeTab === "creators" ? (
               renderCreatorsContent()
             ) : activeTab === "livecreators" ? (
@@ -1839,6 +2188,60 @@ export default function ConsumerChannelPage() {
                             </button>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Tips Section */}
+                    {post.tips && post.tips.count > 0 && (
+                      <div className="mt-4 bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-lg p-4 border border-green-700/30">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-green-400" />
+                            <span className="font-semibold text-green-400 text-sm">
+                              Tips Received
+                            </span>
+                          </div>
+                          <div className="text-green-400 font-bold text-sm">
+                            Total: ₹{post.tips.totalAmount}
+                          </div>
+                        </div>
+                        
+                        {post.tips.recent.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="text-gray-300 text-xs font-medium mb-2">
+                              Recent Tips ({post.tips.count} total)
+                            </div>
+                            {post.tips.recent.map((tip) => (
+                              <div key={tip.id} className="flex items-center gap-3 text-sm">
+                                <Image
+                                  src={tip.user.avatar}
+                                  alt={tip.user.name}
+                                  width={24}
+                                  height={24}
+                                  className="w-6 h-6 rounded-full object-cover border border-green-500/30"
+                                />
+                                <div className="flex-1 flex items-center justify-between">
+                                  <span className="text-gray-200 font-medium">
+                                    {tip.user.name}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-green-400 font-semibold">
+                                      ₹{tip.amount}
+                                    </span>
+                                    <span className="text-gray-400 text-xs">
+                                      {new Date(tip.createdAt).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {post.tips.count > 5 && (
+                              <div className="text-gray-400 text-xs text-center pt-2 border-t border-green-700/30">
+                                ... and {post.tips.count - 5} more tips
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
