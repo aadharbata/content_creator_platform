@@ -98,11 +98,27 @@ interface Post {
     content: string
     userId: string
     createdAt: string
+    user: {
+      id: string
+      name: string
+      avatarUrl: string | null
+    }
   }[]
   _count?: {
     likes: number
     comments: number
   }
+  tip?: {
+    id: string
+    userId: string
+    amount: number
+    createdAt: string
+    user: {
+      id: string
+      name: string
+      avatarUrl: string | null
+    }
+  }[]
 }
 
 interface Creator {
@@ -630,14 +646,14 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
   // Load conversations when messages tab is active
   useEffect(() => {
     if (activeTab === 'messages') {
-      fetchConversations()
+      // fetchConversations() // TODO: Implement this function
     }
   }, [activeTab, id])
 
   // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation) {
-      fetchMessages(selectedConversation.id)
+      // fetchMessages(selectedConversation.id) // TODO: Implement this function
       setNewMessage("")
 
       // Join the conversation room (server auto-marks messages as read)
@@ -703,8 +719,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
         credentials: 'include',
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.accessToken}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ content: newMessage })
       });
@@ -1266,106 +1281,164 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
               </TabsContent>
 
               <TabsContent value="posts">
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl font-bold">My Posts</CardTitle>
-                      <Button asChild className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600">
+                <div className="space-y-6">
+                  {/* Header Section */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">Featured Posts</h2>
+                      <p className="text-gray-600 mt-1">Your most engaging content</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium">
+                        ⭐ {posts.length} trending
+                      </div>
+                      <Button asChild className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6">
                         <Link href={`/creator/${id}/post`}>
                           <Upload className="w-4 h-4 mr-2" />
-                          Create Post
+                          Create New Post
                         </Link>
                       </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {posts.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Edit3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-600 mb-4">No posts yet</p>
-                        <Button asChild className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600">
-                          <Link href={`/creator/${id}/post`}>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Create Your First Post
-                          </Link>
-                        </Button>
+                  </div>
+
+                  {posts.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Edit3 className="w-8 h-8 text-gray-400" />
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {posts.map((post) => (
-                          <Card key={post.id} className="bg-white border-0 shadow-md hover:shadow-lg transition-all">
-                            <CardHeader className="pb-3">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <CardTitle className="text-lg font-semibold text-gray-800 line-clamp-2">
-                                    {post.title}
-                                  </CardTitle>
-                                  <p className="text-sm text-gray-500 mt-1">
-                                    {formatDate(post.createdAt)}
-                                  </p>
-                                </div>
-                                {post.isPaidOnly && (
-                                  <Crown className="w-5 h-5 text-yellow-500 flex-shrink-0 ml-2" />
-                                )}
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No posts yet</h3>
+                      <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                        Start creating amazing content to engage with your audience and grow your following.
+                      </p>
+                      <Button asChild className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8">
+                        <Link href={`/creator/${id}/post`}>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Create Your First Post
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {posts.map((post) => (
+                        <Card key={post.id} className="bg-white border-0 shadow-md hover:shadow-lg transition-all">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <CardTitle className="text-lg font-semibold text-gray-800 line-clamp-2">
+                                  {post.title}
+                                </CardTitle>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  {formatDate(post.createdAt)}
+                                </p>
                               </div>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                              <p className="text-gray-600 text-sm line-clamp-3 mb-4">
-                                {post.content}
-                              </p>
-                              
-                              {post.media && post.media.length > 0 && (
-                                <div className="grid grid-cols-2 gap-2 mb-4">
-                                  {post.media.slice(0, 4).map((media, index) => (
-                                    <div key={media.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                                      {media.type === 'image' || media.type === 'photo' ? (
-                                        <Image
-                                          src={media.url}
-                                          alt={`Post media ${index + 1}`}
-                                          fill
-                                          className="object-cover"
-                                        />
-                                      ) : (
-                                        <video
-                                          src={media.url}
-                                          className="w-full h-full object-cover"
-                                          muted
-                                        />
-                                      )}
-                                      {index === 3 && post.media && post.media.length > 4 && (
-                                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                          <span className="text-white font-semibold">
-                                            +{post.media.length - 4}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
+                              {post.isPaidOnly && (
+                                <Crown className="w-5 h-5 text-yellow-500 flex-shrink-0 ml-2" />
                               )}
-                              
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <p className="text-gray-600 text-sm line-clamp-3 mb-4">
+                              {post.content}
+                            </p>
+                            
+                            {post.media && post.media.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2 mb-4">
+                                {post.media.slice(0, 4).map((media, index) => (
+                                  <div key={media.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                                    {media.type === 'image' || media.type === 'photo' ? (
+                                      <Image
+                                        src={media.url}
+                                        alt={`Post media ${index + 1}`}
+                                        fill
+                                        className="object-cover"
+                                      />
+                                    ) : (
+                                      <video
+                                        src={media.url}
+                                        className="w-full h-full object-cover"
+                                        muted
+                                      />
+                                    )}
+                                    {index === 3 && post.media && post.media.length > 4 && (
+                                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                        <span className="text-white font-semibold">
+                                          +{post.media.length - 4}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Enhanced Interactions Section */}
+                            <div className="space-y-3">
+                              {/* Stats Row */}
                               <div className="flex items-center justify-between text-sm text-gray-500">
                                 <div className="flex items-center space-x-4">
                                   <div className="flex items-center space-x-1">
-                                    <Star className="w-4 h-4" />
-                                    <span>{post._count?.likes || post.likes.length}</span>
+                                    <Star className="w-4 h-4 text-yellow-500" />
+                                    <span className="font-medium">{post._count?.likes || 0} likes</span>
                                   </div>
                                   <div className="flex items-center space-x-1">
-                                    <MessageCircle className="w-4 h-4" />
-                                    <span>{post._count?.comments || post.comments.length}</span>
+                                    <MessageCircle className="w-4 h-4 text-blue-500" />
+                                    <span className="font-medium">{post._count?.comments || 0} comments</span>
+                                  </div>
+                                  {/* Tips Display */}
+                                  <div className="flex items-center space-x-1">
+                                    <DollarSign className="w-4 h-4 text-green-500" />
+                                    <span className="font-medium text-green-600">
+                                      ${post.tip?.reduce((sum, tip) => sum + tip.amount, 0) || 0}
+                                    </span>
                                   </div>
                                 </div>
                                 <Badge variant={post.isPaidOnly ? "default" : "secondary"}>
                                   {post.isPaidOnly ? "Premium" : "Free"}
                                 </Badge>
                               </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+
+                              {/* Recent Comments Preview */}
+                              {post.comments && post.comments.length > 0 && (
+                                <div className="border-t pt-3">
+                                  <p className="text-xs text-gray-500 mb-2">Recent Comments:</p>
+                                  <div className="space-y-2 max-h-20 overflow-y-auto">
+                                    {post.comments.slice(0, 2).map((comment) => (
+                                      <div key={comment.id} className="text-xs">
+                                        <span className="font-medium text-gray-700">{comment.user.name}:</span>
+                                        <span className="text-gray-600 ml-1">{comment.content}</span>
+                                      </div>
+                                    ))}
+                                    {post.comments.length > 2 && (
+                                      <p className="text-xs text-blue-500">+{post.comments.length - 2} more comments</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Tips Preview */}
+                              {post.tip && post.tip.length > 0 && (
+                                <div className="border-t pt-3">
+                                  <p className="text-xs text-gray-500 mb-2">Recent Tips:</p>
+                                  <div className="space-y-1 max-h-16 overflow-y-auto">
+                                    {post.tip.slice(0, 3).map((tip) => (
+                                      <div key={tip.id} className="text-xs flex items-center justify-between">
+                                        <span className="font-medium text-gray-700">{tip.user.name}</span>
+                                        <span className="text-green-600 font-medium">${tip.amount}</span>
+                                      </div>
+                                    ))}
+                                    {post.tip.length > 3 && (
+                                      <p className="text-xs text-green-500">+{post.tip.length - 3} more tips</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent value="analytics">

@@ -33,6 +33,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // First, find the CreatorProfile for the given User ID
+  const creatorProfile = await prisma.creatorProfile.findUnique({
+    where: {
+      userId: id
+    }
+  });
+
+  if (!creatorProfile) {
+    return NextResponse.json({ error: 'Creator profile not found' }, { status: 404 });
+  }
+
   let isSubscribed = false;
   
   // Only check subscription if it's not the creator's own posts
@@ -48,7 +59,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const posts = await prisma.post.findMany({
     where: {
-      creatorId: id,
+      creatorId: creatorProfile.id, // Use CreatorProfile.id instead of User.id
       // If it's the creator viewing their own posts, show all posts
       // Otherwise, filter based on subscription status
       isPaidOnly: isOwnPosts ? undefined : (isSubscribed ? undefined : false),
@@ -65,10 +76,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           }
         }
       },
+      tip: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              profile: {
+                select: {
+                  avatarUrl: true
+                }
+              }
+            }
+          }
+        }
+      },
       _count: {
         select: {
           likes: true,
-          comments: true
+          comments: true,
+          tip: true
         }
       }
     },
