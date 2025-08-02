@@ -8,6 +8,77 @@ datasource db {
   // url      = "postgresql://neondb_owner:npg_ELj4xgYVTnr7@ep-twilight-fog-a1x0wp2e-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
   url      = "postgresql://neondb_owner:npg_aWB7qIgko9lZ@ep-gentle-sea-aegbro31-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 }
+
+enum Role {
+  ADMIN
+  CREATOR
+  CONSUMER
+}
+
+enum ContentType {
+  VIDEO
+  ARTICLE
+  PODCAST
+  COURSE
+  TEMPLATE
+  SOFTWARE
+  EBOOK
+  AUDIO
+  IMAGE
+  OTHER
+}
+
+enum ProductType {
+  IMAGE
+  VIDEO
+  COURSE
+  TEMPLATE
+  SOFTWARE
+  EBOOK
+  AUDIO
+  PHYSICAL
+  OTHER
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAUSED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  SUCCEEDED
+  PENDING
+  FAILED
+  REFUNDED
+}
+
+enum NotificationType {
+  SYSTEM
+  PAYMENT
+  CONTENT
+  SUBSCRIPTION
+  COMMUNITY
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  POST_MEDIA_UNLOCK
+  COURSE
+}
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model User {
   id                   String            @id @default(uuid())
   email                String            @unique
@@ -205,70 +276,6 @@ model Notification {
   user      User             @relation(fields: [userId], references: [id])
 }
 
-enum Role {
-  ADMIN
-  CREATOR
-  CONSUMER
-}
-
-enum ContentType {
-  VIDEO
-  ARTICLE
-  PODCAST
-  COURSE
-  TEMPLATE
-  SOFTWARE
-  EBOOK
-  AUDIO
-  IMAGE
-  OTHER
-}
-
-enum ProductType {
-  IMAGE
-  VIDEO
-  COURSE
-  TEMPLATE
-  SOFTWARE
-  EBOOK
-  AUDIO
-  PHYSICAL
-  OTHER
-}
-
-enum ContentStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  CANCELLED
-  PAUSED
-  EXPIRED
-}
-
-enum PaymentStatus {
-  SUCCEEDED
-  PENDING
-  FAILED
-  REFUNDED
-}
-
-enum NotificationType {
-  SYSTEM
-  PAYMENT
-  CONTENT
-  SUBSCRIPTION
-  COMMUNITY
-}
-
-enum PaymentType {
-  SUBSCRIPTION
-  POST_MEDIA_UNLOCK
-  COURSE
-}
 
 model Community {
   id          String  @id @default(uuid())
@@ -468,7 +475,7 @@ model PostMedia {
   post       Post     @relation(fields: [postId], references: [id])
   postId     String
   createdAt  DateTime @default(now())
-  payments Payment[]
+  payments   Payment[]
 }
 
 model Like {
@@ -513,6 +520,7 @@ model Product {
   price       Float
   type        ProductType
   thumbnail   String?
+  images      String[]    // Array of image URLs
   status      ProductStatus @default(DRAFT)
   rating      Float       @default(0)
   salesCount  Int         @default(0)
@@ -522,8 +530,8 @@ model Product {
   // Relations
   creatorId   String
   creator     User        @relation(fields: [creatorId], references: [id])
-  categoryId  String?
-  category    ProductCategory? @relation(fields: [categoryId], references: [id])
+  // categoryId  String?
+  // category    ProductCategory? @relation(fields: [categoryId], references: [id])
   reviews     ProductReview[]
   sales       ProductSale[]
   
@@ -540,7 +548,7 @@ model ProductCategory {
   createdAt   DateTime  @default(now())
   
   // Relations
-  products    Product[]
+  // products    Product[]
 }
 
 model ProductReview {
@@ -576,11 +584,6 @@ model ProductSale {
   @@index([buyerId])
 }
 
-enum ProductStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
 
 model TrialSubscription {
   id          String   @id @default(uuid())
