@@ -1285,17 +1285,21 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   {/* Header Section */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900">Featured Posts</h2>
-                      <p className="text-gray-600 mt-1">Your most engaging content</p>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        {t.featuredPosts}
+                      </h2>
+                      <p className="text-gray-600 mt-1">
+                        {t.yourMostEngagingContent}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium">
-                        ⭐ {posts.length} trending
+                        ⭐ {posts.length} {t.trending}
                       </div>
                       <Button asChild className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6">
                         <Link href={`/creator/${id}/post`}>
                           <Upload className="w-4 h-4 mr-2" />
-                          Create New Post
+                          {t.createNewPost}
                         </Link>
                       </Button>
                     </div>
@@ -1306,14 +1310,16 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Edit3 className="w-8 h-8 text-gray-400" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No posts yet</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {t.noPostsYet}
+                      </h3>
                       <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                        Start creating amazing content to engage with your audience and grow your following.
+                        {t.startCreatingAmazingContent}
                       </p>
                       <Button asChild className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8">
                         <Link href={`/creator/${id}/post`}>
                           <Upload className="w-4 h-4 mr-2" />
-                          Create Your First Post
+                          {t.createYourFirstPost}
                         </Link>
                       </Button>
                     </div>
@@ -1378,11 +1384,11 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                                 <div className="flex items-center space-x-4">
                                   <div className="flex items-center space-x-1">
                                     <Star className="w-4 h-4 text-yellow-500" />
-                                    <span className="font-medium">{post._count?.likes || 0} likes</span>
+                                    <span className="font-medium">{post._count?.likes || 0} {t.likes}</span>
                                   </div>
                                   <div className="flex items-center space-x-1">
                                     <MessageCircle className="w-4 h-4 text-blue-500" />
-                                    <span className="font-medium">{post._count?.comments || 0} comments</span>
+                                    <span className="font-medium">{post._count?.comments || 0} {t.comments}</span>
                                   </div>
                                   {/* Tips Display */}
                                   <div className="flex items-center space-x-1">
@@ -1400,16 +1406,24 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                               {/* Recent Comments Preview */}
                               {post.comments && post.comments.length > 0 && (
                                 <div className="border-t pt-3">
-                                  <p className="text-xs text-gray-500 mb-2">Recent Comments:</p>
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    {t.recentComments}:
+                                  </p>
                                   <div className="space-y-2 max-h-20 overflow-y-auto">
                                     {post.comments.slice(0, 2).map((comment) => (
                                       <div key={comment.id} className="text-xs">
-                                        <span className="font-medium text-gray-700">{comment.user.name}:</span>
-                                        <span className="text-gray-600 ml-1">{comment.content}</span>
+                                        <span className="font-medium text-gray-700">
+                                          {comment.user.name}:
+                                        </span>
+                                        <span className="text-gray-600 ml-1">
+                                          {comment.content}
+                                        </span>
                                       </div>
                                     ))}
                                     {post.comments.length > 2 && (
-                                      <p className="text-xs text-blue-500">+{post.comments.length - 2} more comments</p>
+                                      <p className="text-xs text-blue-500">
+                                        +{post.comments.length - 2} {t.moreComments}
+                                      </p>
                                     )}
                                   </div>
                                 </div>
@@ -1418,16 +1432,24 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                               {/* Tips Preview */}
                               {post.tip && post.tip.length > 0 && (
                                 <div className="border-t pt-3">
-                                  <p className="text-xs text-gray-500 mb-2">Recent Tips:</p>
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    {t.recentTips}:
+                                  </p>
                                   <div className="space-y-1 max-h-16 overflow-y-auto">
                                     {post.tip.slice(0, 3).map((tip) => (
                                       <div key={tip.id} className="text-xs flex items-center justify-between">
-                                        <span className="font-medium text-gray-700">{tip.user.name}</span>
-                                        <span className="text-green-600 font-medium">${tip.amount}</span>
+                                        <span className="font-medium text-gray-700">
+                                          {tip.user.name}
+                                        </span>
+                                        <span className="text-green-600 font-medium">
+                                          ${tip.amount}
+                                        </span>
                                       </div>
                                     ))}
                                     {post.tip.length > 3 && (
-                                      <p className="text-xs text-green-500">+{post.tip.length - 3} more tips</p>
+                                      <p className="text-xs text-green-500">
+                                        +{post.tip.length - 3} {t.moreTips}
+                                      </p>
                                     )}
                                   </div>
                                 </div>
@@ -1474,7 +1496,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   <CardHeader>
                     <CardTitle className="text-xl font-bold flex items-center gap-2">
                       <CreditCard className="w-6 h-6" />
-                      Manage Subscription
+                      {t.manageSubscription}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>

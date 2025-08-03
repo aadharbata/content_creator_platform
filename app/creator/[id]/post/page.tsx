@@ -5,10 +5,13 @@ import { useParams } from "next/navigation";
 import { Upload } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
+import { useLanguage } from "@/lib/contexts/LanguageContext";
 
 export default function CreatePost() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [titleHi, setTitleHi] = useState(""); // Hindi title
+  const [contentHi, setContentHi] = useState(""); // Hindi content
   const [isPaidOnly, setIsPaidOnly] = useState(false);
   const [media, setMedia] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -18,6 +21,7 @@ export default function CreatePost() {
   const params = useParams();
   const creatorId = params?.id as string | undefined;
   const { data: session, status } = useSession();
+  const { translations: t, language } = useLanguage();
 
   // Check if user is authenticated and is the correct creator
   useEffect(() => {
@@ -111,6 +115,8 @@ export default function CreatePost() {
     const formData = new FormData();
     formData.append("title", title);
     formData.append("content", content);
+    formData.append("titleHi", titleHi); // Add Hindi title
+    formData.append("contentHi", contentHi); // Add Hindi content
     formData.append("isPaidOnly", String(isPaidOnly));
     formData.append("creatorId", creatorId);
     media.forEach((f) => formData.append("image", f));
@@ -139,21 +145,46 @@ export default function CreatePost() {
     <div className="p-6 max-w-xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">Create a New Post</h2>
       <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Title"
-          className="block border p-2 my-2 w-full rounded"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-        <textarea
-          placeholder="Content"
-          className="block border p-2 my-2 w-full rounded"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          required
-        />
+        {/* English Content */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-gray-800">English Content</h3>
+          <input
+            type="text"
+            placeholder="Title (English)"
+            className="block border p-2 my-2 w-full rounded"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+          <textarea
+            placeholder="Content (English)"
+            className="block border p-2 my-2 w-full rounded"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            required
+            rows={4}
+          />
+        </div>
+
+        {/* Hindi Content */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-gray-800">Hindi Content (Optional)</h3>
+          <input
+            type="text"
+            placeholder="शीर्षक (हिंदी)"
+            className="block border p-2 my-2 w-full rounded"
+            value={titleHi}
+            onChange={(e) => setTitleHi(e.target.value)}
+          />
+          <textarea
+            placeholder="सामग्री (हिंदी)"
+            className="block border p-2 my-2 w-full rounded"
+            value={contentHi}
+            onChange={(e) => setContentHi(e.target.value)}
+            rows={4}
+          />
+        </div>
+
         <label className="block my-2">
           <input
             type="checkbox"

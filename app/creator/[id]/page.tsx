@@ -500,24 +500,23 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const fetchSubscriptionSettings = async () => {
       try {
-        console.log('🔍 [SETTINGS] Fetching subscription settings for creator:', id);
-        const response = await fetch(`/api/creator/${id}/public-subscription-settings`);
-        
+        const response = await fetch(`/api/creator/${id}/public-subscription-settings`)
         if (response.ok) {
-          const settings = await response.json();
-          console.log('✅ [SETTINGS] Subscription settings received:', settings);
-          setSubscriptionSettings(settings);
+          const data = await response.json()
+          setSubscriptionSettings(data)
+          console.log('📄 Creator subscription settings:', data)
         } else {
           console.log('❌ Failed to fetch subscription settings:', response.status)
           // Set default settings if fetch fails - new creators default to 'free'
           setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null, enableFreeTrial: false })
         }
-      } catch (error) {
-        console.error('❌ Error fetching subscription settings:', error)
-        // Set default settings if error occurs - new creators default to 'free'
-        setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null, enableFreeTrial: false })
+              } catch (error) {
+          console.error('❌ Error fetching subscription settings:', error)
+          // Set default settings if error occurs - new creators default to 'free'
+          setSubscriptionSettings({ subscriptionType: 'free', isPaid: false, subscriptionPrice: null, trialDuration: null, enableFreeTrial: false })
       } finally {
         setLoadingSettings(false)
+        console.log('✅ Subscription settings loading finished')
       }
     }
 
@@ -590,12 +589,12 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
         }
       } finally {
         if (isMounted) {
-                setLoading(false)
+        setLoading(false)
         }
       }
     }
 
-    fetchCreatorData()
+      fetchCreatorData()
 
     return () => {
       isMounted = false
@@ -773,6 +772,207 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
 
+                {/* Paid Subscription Box - Show for regular paid creators ONLY (not for trials) */}
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && !subscriptionSettings?.enableFreeTrial && (
+                  <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
+                    <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
+                      <div className="text-xl font-bold">
+                        Premium Membership
+                      </div>
+                      <div className="text-sm opacity-80">
+                        Unlock exclusive content & benefits
+                      </div>
+                    </div>
+                    <div className="text-4xl font-extrabold text-gray-900 mb-2">
+                      {subscriptionSettings?.subscriptionPrice ? `₹${subscriptionSettings.subscriptionPrice.toLocaleString()}` : 'N/A'}
+                      <span className="text-lg font-medium text-gray-700">/month</span>
+                    </div>
+                    <ul className="text-gray-700 text-base mb-6 w-full">
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Access to all premium courses</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Weekly live Q&A sessions</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Exclusive community access</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
+                    </ul>
+                    
+                    <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
+                      const user = session?.user;
+                      // Debug: log userId and creatorId for subscription POST
+                      console.log('Subscribe POST:', { userId: (user as any)?.id, creatorId: id });
+                      const response = await fetch("/api/subscribe", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ creatorId: id })
+                      });
+                      
+                      if (response.ok) {
+                        setIsSubscribed(true);
+                        console.log('✅ Successfully subscribed');
+                      } else {
+                        console.error('❌ Subscription failed:', response.status);
+                      }
+                    }}>
+                      Subscribe Now
+                    </Button>
+                    <div className="text-xs text-gray-500 mt-2 text-center">
+                      Cancel anytime. No hidden fees.
+                    </div>
+                  </div>
+                )}
+
+
+
+                {/* Trial Subscription Box - Show ONLY when trial is available and NOT expired */}
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && subscriptionSettings?.enableFreeTrial && !trialExpired && (
+                  <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-green-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
+                    <div className="w-full bg-gradient-to-r from-green-500 to-teal-500 rounded-lg p-4 mb-4 text-white text-center">
+                      <div className="text-xl font-bold">🎁 Free Trial Available</div>
+                      <div className="text-sm opacity-80">
+                        Get {subscriptionSettings.trialDuration === 1 ? '1 minute' : `${subscriptionSettings.trialDuration} days`} free, then ₹{subscriptionSettings.subscriptionPrice}/month
+                        {subscriptionSettings.trialDuration === 1 && <span className="block mt-1 text-yellow-200 font-medium">(Test Mode)</span>}
+                      </div>
+                    </div>
+                    <div className="text-4xl font-extrabold text-gray-900 mb-2">
+                      FREE
+                      <span className="text-lg font-medium text-gray-700"> 
+                        for {subscriptionSettings.trialDuration === 1 ? '1 minute' : `${subscriptionSettings.trialDuration} days`}
+                      </span>
+                    </div>
+                    
+                    <div className="text-center mb-4">
+                      <div className="text-lg text-gray-700">Then ₹{subscriptionSettings.subscriptionPrice}/month</div>
+                      <div className="text-sm text-gray-500">
+                        {subscriptionSettings.trialDuration === 1 
+                          ? 'Cancel anytime during 1-minute trial' 
+                          : 'Cancel anytime during trial'
+                        }
+                      </div>
+                      {subscriptionSettings.trialDuration === 1 && (
+                        <div className="text-xs text-yellow-600 font-medium mt-1">
+                          ⚡ Testing Mode - Trial expires in 1 minute
+                        </div>
+                      )}
+                    </div>
+                    <ul className="text-gray-700 text-base mb-6 w-full">
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Full access during trial</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>All premium content</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Cancel before trial ends</li>
+                      <li className="flex items-center mb-2">
+                        <span className="text-green-500 mr-2">✓</span>
+                        {subscriptionSettings.trialDuration === 1 
+                          ? 'Auto billing after 1 minute' 
+                          : 'Automatic billing after trial'
+                        }
+                      </li>
+                    </ul>
+                    
+                    <Button 
+                      disabled={trialButtonLoading}
+                      className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2 disabled:opacity-50" 
+                      onClick={async () => {
+                        const user = session?.user;
+                        console.log('🎬 [TRIAL-BTN] START TRIAL BUTTON CLICKED!');
+                        console.log('🔍 [TRIAL-BTN] User session:', user);
+                        console.log('🔍 [TRIAL-BTN] Creator ID:', id);
+                        console.log('🔍 [TRIAL-BTN] Trial duration:', subscriptionSettings?.trialDuration);
+                        
+                        if (!user) {
+                          console.error('❌ [TRIAL-BTN] No user session found');
+                          alert('Please log in to start your free trial');
+                          return;
+                        }
+                        
+                        console.log('⏳ [TRIAL-BTN] Setting loading state...');
+                        setTrialButtonLoading(true);
+                        
+                        try {
+                          console.log('📡 [TRIAL-BTN] Making API request to /api/subscribe/check-trial...');
+                          const response = await fetch("/api/subscribe/check-trial", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ 
+                              creatorId: id, 
+                              userId: (user as any)?.id,
+                              createTrial: true 
+                            })
+                          });
+                          
+                          console.log('📨 [TRIAL-BTN] Response status:', response.status);
+                          
+                          if (response.ok) {
+                            const data = await response.json();
+                            console.log('✅ [TRIAL-BTN] Trial created successfully:', data);
+                            
+                            // Set subscription state directly
+                            setIsSubscribed(true);
+                            setHasActiveTrial(true);
+                            setTrialExpired(false);
+                            setTrialExpiresAt(data.expiresAt);
+                          } else {
+                            console.error('❌ [TRIAL-BTN] Failed to create trial:', response.status);
+                            alert('Failed to start trial. Please try again.');
+                          }
+                        } catch (error) {
+                          console.error('❌ [TRIAL-BTN] Error creating trial:', error);
+                          alert('Failed to start trial. Please try again.');
+                        } finally {
+                          setTrialButtonLoading(false);
+                        }
+                      }}
+                    >
+                      {trialButtonLoading ? 'Starting Trial...' : 'Start Free Trial'}
+                    </Button>
+                    <div className="text-xs text-gray-500 mt-2 text-center">
+                      Cancel anytime during trial period
+                    </div>
+                  </div>
+                )}
+
+                {/* Expired Trial Box - Show when trial has expired and auto-pay was cancelled */}
+                {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && subscriptionSettings?.enableFreeTrial && trialExpired && (
+                  <div className="w-full md:w-[350px] bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6 mt-6 md:mt-0" style={{ minWidth: 320 }}>
+                    <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
+                      <div className="text-xl font-bold">Premium Membership</div>
+                      <div className="text-sm opacity-80">
+                        Unlock exclusive content & benefits
+                      </div>
+                    </div>
+                    <div className="text-4xl font-extrabold text-gray-900 mb-2">
+                      ₹{subscriptionSettings.subscriptionPrice}/month
+                    </div>
+                    
+                    <ul className="text-gray-700 text-base mb-6 w-full">
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Access to all premium courses</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Weekly live Q&A sessions</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Exclusive community access</li>
+                      <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
+                    </ul>
+                    
+                    <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
+                      const user = session?.user;
+                      console.log('Subscribe POST:', { userId: (user as any)?.id, creatorId: id });
+                      const response = await fetch("/api/subscribe", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ creatorId: id })
+                      });
+                      
+                      if (response.ok) {
+                        setIsSubscribed(true);
+                        console.log('✅ Successfully subscribed');
+                      } else {
+                        console.error('❌ Subscription failed:', response.status);
+                      }
+                    }}>
+                      Subscribe Now
+                    </Button>
+                    <div className="text-xs text-gray-500 mt-2 text-center">
+                      Cancel anytime. No hidden fees.
+                    </div>
+                  </div>
+                )}
+
+
+
                 {userId && userId !== id && isSubscribed && (
                   <div className="flex items-center md:justify-end w-full md:w-auto">
                     <Button 
@@ -786,266 +986,59 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
               </div>
             </div>
           </div>
+
+          {/* Stats - Using real data from API */}
+          {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
+            <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{stats.totalStudents.toLocaleString()}</div>
+                <div className="text-sm text-gray-600">{t.students}</div>
+            </div>
+            <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{stats.totalCourses}</div>
+                <div className="text-sm text-gray-600">{t.totalCourses}</div>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1">
+                <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                  <span className="text-2xl font-bold text-yellow-600">{stats.averageRating.toFixed(1)}</span>
+                </div>
+                <div className="text-sm text-gray-600">{t.averageRating}</div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Subscription Boxes - Positioned on the left side */}
-      <div className="container mx-auto px-4 mb-8">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left side - Subscription boxes */}
-          <div className="lg:w-1/3">
-            {/* Paid Subscription Box - Show for regular paid creators ONLY (not for trials) */}
-            {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && !subscriptionSettings?.enableFreeTrial && (
-              <div className="w-full bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6" style={{ minWidth: 320 }}>
-                <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
-                  <div className="text-xl font-bold">
-                    Premium Membership
-                  </div>
-                  <div className="text-sm opacity-80">
-                    Unlock exclusive content & benefits
-                  </div>
-                </div>
-                <div className="text-4xl font-extrabold text-gray-900 mb-2">
-                  {subscriptionSettings?.subscriptionPrice ? `₹${subscriptionSettings.subscriptionPrice.toLocaleString()}` : 'N/A'}
-                  <span className="text-lg font-medium text-gray-700">/month</span>
-                </div>
-                <ul className="text-gray-700 text-base mb-6 w-full">
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Access to all premium courses</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Weekly live Q&A sessions</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Exclusive community access</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
-                </ul>
-                
-                <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
-                  const user = session?.user;
-                  // Debug: log userId and creatorId for subscription POST
-                  console.log('Subscribe POST:', { userId: (user as any)?.id, creatorId: id });
-                  const response = await fetch("/api/subscribe", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ creatorId: id })
-                  });
-                  
-                  if (response.ok) {
-                    setIsSubscribed(true);
-                    console.log('✅ Successfully subscribed');
-                  } else {
-                    console.error('❌ Subscription failed:', response.status);
-                  }
-                }}>
-                  Subscribe Now
-                </Button>
-                <div className="text-xs text-gray-500 mt-2 text-center">
-                  Cancel anytime. No hidden fees.
+        {/* Content Tabs */}
+        <Tabs defaultValue="courses" className="pb-6">
+          <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm">
+            <TabsTrigger value="courses" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
+              {t.courses}
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
+              {t.reviews}
+            </TabsTrigger>
+            <TabsTrigger value="about" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
+              {t.about}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="courses" className="mt-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">{t.courses} ({courses.length})</h2>
+              <div className="flex gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder={t.searchCourses}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 w-64 bg-white/80 backdrop-blur-sm border-0 shadow-sm"
+                    aria-label="Search courses"
+                  />
                 </div>
               </div>
-            )}
-
-            {/* Trial Subscription Box - Show ONLY when trial is available and NOT expired */}
-            {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && subscriptionSettings?.enableFreeTrial && !trialExpired && (
-              <div className="w-full bg-white rounded-xl shadow-xl border-2 border-green-200 flex flex-col items-center p-6" style={{ minWidth: 320 }}>
-                <div className="w-full bg-gradient-to-r from-green-500 to-teal-500 rounded-lg p-4 mb-4 text-white text-center">
-                  <div className="text-xl font-bold">🎁 Free Trial Available</div>
-                  <div className="text-sm opacity-80">
-                    Get {subscriptionSettings.trialDuration === 1 ? '1 minute' : `${subscriptionSettings.trialDuration} days`} free, then ₹{subscriptionSettings.subscriptionPrice}/month
-                    {subscriptionSettings.trialDuration === 1 && <span className="block mt-1 text-yellow-200 font-medium">(Test Mode)</span>}
-                  </div>
-                </div>
-                <div className="text-4xl font-extrabold text-gray-900 mb-2">
-                  FREE
-                  <span className="text-lg font-medium text-gray-700"> 
-                    for {subscriptionSettings.trialDuration === 1 ? '1 minute' : `${subscriptionSettings.trialDuration} days`}
-                  </span>
-                </div>
-                
-                <div className="text-center mb-4">
-                  <div className="text-lg text-gray-700">Then ₹{subscriptionSettings.subscriptionPrice}/month</div>
-                  <div className="text-sm text-gray-500">
-                    {subscriptionSettings.trialDuration === 1 
-                      ? 'Cancel anytime during 1-minute trial' 
-                      : 'Cancel anytime during trial'
-                    }
-                  </div>
-                  {subscriptionSettings.trialDuration === 1 && (
-                    <div className="text-xs text-yellow-600 font-medium mt-1">
-                      ⚡ Testing Mode - Trial expires in 1 minute
-                    </div>
-                  )}
-                </div>
-                <ul className="text-gray-700 text-base mb-6 w-full">
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Full access during trial</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>All premium content</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Cancel before trial ends</li>
-                  <li className="flex items-center mb-2">
-                    <span className="text-green-500 mr-2">✓</span>
-                    {subscriptionSettings.trialDuration === 1 
-                      ? 'Auto billing after 1 minute' 
-                      : 'Automatic billing after trial'
-                    }
-                  </li>
-                </ul>
-                
-                <Button 
-                  disabled={trialButtonLoading}
-                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2 disabled:opacity-50" 
-                  onClick={async () => {
-                    const user = session?.user;
-                    console.log('🎬 [TRIAL-BTN] START TRIAL BUTTON CLICKED!');
-                    console.log('🔍 [TRIAL-BTN] User session:', user);
-                    console.log('🔍 [TRIAL-BTN] Creator ID:', id);
-                    console.log('🔍 [TRIAL-BTN] Trial duration:', subscriptionSettings?.trialDuration);
-                    
-                    if (!user) {
-                      console.error('❌ [TRIAL-BTN] No user session found');
-                      alert('Please log in to start your free trial');
-                      return;
-                    }
-                    
-                    console.log('⏳ [TRIAL-BTN] Setting loading state...');
-                    setTrialButtonLoading(true);
-                    
-                    try {
-                      console.log('📡 [TRIAL-BTN] Making API request to /api/subscribe/check-trial...');
-                      const response = await fetch("/api/subscribe/check-trial", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ 
-                          creatorId: id, 
-                          userId: (user as any)?.id,
-                          createTrial: true 
-                        })
-                      });
-                      
-                      console.log('📨 [TRIAL-BTN] Response status:', response.status);
-                      
-                      if (response.ok) {
-                        const data = await response.json();
-                        console.log('✅ [TRIAL-BTN] Trial created successfully:', data);
-                        
-                        // Set subscription state directly
-                        setIsSubscribed(true);
-                        setHasActiveTrial(true);
-                        setTrialExpired(false);
-                        setTrialExpiresAt(data.expiresAt);
-                      } else {
-                        const errorData = await response.json();
-                        console.error('❌ [TRIAL-BTN] Failed to create trial:', errorData);
-                        alert(`Failed to start trial: ${errorData.error || 'Unknown error'}`);
-                      }
-                    } catch (error) {
-                      console.error('❌ [TRIAL-BTN] Network error:', error);
-                      alert('Network error. Please try again.');
-                    } finally {
-                      setTrialButtonLoading(false);
-                    }
-                  }}
-                >
-                  {trialButtonLoading ? 'Starting Trial...' : 'Start Free Trial'}
-                </Button>
-                <div className="text-xs text-gray-500 mt-2 text-center">
-                  Cancel anytime. No hidden fees.
-                </div>
-              </div>
-            )}
-
-            {/* Expired Trial Box - Show when trial has expired and auto-pay was cancelled */}
-            {!isSubscribed && !loadingSubscription && subscriptionSettings?.subscriptionType === 'paid' && subscriptionSettings?.enableFreeTrial && trialExpired && (
-              <div className="w-full bg-white rounded-xl shadow-xl border-2 border-purple-200 flex flex-col items-center p-6" style={{ minWidth: 320 }}>
-                <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-4 mb-4 text-white text-center">
-                  <div className="text-xl font-bold">Premium Membership</div>
-                  <div className="text-sm opacity-80">
-                    Unlock exclusive content & benefits
-                  </div>
-                </div>
-                <div className="text-4xl font-extrabold text-gray-900 mb-2">
-                  ₹{subscriptionSettings.subscriptionPrice}/month
-                </div>
-                
-                <ul className="text-gray-700 text-base mb-6 w-full">
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Access to all premium courses</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Weekly live Q&A sessions</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>Exclusive community access</li>
-                  <li className="flex items-center mb-2"><span className="text-green-500 mr-2">✓</span>1-on-1 monthly mentoring call</li>
-                </ul>
-                
-                <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-3 text-lg rounded-lg shadow-md mb-2" onClick={async () => {
-                  const user = session?.user;
-                  console.log('Subscribe POST:', { userId: (user as any)?.id, creatorId: id });
-                  const response = await fetch("/api/subscribe", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ creatorId: id })
-                  });
-                  
-                  if (response.ok) {
-                    setIsSubscribed(true);
-                    console.log('✅ Successfully subscribed');
-                  } else {
-                    console.error('❌ Subscription failed:', response.status);
-                  }
-                }}>
-                  Subscribe Now
-                </Button>
-                <div className="text-xs text-gray-500 mt-2 text-center">
-                  Cancel anytime. No hidden fees.
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right side - Content area */}
-          <div className="lg:w-2/3">
-            {/* Stats - Using real data from API */}
-            {stats && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
-                <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{stats.totalStudents.toLocaleString()}</div>
-                    <div className="text-sm text-gray-600">{t.students}</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">{stats.totalCourses}</div>
-                    <div className="text-sm text-gray-600">{t.totalCourses}</div>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-2xl font-bold text-yellow-600">{stats.averageRating.toFixed(1)}</span>
-                    </div>
-                    <div className="text-sm text-gray-600">{t.averageRating}</div>
-                  </div>
-                </div>
-            )}
-
-            {/* Content Tabs */}
-            <Tabs defaultValue="courses" className="pb-6">
-              <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm">
-                <TabsTrigger value="courses" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-                  {t.courses}
-                </TabsTrigger>
-                <TabsTrigger value="reviews" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-                  {t.reviews}
-                </TabsTrigger>
-                <TabsTrigger value="about" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white">
-                  {t.about}
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="courses" className="mt-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold">{t.courses} ({courses.length})</h2>
-                  <div className="flex gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <Input
-                        placeholder={t.searchCourses}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 w-64 bg-white/80 backdrop-blur-sm border-0 shadow-sm"
-                        aria-label="Search courses"
-                      />
-                    </div>
-                  </div>
-                </div>
+            </div>
             
             {filteredCourses.length === 0 ? (
               <div className="text-center py-12">
@@ -1079,11 +1072,11 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">{t.whatStudentsSay}</h2>
               {stats && (
-                <div className="flex items-center gap-2">
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold">{stats.averageRating.toFixed(1)}</span>
-                    <span className="text-gray-600">({reviews.length} {t.reviews})</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                  <span className="font-semibold">{stats.averageRating.toFixed(1)}</span>
+                  <span className="text-gray-600">({reviews.length} {t.reviews})</span>
+              </div>
               )}
             </div>
             
@@ -1211,7 +1204,6 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ id: s
           </TabsContent>
         </Tabs>
       </div>
-    </div>
 
       {/* Welcome Popup */}
       {showWelcomePopup && (
