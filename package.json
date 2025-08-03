@@ -41,6 +41,7 @@
     "i18next-browser-languagedetector": "^8.2.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.517.0",
+    "mediasoup": "^3.18.0",
     "mediasoup-client": "^3.14.0",
     "next": "15.2.4",
     "next-auth": "^4.24.11",

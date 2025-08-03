@@ -4,13 +4,60 @@ import { types as mediasoupTypes } from 'mediasoup';
 export class TransportManager {
   private transports = new Map<string, mediasoupTypes.WebRtcTransport>();
   private consumers = new Map<string, mediasoupTypes.Consumer[]>();
+  private producerTransports = new Map<string, mediasoupTypes.WebRtcTransport>(); // streamId -> producer transport
 
   addTransport(transportId: string, transport: mediasoupTypes.WebRtcTransport): void {
     this.transports.set(transportId, transport);
+    
+    // Set up transport error handlers
+    transport.on('dtlsstatechange', (dtlsState) => {
+      if (dtlsState === 'failed' || dtlsState === 'closed') {
+        console.log(`Transport ${transportId} DTLS state changed to ${dtlsState}`);
+        this.removeTransport(transportId);
+      }
+    });
+
+    transport.on('icestatechange', (iceState) => {
+      console.log(`Transport ${transportId} ICE state changed to ${iceState}`);
+      if (iceState === 'closed') {
+        this.removeTransport(transportId);
+      }
+    });
   }
 
   getTransport(transportId: string): mediasoupTypes.WebRtcTransport | undefined {
     return this.transports.get(transportId);
+  }
+
+  addProducerTransport(streamId: string, transport: mediasoupTypes.WebRtcTransport): void {
+    this.producerTransports.set(streamId, transport);
+    
+    // Set up transport error handlers
+    transport.on('dtlsstatechange', (dtlsState) => {
+      if (dtlsState === 'failed' || dtlsState === 'closed') {
+        console.log(`Producer transport for stream ${streamId} DTLS state changed to ${dtlsState}`);
+        this.removeProducerTransport(streamId);
+      }
+    });
+
+    transport.on('icestatechange', (iceState) => {
+      console.log(`Producer transport for stream ${streamId} ICE state changed to ${iceState}`);
+      if (iceState === 'closed') {
+        this.removeProducerTransport(streamId);
+      }
+    });
+  }
+
+  getProducerTransport(streamId: string): mediasoupTypes.WebRtcTransport | undefined {
+    return this.producerTransports.get(streamId);
+  }
+
+  removeProducerTransport(streamId: string): void {
+    const transport = this.producerTransports.get(streamId);
+    if (transport && !transport.closed) {
+      transport.close();
+    }
+    this.producerTransports.delete(streamId);
   }
 
   removeTransport(transportId: string): void {
@@ -19,12 +66,18 @@ export class TransportManager {
       // Close all consumers for this transport
       const transportConsumers = this.consumers.get(transportId);
       if (transportConsumers) {
-        transportConsumers.forEach(consumer => consumer.close());
+        transportConsumers.forEach(consumer => {
+          if (!consumer.closed) {
+            consumer.close();
+          }
+        });
         this.consumers.delete(transportId);
       }
       
       // Close and remove the transport
-      transport.close();
+      if (!transport.closed) {
+        transport.close();
+      }
       this.transports.delete(transportId);
     }
   }
@@ -39,14 +92,26 @@ export class TransportManager {
     // Set up consumer event handlers
     consumer.on('transportclose', () => {
       console.log(`Transport closed for consumer ${consumer.id} (${consumer.kind})`);
-      consumer.close();
+      if (!consumer.closed) {
+        consumer.close();
+      }
       this.removeConsumer(transportId, consumer);
     });
 
     consumer.on('producerclose', () => {
       console.log(`Producer closed for consumer ${consumer.id} (${consumer.kind})`);
-      consumer.close();
+      if (!consumer.closed) {
+        consumer.close();
+      }
       this.removeConsumer(transportId, consumer);
+    });
+
+    consumer.on('producerpause', () => {
+      console.log(`Producer paused for consumer ${consumer.id} (${consumer.kind})`);
+    });
+
+    consumer.on('producerresume', () => {
+      console.log(`Producer resumed for consumer ${consumer.id} (${consumer.kind})`);
     });
   }
 
@@ -72,5 +137,19 @@ export class TransportManager {
       this.removeTransport(transportId);
       console.log(`Cleaned up transport ${transportId} for disconnected socket`);
     }
+  }
+
+  cleanupStreamTransports(streamId: string): void {
+    // Clean up producer transport for the stream
+    this.removeProducerTransport(streamId);
+    console.log(`Cleaned up producer transport for stream ${streamId}`);
+  }
+
+  getAllTransportIds(): string[] {
+    return Array.from(this.transports.keys());
+  }
+
+  getAllProducerTransportStreamIds(): string[] {
+    return Array.from(this.producerTransports.keys());
   }
 }

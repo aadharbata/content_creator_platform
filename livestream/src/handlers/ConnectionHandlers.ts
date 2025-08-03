@@ -2,12 +2,14 @@
 import { Socket, Server } from 'socket.io';
 import { StreamManager } from '../services/StreamManager';
 import { TransportManager } from '../services/TransportManager';
+import { ChatManager } from '../services/ChatManager';
 
 export class ConnectionHandlers {
   constructor(
     private streamManager: StreamManager,
     private transportManager: TransportManager,
-    private io: Server
+    private io: Server,
+    private chatManager?: ChatManager
   ) {}
 
   handleConnection(socket: Socket): Set<string> {
@@ -35,6 +37,9 @@ export class ConnectionHandlers {
       const endedStreamId = this.streamManager.handleBroadcasterDisconnect(socket.id);
       
       if (endedStreamId) {
+        // Cleanup stream transports
+        this.transportManager.cleanupStreamTransports(endedStreamId);
+        
         // Notify all users
         this.io.emit('streamEnded', endedStreamId);
         this.io.emit('availableStreams', this.streamManager.getActiveStreams());
@@ -55,6 +60,30 @@ export class ConnectionHandlers {
           // Emit updated available streams
           this.io.emit('availableStreams', this.streamManager.getActiveStreams());
         }
+      }
+      
+      // Handle chat disconnection if chatManager is available
+      if (this.chatManager) {
+        const affectedStreams = this.chatManager.removeUserFromAllChats(socket.id);
+        
+        // Notify all affected chat rooms
+        affectedStreams.forEach(streamId => {
+          const chatUsers = this.chatManager!.getChatUsers(streamId);
+          socket.to(`stream:${streamId}:chat`).emit('userLeftChat', {
+            chatUsers
+          });
+
+          // Broadcast the leave message if there is one
+          const recentMessages = this.chatManager!.getChatHistory(streamId);
+          if (recentMessages.length > 0) {
+            const lastMessage = recentMessages[recentMessages.length - 1];
+            if (lastMessage.type === 'system' && lastMessage.message.includes('left the chat')) {
+              this.io.to(`stream:${streamId}:chat`).emit('newChatMessage', {
+                message: lastMessage
+              });
+            }
+          }
+        });
       }
       
       // Clean up transports and consumers created by this socket

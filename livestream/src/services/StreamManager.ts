@@ -61,14 +61,15 @@ export class StreamManager {
     stream.viewers.clear();
     
     // Close all producers
-    stream.producers.forEach(producer => producer.close());
+    stream.producers.forEach(producer => {
+      if (!producer.closed) {
+        producer.close();
+      }
+    });
     stream.producers.clear();
     
-    // Close producer transport
-    if (stream.producerTransport) {
-      stream.producerTransport.close();
-      stream.producerTransport = undefined;
-    }
+    // Clear producer transport reference (but don't close it here - let TransportManager handle it)
+    stream.producerTransport = undefined;
     
     // Remove from maps
     this.streams.delete(streamId);
@@ -77,8 +78,11 @@ export class StreamManager {
 
   joinStreamAsViewer(streamId: string, viewerId: string): StreamInfo {
     const stream = this.streams.get(streamId);
-    if (!stream || !stream.isActive) {
-      throw new Error('Stream not available');
+    if (!stream) {
+      throw new Error('Stream not found');
+    }
+    if (!stream.isActive) {
+      throw new Error('Stream is not currently active or still initializing. Please try again in a moment.');
     }
 
     stream.viewers.add(viewerId);
@@ -104,13 +108,15 @@ export class StreamManager {
         stream.viewers.clear();
         
         // Close all producers
-        stream.producers.forEach(producer => producer.close());
+        stream.producers.forEach(producer => {
+          if (!producer.closed) {
+            producer.close();
+          }
+        });
         stream.producers.clear();
         
-        // Close producer transport
-        if (stream.producerTransport) {
-          stream.producerTransport.close();
-        }
+        // Clear producer transport reference
+        stream.producerTransport = undefined;
         
         // Remove from maps
         this.streams.delete(streamId);

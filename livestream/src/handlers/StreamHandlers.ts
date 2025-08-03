@@ -26,19 +26,13 @@ export class StreamHandlers {
       try {
         const stream = this.streamManager.startStream(streamId, socket.id);
         
-        // Notify all users about new active stream
-        this.io.emit('streamStarted', {
-          id: stream.id,
-          title: stream.title,
-          broadcasterName: stream.broadcasterName,
-          startTime: stream.startTime,
-          viewerCount: stream.viewers.size
-        });
+        console.log(`Stream ${streamId} started by ${stream.broadcasterName}`);
         
-        this.io.emit('availableStreams', this.streamManager.getActiveStreams());
-        console.log(`Stream ${streamId} went live`);
+        // Don't notify viewers immediately - wait for producers to be created
+        // The notification will happen when the first producer is created in handleProduce
       } catch (error) {
         console.error('Error in startStream:', error);
+        socket.emit('streamStartError', (error as Error).message);
       }
     });
   }
@@ -55,6 +49,7 @@ export class StreamHandlers {
         console.log(`Stream ${streamId} stopped`);
       } catch (error) {
         console.error('Error in stopStream:', error);
+        socket.emit('streamStopError', (error as Error).message);
       }
     });
   }
@@ -94,6 +89,7 @@ export class StreamHandlers {
         }
       } catch (error) {
         console.error('Error in leaveStream:', error);
+        socket.emit('leaveStreamError', (error as Error).message);
       }
     });
   }

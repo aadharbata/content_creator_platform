@@ -31,14 +31,31 @@ const chatManager = new ChatManager(streamManager);
 // Initialize server
 const app = express();
 const httpServer = http.createServer(app);
+
+// Add health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    activeStreams: streamManager.getActiveStreams().length 
+  });
+});
+
+// Add CORS headers for HTTP endpoints
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
 const io = new Server(httpServer, {
   cors: SERVER_CONFIG.cors,
 });
 
 // Initialize handlers
-const connectionHandlers = new ConnectionHandlers(streamManager, transportManager, io);
+const connectionHandlers = new ConnectionHandlers(streamManager, transportManager, io, chatManager);
 const streamHandlers = new StreamHandlers(streamManager, io);
-const mediaHandlers = new MediaHandlers(mediasoupService, streamManager, transportManager);
+const mediaHandlers = new MediaHandlers(mediasoupService, streamManager, transportManager, io);
 const chatHandlers = new ChatHandlers(chatManager, streamManager, io);
 
 // Initialize mediasoup
@@ -81,11 +98,6 @@ io.on('connection', (socket) => {
   
   // Handle disconnection
   connectionHandlers.handleDisconnection(socket, socketTransports);
-  
-  // Handle chat disconnection
-  socket.on('disconnect', () => {
-    chatHandlers.handleDisconnection(socket);
-  });
 });
 
 // Start server

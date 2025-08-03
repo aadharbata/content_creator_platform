@@ -8,18 +8,27 @@ export class MediasoupService {
   private router?: mediasoupTypes.Router;
 
   async initialize(): Promise<void> {
-    this.worker = await mediasoup.createWorker({
-      logLevel: 'warn',
-    });
+    try {
+      this.worker = await mediasoup.createWorker({
+        logLevel: 'warn',
+        rtcMinPort: 10000,
+        rtcMaxPort: 10100,
+      });
 
-    this.worker.on('died', () => {
-      console.error('mediasoup worker has died');
-      setTimeout(() => process.exit(1), 2000);
-    });
+      this.worker.on('died', () => {
+        console.error('mediasoup worker has died');
+        setTimeout(() => process.exit(1), 2000);
+      });
 
-    this.router = await this.worker.createRouter({ 
-      mediaCodecs: MEDIA_CODECS 
-    });
+      this.router = await this.worker.createRouter({ 
+        mediaCodecs: MEDIA_CODECS 
+      });
+
+      console.log('Mediasoup worker and router initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize mediasoup:', error);
+      throw error;
+    }
   }
 
   getRouter(): mediasoupTypes.Router {
@@ -50,6 +59,17 @@ export class MediasoupService {
     });
 
     transport.setMaxIncomingBitrate(TRANSPORT_CONFIG.maxIncomingBitrate);
+    
+    // Add transport error handling
+    transport.on('routerclose', () => {
+      console.log('Transport router closed');
+    });
+
+    transport.on('dtlsstatechange', (dtlsState) => {
+      if (dtlsState === 'failed') {
+        console.error('Transport DTLS failed');
+      }
+    });
     
     return transport;
   }

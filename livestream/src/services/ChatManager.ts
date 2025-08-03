@@ -6,6 +6,9 @@ export class ChatManager {
   private messageHistory = new Map<string, ChatMessage[]>(); // streamId -> messages
   private readonly MAX_MESSAGES_PER_STREAM = 100;
   private messageCounter = 0; // Add counter for uniqueness
+  private rateLimitMap = new Map<string, { count: number; lastReset: number }>(); // socketId -> rate limit info
+  private readonly RATE_LIMIT_WINDOW = 10000; // 10 seconds
+  private readonly RATE_LIMIT_MAX_MESSAGES = 5; // 5 messages per window
 
   constructor(private streamManager: StreamManager) {}
 
@@ -95,6 +98,14 @@ export class ChatManager {
         return { success: false, error: 'Not in chat' };
       }
 
+      // Check rate limiting (moderators are exempt)
+      if (!user.isModerator) {
+        const rateLimitCheck = this.checkRateLimit(socketId);
+        if (!rateLimitCheck.allowed) {
+          return { success: false, error: `Rate limit exceeded. Please wait ${Math.ceil(rateLimitCheck.waitTime / 1000)} seconds.` };
+        }
+      }
+
       // Validate message
       if (!data.message || data.message.trim().length === 0) {
         return { success: false, error: 'Message cannot be empty' };
@@ -147,6 +158,9 @@ export class ChatManager {
       }
     }
 
+    // Clean up rate limiting for this user
+    this.cleanupRateLimit(socketId);
+
     return affectedStreams;
   }
 
@@ -189,5 +203,38 @@ export class ChatManager {
     // Use counter + timestamp + random for guaranteed uniqueness
     this.messageCounter++;
     return `msg_${Date.now()}_${this.messageCounter}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private checkRateLimit(socketId: string): { allowed: boolean; waitTime: number } {
+    const now = Date.now();
+    const rateLimitInfo = this.rateLimitMap.get(socketId);
+
+    if (!rateLimitInfo) {
+      // First message from this user
+      this.rateLimitMap.set(socketId, { count: 1, lastReset: now });
+      return { allowed: true, waitTime: 0 };
+    }
+
+    // Check if we need to reset the window
+    if (now - rateLimitInfo.lastReset >= this.RATE_LIMIT_WINDOW) {
+      rateLimitInfo.count = 1;
+      rateLimitInfo.lastReset = now;
+      return { allowed: true, waitTime: 0 };
+    }
+
+    // Check if user has exceeded rate limit
+    if (rateLimitInfo.count >= this.RATE_LIMIT_MAX_MESSAGES) {
+      const waitTime = this.RATE_LIMIT_WINDOW - (now - rateLimitInfo.lastReset);
+      return { allowed: false, waitTime };
+    }
+
+    // Allow message and increment counter
+    rateLimitInfo.count++;
+    return { allowed: true, waitTime: 0 };
+  }
+
+  // Clean up rate limit data for disconnected users
+  cleanupRateLimit(socketId: string): void {
+    this.rateLimitMap.delete(socketId);
   }
 }
