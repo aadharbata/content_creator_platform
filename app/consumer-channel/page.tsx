@@ -27,7 +27,10 @@ import {
   Sun, 
   DollarSign, 
   Bookmark,
-  Globe
+  Globe,
+  X,
+  Clock,
+  XCircle
 } from "lucide-react";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
@@ -107,6 +110,12 @@ export default function ConsumerChannelPage() {
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   const [loadingCreators, setLoadingCreators] = useState(true);
   const [creatorSearchTerm, setCreatorSearchTerm] = useState("");
+  const [tipAmounts, setTipAmounts] = useState<{ [key: string]: number }>({});
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [currentTipPost, setCurrentTipPost] = useState<{ postId: string; creatorId: string } | null>(null);
+  const [tipInput, setTipInput] = useState('');
+  const [submittingTip, setSubmittingTip] = useState(false);
+  const [subscriptionFilter, setSubscriptionFilter] = useState<'paid' | 'trial' | 'cancelled'>('paid');
 
   const sidebarLinks = [
     { id: "feed", label: t?.feed || "Feed", href: "#", icon: <Home className="w-6 h-6" /> },
@@ -123,18 +132,23 @@ export default function ConsumerChannelPage() {
     .filter(creator =>
       creator.name.toLowerCase().includes(creatorSearchTerm.toLowerCase()) ||
       creator.handle.toLowerCase().includes(creatorSearchTerm.toLowerCase())
-    )
-    .slice(0, 4);
+    );
 
   const fetchAndSetPosts = async () => {
     try {
       setLoadingPosts(true);
+      console.log("Fetching posts with language:", language);
       const response = await axios.get(`/api/posts?lang=${language}`);
+      console.log("Posts response:", response.data);
       if (response.data.success) {
         setPost(response.data.posts);
+      } else {
+        console.log("Posts response not successful:", response.data);
+        setPost([]);
       }
     } catch (error) {
       console.error("Error fetching posts:", error);
+      setPost([]);
     } finally {
       setLoadingPosts(false);
     }
@@ -147,7 +161,8 @@ export default function ConsumerChannelPage() {
         fetchAndSetPosts(),
         fetchTopCreators(),
         fetchLiveCreators(),
-        fetchSubscriptions()
+        fetchSubscriptions(),
+        fetchUserTips()
       ]).finally(() => {
         setInitialLoading(false);
       });
@@ -217,6 +232,21 @@ export default function ConsumerChannelPage() {
       setSubscriptions([]);
     } finally {
       setLoadingSubscriptions(false);
+    }
+  };
+
+  const fetchUserTips = async () => {
+    try {
+      const response = await axios.get("/api/user/tips");
+      if (response.data.success) {
+        const tipsMap: { [key: string]: number } = {};
+        response.data.tips.forEach((tip: any) => {
+          tipsMap[tip.postId] = tip.amount;
+        });
+        setTipAmounts(tipsMap);
+      }
+    } catch (error) {
+      console.error("Error fetching user tips:", error);
     }
   };
 
@@ -381,10 +411,42 @@ export default function ConsumerChannelPage() {
   };
 
   const handleTip = async (postId: string, creatorId: string) => {
+    setCurrentTipPost({ postId, creatorId });
+    setShowTipModal(true);
+    setTipInput('');
+  };
+
+  const handleTipSubmit = async () => {
+    if (!currentTipPost || !tipInput.trim()) return;
+    
+    const amount = parseFloat(tipInput);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
     try {
-      router.push(`/payment?postId=${postId}&creatorId=${creatorId}&type=tip`);
+      setSubmittingTip(true);
+      const response = await axios.post(`/api/posts/${currentTipPost.postId}/tip`, {
+        tipAmount: amount
+      });
+
+      if (response.data.message === "Tip sent successfully") {
+        // Update the tip amount for this post (add to existing amount)
+        setTipAmounts(prev => ({
+          ...prev,
+          [currentTipPost.postId]: (prev[currentTipPost.postId] || 0) + amount
+        }));
+        
+        setShowTipModal(false);
+        setCurrentTipPost(null);
+        setTipInput('');
+      }
     } catch (error) {
-      // nothing
+      console.error('Error sending tip:', error);
+      alert('Failed to send tip. Please try again.');
+    } finally {
+      setSubmittingTip(false);
     }
   };
 
@@ -396,6 +458,22 @@ export default function ConsumerChannelPage() {
       });
     } else {
       navigator.clipboard.writeText(`${window.location.origin}/post/${postId}`);
+    }
+  };
+
+  const handleUnlock = async (postId: string) => {
+    try {
+      const response = await axios.post("/api/payment/unlock-media", { postId });
+      
+      if (response.data.success && response.data.unlocked) {
+        // Update the post to show as unlocked
+        setPost(prev => prev.map(p => 
+          p.id === postId ? { ...p, isUnlocked: true } : p
+        ));
+      }
+    } catch (error) {
+      console.error("Error unlocking media:", error);
+      alert("Failed to unlock content. Please try again.");
     }
   };
 
@@ -523,11 +601,11 @@ export default function ConsumerChannelPage() {
   }
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-white'}`}>
-      <div className="flex">
-        {/* Sidebar */}
-        <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
-          <div className="p-6">
+    <div className={`h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-white'} overflow-hidden`}>
+      <div className="flex h-full">
+        {/* Left Sidebar - Fixed */}
+        <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div className="p-6 h-full flex flex-col">
             {/* Logo */}
             <div className="flex items-center space-x-2 mb-8">
               <div className="h-5 w-6 shrink-0 rounded-tl-lg rounded-tr-sm rounded-br-lg rounded-bl-sm bg-orange-500" />
@@ -535,7 +613,7 @@ export default function ConsumerChannelPage() {
             </div>
 
             {/* Navigation Links */}
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1">
               {sidebarLinks.map((link) => (
                 <button
                   key={link.id}
@@ -564,7 +642,7 @@ export default function ConsumerChannelPage() {
             </div>
 
             {/* User Profile */}
-            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
                 <Avatar className="w-8 h-8">
                   <AvatarImage src={user?.image || undefined} alt={user?.name || "User"} />
@@ -578,12 +656,12 @@ export default function ConsumerChannelPage() {
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content Area - Fixed Height */}
         <div className="flex-1 flex bg-gray-100 dark:bg-gray-900">
-          {/* Left Content Area */}
-          <div className="flex-1 max-w-3xl mx-auto px-4 py-6">
-            {/* Top Bar */}
-            <div className="flex items-center justify-between mb-6">
+          {/* Center Content - Scrollable */}
+          <div className="flex-1 flex flex-col">
+            {/* Top Bar - Fixed */}
+            <div className="flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex-1 max-w-md">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -611,11 +689,11 @@ export default function ConsumerChannelPage() {
               </div>
             </div>
             
-            {/* Content */}
-            <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-              <div className="max-w-6xl mx-auto">
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+              <div className="max-w-2xl mx-auto p-6">
                 {activeTab === "feed" && (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {loadingPosts ? (
                       <div className="text-center py-16">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
@@ -632,27 +710,27 @@ export default function ConsumerChannelPage() {
                     ) : (
                       post.map((p) => (
                         <Card key={p.id} className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700">
-                          <CardContent className="p-6">
+                          <CardContent className="p-4">
                             {/* Post Header */}
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center space-x-3">
-                                <Avatar className="w-10 h-10">
+                                <Avatar className="w-8 h-8">
                                   <AvatarImage src={p.creator.avatar} alt={p.creator.name} />
-                                  <AvatarFallback className="bg-orange-500 text-white">
+                                  <AvatarFallback className="bg-orange-500 text-white text-sm">
                                     {p.creator.name.charAt(0)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                                  <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">
                                     {translateContent(p.creator.name, 'name')}
                                   </h3>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
                                     @{p.creator.handle} • {p.time}
                                   </p>
                                 </div>
                               </div>
                               {p.isPaid && (
-                                <Badge className="bg-orange-500 text-white">
+                                <Badge className="bg-orange-500 text-white text-xs">
                                   <Lock className="w-3 h-3 mr-1" />
                                   {p.price}
                                 </Badge>
@@ -660,21 +738,22 @@ export default function ConsumerChannelPage() {
                             </div>
 
                             {/* Post Content */}
-                            <div className="mb-4">
-                              <p className="text-gray-900 dark:text-gray-100 mb-3">
+                            <div className="mb-3">
+                              <p className="text-sm text-gray-900 dark:text-gray-100 mb-3">
                                 {translateContent(p.content, 'post')}
                               </p>
                               {p.image && (
                                 <div className="relative">
                                   {p.isPaid && !p.isUnlocked ? (
                                     <div className="relative">
-                                      <div className="w-full h-64 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                                      <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                                         <div className="text-center">
-                                          <Lock className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                                          <p className="text-gray-500 dark:text-gray-400 mb-2">Paid Content</p>
+                                          <Lock className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                          <p className="text-gray-500 dark:text-gray-400 mb-2 text-sm">Paid Content</p>
                                           <Button 
-                                            onClick={() => handleTip(p.id, p.creator.id)}
-                                            className="bg-orange-500 hover:bg-orange-600 text-white"
+                                            onClick={() => handleUnlock(p.id)}
+                                            className="bg-orange-500 hover:bg-orange-600 text-white text-xs"
+                                            size="sm"
                                           >
                                             Unlock {p.price}
                                           </Button>
@@ -685,7 +764,7 @@ export default function ConsumerChannelPage() {
                                     <img 
                                       src={p.image} 
                                       alt="Post content" 
-                                      className="w-full h-auto rounded-lg"
+                                      className="w-full h-48 object-cover rounded-lg"
                                     />
                                   )}
                                 </div>
@@ -693,67 +772,74 @@ export default function ConsumerChannelPage() {
                             </div>
 
                             {/* Post Actions */}
-                            <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                              <div className="flex items-center space-x-6">
+                            <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                              <div className="flex items-center space-x-4">
                                 <button
                                   onClick={() => handleLikeToggle(p.id)}
-                                  className={`flex items-center space-x-2 text-sm transition-colors ${
+                                  className={`flex items-center space-x-1 text-xs transition-colors ${
                                     likedPosts.has(p.id) || p.isLiked 
                                       ? "text-red-500" 
                                       : "text-gray-500 hover:text-red-500"
                                   }`}
                                 >
-                                  <Heart className={`w-4 h-4 ${likedPosts.has(p.id) || p.isLiked ? "fill-current" : ""}`} />
+                                  <Heart className={`w-3 h-3 ${likedPosts.has(p.id) || p.isLiked ? "fill-current" : ""}`} />
                                   <span>{p.likes}</span>
                                 </button>
                                 
                                 <button
                                   onClick={() => toggleComments(p.id)}
-                                  className="flex items-center space-x-2 text-sm text-gray-500 hover:text-blue-500 transition-colors"
+                                  className="flex items-center space-x-1 text-xs text-gray-500 hover:text-blue-500 transition-colors"
                                 >
-                                  <MessageCircle className="w-4 h-4" />
-                                  <span>{commentCount[p.id] || p.comments}</span>
+                                  <MessageCircle className="w-3 h-3" />
+                                  <span>
+                                    {visibleComments.has(p.id) ? "Hide" : "Show"} ({commentCount[p.id] || p.comments})
+                                  </span>
                                 </button>
 
                                 <button
                                   onClick={() => handleShare(p.id)}
-                                  className="flex items-center space-x-2 text-sm text-gray-500 hover:text-green-500 transition-colors"
+                                  className="flex items-center space-x-1 text-xs text-gray-500 hover:text-green-500 transition-colors"
                                 >
-                                  <Share className="w-4 h-4" />
+                                  <Share className="w-3 h-3" />
                                   <span>Share</span>
                                 </button>
                               </div>
 
-                              {p.isPaid && (
-                                <Button
-                                  onClick={() => handleTip(p.id, p.creator.id)}
-                                  size="sm"
-                                  className="bg-orange-500 hover:bg-orange-600 text-white"
-                                >
-                                  <DollarSign className="w-4 h-4 mr-1" />
-                                  Tip
-                                </Button>
-                              )}
+                              <Button
+                                onClick={() => handleTip(p.id, p.creator.id)}
+                                size="sm"
+                                className={`text-xs ${
+                                  tipAmounts[p.id] 
+                                    ? 'bg-green-500 hover:bg-green-600 text-white' 
+                                    : 'bg-orange-500 hover:bg-orange-600 text-white'
+                                }`}
+                              >
+                                <DollarSign className="w-3 h-3 mr-1" />
+                                {tipAmounts[p.id] 
+                                  ? `${language === 'hi' ? 'टिप किया' : 'Tipped'} ₹${tipAmounts[p.id]}` 
+                                  : (language === 'hi' ? 'टिप' : 'Tip')
+                                }
+                              </Button>
                             </div>
 
                             {/* Comments Section */}
                             {visibleComments.has(p.id) && (
-                              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                <div className="space-y-3 mb-4">
+                              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <div className="space-y-2 mb-3">
                                   {comments[p.id]?.map((comment) => (
-                                    <div key={comment.id} className="flex space-x-3">
-                                      <Avatar className="w-6 h-6">
-                                        <AvatarImage src={comment.user.profile.avatarUrl} />
+                                    <div key={comment.id} className="flex space-x-2">
+                                      <Avatar className="w-5 h-5">
+                                        <AvatarImage src={comment.user?.profile?.avatarUrl || undefined} />
                                         <AvatarFallback className="text-xs">
-                                          {comment.user.name.charAt(0)}
+                                          {comment.user?.name?.charAt(0) || 'U'}
                                         </AvatarFallback>
                                       </Avatar>
                                       <div className="flex-1">
-                                        <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
-                                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {comment.user.name}
+                                        <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-2 py-1">
+                                          <p className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                                            {comment.user?.name || 'Unknown User'}
                                           </p>
-                                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                                          <p className="text-xs text-gray-700 dark:text-gray-300">
                                             {comment.content}
                                           </p>
                                         </div>
@@ -770,12 +856,13 @@ export default function ConsumerChannelPage() {
                                     placeholder="Add a comment..."
                                     value={commentInputs[p.id] || ''}
                                     onChange={(e) => setCommentInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
-                                    className="flex-1"
+                                    className="flex-1 text-xs"
                                   />
                                   <Button
                                     onClick={() => handleCommentSubmit(p.id)}
                                     disabled={submittingComments.has(p.id)}
-                                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                                    className="bg-orange-500 hover:bg-orange-600 text-white text-xs"
+                                    size="sm"
                                   >
                                     {submittingComments.has(p.id) ? "Posting..." : "Post"}
                                   </Button>
@@ -792,9 +879,11 @@ export default function ConsumerChannelPage() {
                 {activeTab === "creators" && (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Top Creators</h2>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        {language === 'hi' ? 'टॉप क्रिएटर्स' : 'Top Creators'}
+                      </h2>
                       <Input
-                        placeholder="Search creators..."
+                        placeholder={language === 'hi' ? 'क्रिएटर्स खोजें...' : 'Search creators...'}
                         value={creatorSearchTerm}
                         onChange={(e) => setCreatorSearchTerm(e.target.value)}
                         className="w-64"
@@ -806,36 +895,54 @@ export default function ConsumerChannelPage() {
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
                         <p className="text-gray-500 dark:text-gray-400 mt-4">Loading creators...</p>
                       </div>
+                    ) : filteredCreators.length === 0 ? (
+                      <div className="text-center py-16">
+                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                          <Users className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Creators Found</h3>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          {creatorSearchTerm ? 'No creators match your search.' : 'No creators available at the moment.'}
+                        </p>
+                      </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
                         {filteredCreators.map((creator) => (
-                          <Card key={creator.id} className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700">
-                            <CardContent className="p-6">
-                              <div className="flex items-center space-x-4">
-                                <Avatar className="w-12 h-12">
+                          <Card key={creator.id} className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                            <CardContent className="p-4">
+                              <div className="flex flex-col items-center text-center space-y-3">
+                                <Avatar className="w-16 h-16">
                                   <AvatarImage src={creator.avatar} alt={creator.name} />
-                                  <AvatarFallback className="bg-orange-500 text-white">
+                                  <AvatarFallback className="bg-orange-500 text-white text-lg font-semibold">
                                     {creator.name.charAt(0)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div className="flex-1">
-                                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                                    {translateContent(creator.name, 'name')}
-                                  </h3>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    @{creator.handle}
-                                  </p>
-                                  <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                                    <span>{creator.subscriberCount} subscribers</span>
-                                    <span>{creator.postCount} posts</span>
+                                
+                                <div className="w-full">
+                                  <button
+                                    onClick={() => handleCreatorClick(creator.id)}
+                                    className="text-center hover:underline cursor-pointer group w-full"
+                                  >
+                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-base group-hover:text-orange-500 transition-colors truncate">
+                                      {translateContent(creator.name, 'name')}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-orange-400 transition-colors truncate">
+                                      @{creator.handle}
+                                    </p>
+                                  </button>
+                                  
+                                  <div className="flex flex-col space-y-1 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <span className="font-medium">{creator.subscriberCount} subscribers</span>
+                                    <span className="font-medium">{creator.postCount} posts</span>
                                   </div>
+                                  
+                                  <Button
+                                    onClick={() => handleCreatorClick(creator.id)}
+                                    className="w-full mt-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors duration-200"
+                                  >
+                                    {creator.subscribed ? "Subscribed" : "Subscribe"}
+                                  </Button>
                                 </div>
-                                <Button
-                                  onClick={() => handleCreatorClick(creator.id)}
-                                  className="bg-orange-500 hover:bg-orange-600 text-white"
-                                >
-                                  {creator.subscribed ? "Subscribed" : "Subscribe"}
-                                </Button>
                               </div>
                             </CardContent>
                           </Card>
@@ -846,16 +953,23 @@ export default function ConsumerChannelPage() {
                 )}
 
                 {activeTab === "live-creators" && (
-                  <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Live Creators</h2>
+                  <div className="space-y-4">
+                    <div className="text-center mb-6">
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                        {language === 'hi' ? 'लाइव क्रिएटर्स' : 'Live Creators'}
+                      </h2>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        {language === 'hi' ? 'अभी लाइव स्ट्रीमिंग कर रहे क्रिएटर्स को देखें' : 'Discover amazing creators who are streaming live right now'}
+                      </p>
+                    </div>
                     
                     {loadingLiveCreators ? (
-                      <div className="text-center py-16">
+                      <div className="text-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
                         <p className="text-gray-500 dark:text-gray-400 mt-4">Loading live creators...</p>
                       </div>
                     ) : liveCreators.length === 0 ? (
-                      <div className="text-center py-16">
+                      <div className="text-center py-12">
                         <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
                           <TrendingUp className="w-8 h-8 text-gray-400" />
                         </div>
@@ -863,35 +977,46 @@ export default function ConsumerChannelPage() {
                         <p className="text-gray-500 dark:text-gray-400">No creators are currently live streaming.</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className={`grid gap-4 ${
+                        liveCreators.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' :
+                        liveCreators.length === 2 ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' :
+                        liveCreators.length === 3 ? 'grid-cols-1 sm:grid-cols-3 max-w-3xl mx-auto' :
+                        liveCreators.length === 4 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-4xl mx-auto' :
+                        'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-6xl mx-auto'
+                      }`}>
                         {liveCreators.map((creator) => (
-                          <Card key={creator.id} className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700">
-                            <CardContent className="p-6">
-                              <div className="flex items-center space-x-4">
-                                <Avatar className="w-12 h-12">
-                                  <AvatarImage src={creator.avatar} alt={creator.name} />
-                                  <AvatarFallback className="bg-orange-500 text-white">
-                                    {creator.name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2">
-                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                                      {translateContent(creator.name, 'name')}
-                                    </h3>
-                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                  </div>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                          <Card key={creator.id} className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                            <CardContent className="p-4">
+                              <div className="flex flex-col items-center text-center space-y-3">
+                                <div className="relative">
+                                  <Avatar className="w-14 h-14">
+                                    <AvatarImage src={creator.avatar} alt={creator.name} />
+                                    <AvatarFallback className="bg-orange-500 text-white text-base font-semibold">
+                                      {creator.name.charAt(0)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-gray-800"></div>
+                                </div>
+                                
+                                <div className="w-full">
+                                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-base mb-1">
+                                    {translateContent(creator.name, 'name')}
+                                  </h3>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                                     @{creator.handle}
                                   </p>
-                                  <p className="text-sm text-red-500 font-medium mt-1">Live Now</p>
+                                  <div className="flex items-center justify-center space-x-1 mb-3">
+                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
+                                    <p className="text-xs text-red-500 font-medium">Live Now</p>
+                                  </div>
+                                  
+                                  <Button
+                                    onClick={() => handleLiveCreatorClick(creator.id)}
+                                    className="w-full bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1.5 px-3 rounded-md transition-colors duration-200"
+                                  >
+                                    Watch Live
+                                  </Button>
                                 </div>
-                                <Button
-                                  onClick={() => handleLiveCreatorClick(creator.id)}
-                                  className="bg-red-500 hover:bg-red-600 text-white"
-                                >
-                                  Watch
-                                </Button>
                               </div>
                             </CardContent>
                           </Card>
@@ -903,67 +1028,224 @@ export default function ConsumerChannelPage() {
 
                 {activeTab === "subscriptions" && (
                   <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">My Subscriptions</h2>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        {language === 'hi' ? 'मेरी सदस्यताएं' : 'My Subscriptions'}
+                      </h2>
+                      
+                      {/* Subscription Type Toggle */}
+                      <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                        <button
+                          onClick={() => setSubscriptionFilter('paid')}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            subscriptionFilter === 'paid'
+                              ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm'
+                              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span>{language === 'hi' ? 'पेड' : 'Paid'}</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setSubscriptionFilter('trial')}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            subscriptionFilter === 'trial'
+                              ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm'
+                              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span>{language === 'hi' ? 'फ्री ट्रायल' : 'Free Trial'}</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setSubscriptionFilter('cancelled')}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            subscriptionFilter === 'cancelled'
+                              ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm'
+                              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                            <span>{language === 'hi' ? 'रद्द' : 'Cancelled'}</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
                     
                     {loadingSubscriptions ? (
                       <div className="text-center py-16">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
                         <p className="text-gray-500 dark:text-gray-400 mt-4">Loading subscriptions...</p>
                       </div>
-                    ) : subscriptions.length === 0 ? (
-                      <div className="text-center py-16">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                          <CreditCard className="w-8 h-8 text-gray-400" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Subscriptions</h3>
-                        <p className="text-gray-500 dark:text-gray-400">You haven't subscribed to any creators yet.</p>
-                      </div>
                     ) : (
                       <div className="space-y-4">
-                        {subscriptions.map((subscription) => (
-                          <Card key={subscription.id} className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700">
-                            <CardContent className="p-6">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-4">
-                                  <Avatar className="w-12 h-12">
-                                    <AvatarImage src={subscription.creator.avatar} alt={subscription.creator.name} />
-                                    <AvatarFallback className="bg-orange-500 text-white">
-                                      {subscription.creator.name.charAt(0)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                                      {translateContent(subscription.creator.name, 'name')}
-                                    </h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                      {subscription.type === 'trial' ? 'Trial Subscription' : 'Paid Subscription'}
-                                    </p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                      Expires on: {subscription.expiresAt}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex space-x-2">
-                                  <Button
-                                    onClick={() => handleCancelSubscription(subscription.id, subscription.type)}
-                                    variant="outline"
-                                    className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  {subscription.type === 'trial' && (
-                                    <Button
-                                      onClick={() => handleRenewSubscription(subscription.id, subscription.creator.id)}
-                                      className="bg-orange-500 hover:bg-orange-600 text-white"
-                                    >
-                                      Renew
-                                    </Button>
-                                  )}
-                                </div>
+                        {subscriptionFilter === 'paid' && (
+                          <>
+                            {subscriptions.filter(sub => sub.type === 'paid').length > 0 ? (
+                              <div className="grid gap-4">
+                                {subscriptions.filter(sub => sub.type === 'paid').map((subscription) => (
+                                  <Card key={subscription.id} className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700">
+                                    <CardContent className="p-6">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                          <Avatar className="w-12 h-12 bg-green-500">
+                                            <AvatarImage src={subscription.creator.avatar} alt={subscription.creator.name} />
+                                            <AvatarFallback className="bg-green-500 text-white">
+                                              {subscription.creator.name.charAt(0)}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <div>
+                                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                                              {translateContent(subscription.creator.name, 'name')}
+                                            </h3>
+                                            <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                                              Paid Subscription
+                                            </p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                              Expires on: {subscription.expiresAt}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <Button
+                                          onClick={() => handleCancelSubscription(subscription.id, subscription.type)}
+                                          variant="outline"
+                                          className="border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                        >
+                                          {language === 'hi' ? 'रद्द करें' : 'Cancel'}
+                                        </Button>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
                               </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                            ) : (
+                              <div className="text-center py-16">
+                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                                  <CreditCard className="w-8 h-8 text-gray-400" />
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                                  {language === 'hi' ? 'कोई पेड सदस्यता नहीं' : 'No paid subscriptions'}
+                                </h3>
+                                <p className="text-gray-500 dark:text-gray-400">
+                                  {language === 'hi' ? 'आपने अभी तक किसी भी क्रिएटर की पेड सदस्यता नहीं ली है।' : 'You haven\'t subscribed to any paid creators yet.'}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {subscriptionFilter === 'trial' && (
+                          <>
+                            {subscriptions.filter(sub => sub.type === 'trial').length > 0 ? (
+                              <div className="grid gap-4">
+                                {subscriptions.filter(sub => sub.type === 'trial').map((subscription) => (
+                                  <Card key={subscription.id} className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700">
+                                    <CardContent className="p-6">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                          <Avatar className="w-12 h-12 bg-blue-500">
+                                            <AvatarImage src={subscription.creator.avatar} alt={subscription.creator.name} />
+                                            <AvatarFallback className="bg-blue-500 text-white">
+                                              {subscription.creator.name.charAt(0)}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <div>
+                                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                                              {translateContent(subscription.creator.name, 'name')}
+                                            </h3>
+                                            <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                                              Free Trial
+                                            </p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                              Expires on: {subscription.expiresAt}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <Button
+                                          onClick={() => handleRenewSubscription(subscription.id, subscription.creator.id)}
+                                          className="bg-blue-500 hover:bg-blue-600 text-white"
+                                        >
+                                          {language === 'hi' ? 'नवीनीकरण' : 'Renew'}
+                                        </Button>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-16">
+                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                                  <Clock className="w-8 h-8 text-gray-400" />
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                                  {language === 'hi' ? 'कोई फ्री ट्रायल नहीं' : 'No free trials'}
+                                </h3>
+                                <p className="text-gray-500 dark:text-gray-400">
+                                  {language === 'hi' ? 'आपके पास कोई सक्रिय फ्री ट्रायल नहीं है।' : 'You don\'t have any active free trials.'}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {subscriptionFilter === 'cancelled' && (
+                          <>
+                            {subscriptions.filter(sub => sub.status === 'cancelled' || sub.isCancelled).length > 0 ? (
+                              <div className="grid gap-4">
+                                {subscriptions.filter(sub => sub.status === 'cancelled' || sub.isCancelled).map((subscription) => (
+                                  <Card key={subscription.id} className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 opacity-75">
+                                    <CardContent className="p-6">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                          <Avatar className="w-12 h-12 bg-red-500">
+                                            <AvatarImage src={subscription.creator.avatar} alt={subscription.creator.name} />
+                                            <AvatarFallback className="bg-red-500 text-white">
+                                              {subscription.creator.name.charAt(0)}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <div>
+                                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                                              {translateContent(subscription.creator.name, 'name')}
+                                            </h3>
+                                            <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                                              Cancelled
+                                            </p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                              Expired on: {subscription.expiresAt}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <Button
+                                          onClick={() => handleRenewSubscription(subscription.id, subscription.creator.id)}
+                                          className="bg-orange-500 hover:bg-orange-600 text-white"
+                                        >
+                                          {language === 'hi' ? 'पुनः सदस्यता' : 'Resubscribe'}
+                                        </Button>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-16">
+                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                                  <XCircle className="w-8 h-8 text-gray-400" />
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                                  {language === 'hi' ? 'कोई रद्द की गई सदस्यता नहीं' : 'No cancelled subscriptions'}
+                                </h3>
+                                <p className="text-gray-500 dark:text-gray-400">
+                                  {language === 'hi' ? 'आपके पास कोई रद्द की गई सदस्यता नहीं है।' : 'You don\'t have any cancelled subscriptions.'}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -997,10 +1279,148 @@ export default function ConsumerChannelPage() {
                   </div>
                 )}
               </div>
-            </main>
+            </div>
           </div>
+
+          {/* Right Sidebar - Top Creators - Fixed */}
+          {activeTab === "feed" && (
+            <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="p-6 h-full flex flex-col">
+                <div className="flex items-center space-x-2 mb-6">
+                  <TrendingUp className="w-5 h-5 text-orange-500" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {language === 'hi' ? 'टॉप क्रिएटर्स' : 'Top Creators'}
+                  </h2>
+                </div>
+                
+                <div className="space-y-4 flex-1 overflow-y-auto">
+                  {creators.slice(0, 4).map((creator) => (
+                    <div key={creator.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src={creator.avatar} alt={creator.name} />
+                          <AvatarFallback className="bg-orange-500 text-white">
+                            {creator.name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <button
+                            onClick={() => router.push(`/creator/${creator.id}`)}
+                            className="text-left hover:underline cursor-pointer"
+                          >
+                            <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100 hover:text-orange-500 transition-colors">
+                              {translateContent(creator.name, 'name')}
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              @{creator.handle}
+                            </p>
+                          </button>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleCreatorClick(creator.id)}
+                        size="sm"
+                        className="bg-orange-500 hover:bg-orange-600 text-white text-xs"
+                      >
+                        {language === 'hi' ? 'फॉलो करें' : 'Follow'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Tip Modal */}
+      {showTipModal && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50" style={{zIndex: 9999}}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {language === 'hi' ? 'टिप भेजें' : 'Send Tip'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowTipModal(false);
+                  setCurrentTipPost(null);
+                  setTipInput('');
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {language === 'hi' ? 'टिप की राशि (₹)' : 'Tip Amount (₹)'}
+              </label>
+              <Input
+                type="number"
+                placeholder={language === 'hi' ? 'राशि दर्ज करें' : 'Enter amount'}
+                value={tipInput}
+                onChange={(e) => setTipInput(e.target.value)}
+                className="w-full"
+                min="1"
+                step="1"
+              />
+            </div>
+            
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => setTipInput('10')}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                ₹10
+              </Button>
+              <Button
+                onClick={() => setTipInput('50')}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                ₹50
+              </Button>
+              <Button
+                onClick={() => setTipInput('100')}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                ₹100
+              </Button>
+            </div>
+            
+            <div className="mt-6 flex space-x-3">
+              <Button
+                onClick={() => {
+                  setShowTipModal(false);
+                  setCurrentTipPost(null);
+                  setTipInput('');
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                {language === 'hi' ? 'रद्द करें' : 'Cancel'}
+              </Button>
+              <Button
+                onClick={handleTipSubmit}
+                disabled={submittingTip || !tipInput.trim()}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                {submittingTip 
+                  ? (language === 'hi' ? 'भेज रहे हैं...' : 'Sending...') 
+                  : (language === 'hi' ? 'टिप भेजें' : 'Send Tip')
+                }
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
