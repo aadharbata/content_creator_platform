@@ -5,16 +5,34 @@ import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { signIn, useSession, signOut } from "next-auth/react";
+import { Mail, Lock, Eye, EyeOff, Moon } from "lucide-react";
 
 const Login = () => {
   const [form, setForm] = useState({ identifier: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const router = useRouter();
   const { language, translations } = useLanguage();
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
+
+  // Handle dark mode toggle
+  const toggleDarkMode = () => {
+    setIsDarkMode(!isDarkMode);
+    // You can also store this preference in localStorage
+    localStorage.setItem('darkMode', (!isDarkMode).toString());
+  };
+
+  // Load dark mode preference on mount
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode) {
+      setIsDarkMode(savedDarkMode === 'true');
+    }
+  }, []);
 
   // Handle redirect after successful login
   useEffect(() => {
@@ -82,136 +100,213 @@ const Login = () => {
   // Show loading state while session is being determined
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-orange-400 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 text-gray-600'}`}>
+        <div className="text-xl">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-orange-400 flex flex-col justify-center items-center px-2 py-8 font-inter">
-      <main className="w-full max-w-md mx-auto glass p-8 md:p-12 mt-10 mb-8 flex flex-col items-center text-center">
-        <div className="bg-gradient-to-tr from-blue-500 via-orange-400 to-purple-500 rounded-full w-16 h-16 flex items-center justify-center shadow-xl border-4 border-white mb-4">
-          <span className="text-white text-2xl font-extrabold tracking-widest">
-            CP
-          </span>
-        </div>
-        <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-white font-poppins shadow-sm">
-          {language === 'hi' ? 'लॉगिन' : 'Login'}
-        </h1>
-        <p className="text-md text-white/90 mb-6 font-medium">
-          {language === 'hi' 
-            ? 'वापसी पर स्वागत है! कृपया अपने खाते में लॉगिन करें।' 
-            : 'Welcome back! Please login to your account.'
-          }
-        </p>
-        
-        <form
-          className="w-full flex flex-col gap-4 text-left"
-          onSubmit={handleSubmit}
+    <div className={`min-h-screen flex items-center justify-center p-4 relative ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200'}`}>
+      {/* Dark mode toggle */}
+      <div className="absolute top-4 right-4">
+        <button
+          onClick={toggleDarkMode}
+          className={`p-2 rounded-lg transition-colors shadow-lg ${
+            isDarkMode 
+              ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+              : 'bg-white/80 backdrop-blur-sm hover:bg-white/90 text-gray-600'
+          }`}
         >
-          <label className="font-semibold text-white">
-            {language === 'hi' ? 'ईमेल या फोन' : 'Email or Phone'}
-            <input
-              name="identifier"
-              type="text"
-              value={form.identifier}
-              onChange={handleChange}
-              placeholder={language === 'hi' ? 'आप@email.com या 9876543210' : 'you@email.com or 9876543210'}
-              required
-              className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none bg-white text-gray-800 shadow-sm transition-all duration-200 hover:shadow-md"
-            />
-            <div className="text-xs text-gray-200 mt-1 bg-black/20 p-2 rounded-lg backdrop-blur-sm">
-              {language === 'hi' 
-                ? 'फोन नंबर के लिए: केवल 10 अंक (जैसे 9876543210)'
-                : 'For phone: 10 digits only (e.g., 9876543210)'
-              }
+          <Moon className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Main login card */}
+      <div className={`w-full max-w-md rounded-2xl shadow-2xl p-8 border ${
+        isDarkMode 
+          ? 'bg-gray-800 border-gray-700' 
+          : 'bg-white border-gray-100'
+      }`}>
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 bg-gradient-to-tr from-purple-500 via-pink-500 to-purple-600 rounded-full flex items-center justify-center">
+            <span className="text-white text-2xl font-bold">CP</span>
+          </div>
+        </div>
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className={`text-3xl font-bold mb-2 ${
+            isDarkMode ? 'text-white' : 'text-gray-900'
+          }`}>
+            Welcome back
+          </h1>
+          <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+            Please sign in to your account
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Email/Phone Input */}
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${
+              isDarkMode ? 'text-gray-200' : 'text-gray-700'
+            }`}>
+              Email or Phone
+            </label>
+            <div className="relative">
+              <Mail className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+                isDarkMode ? 'text-gray-400' : 'text-gray-400'
+              }`} />
+              <input
+                name="identifier"
+                type="text"
+                value={form.identifier}
+                onChange={handleChange}
+                placeholder="you@example.com or 1234567890"
+                required
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'border-gray-300'
+                }`}
+              />
             </div>
-          </label>
-          
-          <label className="font-semibold text-white">
-            {language === 'hi' ? 'पासवर्ड' : 'Password'}
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder={language === 'hi' ? 'पासवर्ड' : 'Password'}
-              required
-              className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none bg-white text-gray-800 shadow-sm transition-all duration-200 hover:shadow-md"
-            />
-          </label>
-          
-          {/* Forgot Password Link */}
+          </div>
+
+          {/* Password Input */}
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${
+              isDarkMode ? 'text-gray-200' : 'text-gray-700'
+            }`}>
+              Password
+            </label>
+            <div className="relative">
+              <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+                isDarkMode ? 'text-gray-400' : 'text-gray-400'
+              }`} />
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                required
+                className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'border-gray-300'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={`absolute right-3 top-1/2 transform -translate-y-1/2 hover:text-gray-600 ${
+                  isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400'
+                }`}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Forgot Password */}
           <div className="text-right">
             <a
               href="/forgot-password"
-              className="text-sm text-yellow-300 hover:text-yellow-100 hover:underline transition-colors duration-200"
+              className="text-sm text-purple-600 hover:text-purple-800 hover:underline transition-colors"
             >
-              {language === 'hi' ? 'पासवर्ड भूल गए?' : 'Forgot Password?'}
+              Forgot password?
             </a>
           </div>
-          
+
+          {/* Sign In Button */}
           <button
             type="submit"
-            className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 hover:shadow-xl transition-all transform duration-200"
             disabled={loading}
+            className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50"
           >
-            {loading 
-              ? (language === 'hi' ? "लॉगिन हो रहा है..." : "Logging in...") 
-              : (language === 'hi' ? "लॉगिन" : "Login")
-            }
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className={`absolute inset-0 flex items-center ${
+              isDarkMode ? 'border-gray-600' : 'border-gray-300'
+            }`}>
+              <div className={`w-full border-t ${
+                isDarkMode ? 'border-gray-600' : 'border-gray-300'
+              }`}></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className={`px-2 ${
+                isDarkMode 
+                  ? 'bg-gray-800 text-gray-400' 
+                  : 'bg-white text-gray-500'
+              }`}>or</span>
+            </div>
+          </div>
+
+          {/* Google Button */}
+          <button
+            type="button"
+            onClick={() => signIn('google', { redirect: false })}
+            className={`w-full flex items-center justify-center gap-3 border rounded-lg py-3 font-medium transition-colors ${
+              isDarkMode 
+                ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600' 
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <img src="/google.svg" alt="Google" className="w-5 h-5" />
+            Continue with Google
           </button>
         </form>
-        
-        {/* Google Login Button */}
-        <button
-          onClick={() => signIn('google', { redirect: false })}
-          className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-2xl py-3 shadow-md hover:bg-gray-50 hover:shadow-lg transition-all duration-200 text-gray-800 font-semibold"
-          type="button"
-        >
-          <img src="/google.svg" alt="Google" className="w-5 h-5" />
-          {language === 'hi' ? 'Google से लॉगिन करें' : 'Login with Google'}
-        </button>
-        
-        {error && <p className="mt-4 text-red-300 font-semibold bg-red-900/30 p-3 rounded-xl border border-red-400">{error}</p>}
-        {success && (
-          <p className="mt-4 text-green-300 font-semibold bg-green-900/30 p-3 rounded-xl border border-green-400">{success}</p>
+
+        {/* Error/Success Messages */}
+        {error && (
+          <div className={`mt-4 p-3 border rounded-lg ${
+            isDarkMode 
+              ? 'bg-red-900/50 border-red-700' 
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
         )}
-        
-        <p className="mt-6 text-sm text-white">
-          {language === 'hi' ? "खाता नहीं है?" : "Don't have an account?"}{" "}
-          <a
-            href="/signup"
-            className="text-yellow-300 font-bold hover:text-yellow-100 hover:underline transition-colors duration-200"
-          >
-            {language === 'hi' ? "साइन अप करें" : "Sign up"}
-          </a>
-        </p>
-        
-        <div className="mt-4 text-xs text-white/80 text-center bg-black/10 p-3 rounded-xl backdrop-blur-sm">
-          {language === 'hi' 
-            ? 'फोन नंबर के बिना +91 लिखें। ईमेल या फोन दोनों से लॉगिन कर सकते हैं।'
-            : 'Enter phone number without +91. You can login with either email or phone.'
-          }
+        {success && (
+          <div className={`mt-4 p-3 border rounded-lg ${
+            isDarkMode 
+              ? 'bg-green-900/50 border-green-700' 
+              : 'bg-green-50 border-green-200'
+          }`}>
+            <p className="text-green-600 text-sm">{success}</p>
+          </div>
+        )}
+
+        {/* Sign Up Link */}
+        <div className="mt-6 text-center">
+          <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+            Don't have an account?{" "}
+            <a
+              href="/signup"
+              className="text-purple-600 font-semibold hover:text-purple-800 hover:underline transition-colors"
+            >
+              Sign up
+            </a>
+          </p>
         </div>
-      </main>
-      <style jsx global>{`
-        .font-inter {
-          font-family: "Inter", sans-serif;
-        }
-        .font-poppins,
-        .hero-title {
-          font-family: "Poppins", sans-serif;
-        }
-        .glass {
-          background: rgba(0, 0, 0, 0.4);
-          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-          backdrop-filter: blur(20px);
-          border-radius: 2rem;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-      `}</style>
+
+        {/* Phone login instructions */}
+        <div className="mt-4 text-xs text-center">
+          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
+            Phone login: Enter 10 digits only (e.g., 1234567890).
+          </p>
+          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
+            You can sign in with either email or phone number.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

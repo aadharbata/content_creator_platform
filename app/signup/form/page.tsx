@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { signIn } from 'next-auth/react';
+import { Mail, Phone, User, Lock, Eye, EyeOff, ArrowRight, Moon } from 'lucide-react';
 
 const countryCodes = [
   { code: "+1", name: "US/Canada", flag: "🇺🇸" },
@@ -17,6 +18,9 @@ const SignUpForm = () => {
   const [signupMethod, setSignupMethod] = useState<"email" | "phone">("email");
   const [step, setStep] = useState<"signup" | "otp">("signup");
   const [role, setRole] = useState<'CREATOR' | 'CONSUMER' | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -50,6 +54,20 @@ const SignUpForm = () => {
       router.push('/signup');
     }
   }, [searchParams, router]);
+
+  // Dark mode effect
+  useEffect(() => {
+    const savedMode = localStorage.getItem('darkMode');
+    if (savedMode === 'true') {
+      setIsDarkMode(true);
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem('darkMode', newMode.toString());
+  };
 
   // Timer effect for OTP resend
   useEffect(() => {
@@ -125,7 +143,7 @@ const SignUpForm = () => {
         phone: signupMethod === "phone" ? form.phone : "",
         countryCode: form.countryCode,
         password: form.password,
-        role, // Use the selected role
+        role,
         signupMethod,
       };
 
@@ -142,7 +160,6 @@ const SignUpForm = () => {
 
       if (response.ok) {
         if (signupMethod === "phone") {
-          // Phone signup - go to OTP verification
           setStep("otp");
           setOtpData({
             phone: form.countryCode + form.phone,
@@ -156,7 +173,6 @@ const SignUpForm = () => {
           );
           setResendTimer(30);
         } else {
-          // Email signup - direct success
           setSuccess(
             language === 'hi'
               ? "✅ खाता सफलतापूर्वक बनाया गया! लॉगिन पेज पर जा रहे हैं..."
@@ -253,26 +269,22 @@ const SignUpForm = () => {
     }
   };
 
-  // Google OAuth signup with role
   const handleGoogleSignup = async () => {
     if (!role) return;
     
     try {
-      // Store role in server-side cookie for OAuth flow
       await fetch('/api/auth/google-signup-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role })
       });
       
-      // Build callback URL for final redirection
       const callbackUrl = role === 'CREATOR' 
         ? `${window.location.origin}/creator/dashboard`
         : `${window.location.origin}/consumer-channel`;
       
       console.log(`🔐 Starting Google signup for ${role} with callbackUrl:`, callbackUrl);
       
-      // Initiate Google OAuth
       await signIn('google', { 
         redirect: true,
         callbackUrl
@@ -285,8 +297,14 @@ const SignUpForm = () => {
 
   if (!role) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-orange-400 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
+        isDarkMode 
+          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
+          : 'bg-gradient-to-br from-white via-gray-50 to-purple-50'
+      }`}>
+        <div className={`text-xl transition-colors duration-300 ${
+          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+        }`}>Loading...</div>
       </div>
     );
   }
@@ -299,9 +317,44 @@ const SignUpForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-orange-400 flex flex-col justify-center items-center px-2 py-8 font-inter">
-      <main className="w-full max-w-md mx-auto glass p-8 md:p-12 mt-10 mb-8 flex flex-col items-center text-center">
-        <div className="bg-gradient-to-tr from-blue-500 via-orange-400 to-purple-500 rounded-full w-16 h-16 flex items-center justify-center shadow-xl border-4 border-white mb-4">
+    <div className={`min-h-screen flex flex-col justify-center items-center px-2 py-8 font-inter transition-colors duration-300 ${
+      isDarkMode 
+        ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
+        : 'bg-gradient-to-br from-white via-gray-50 to-purple-50'
+    }`}>
+      {/* Progress Indicator */}
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
+        <div className="flex space-x-2 mb-2">
+          <div className="w-8 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+          <div className="w-8 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+        </div>
+        <span className={`text-xs font-medium transition-colors duration-300 ${
+          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+        }`}>
+          Step 2 of 2
+        </span>
+      </div>
+
+      {/* Dark Mode Toggle */}
+      <div className="absolute top-4 right-4">
+        <button
+          onClick={toggleDarkMode}
+          className={`p-2 rounded-full transition-all duration-200 ${
+            isDarkMode 
+              ? 'bg-gray-700 text-white hover:bg-gray-600' 
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+          } shadow-lg`}
+        >
+          <Moon className="w-5 h-5" />
+        </button>
+      </div>
+
+      <main className={`w-full max-w-md mx-auto rounded-2xl shadow-2xl p-8 border transition-colors duration-300 ${
+        isDarkMode 
+          ? 'bg-gray-800 border-gray-700' 
+          : 'bg-white border-gray-100'
+      } mt-10 mb-8 flex flex-col items-center text-center`}>
+        <div className="bg-gradient-to-tr from-purple-500 via-pink-500 to-purple-600 rounded-full w-16 h-16 flex items-center justify-center shadow-xl mb-6">
           <span className="text-white text-2xl font-extrabold tracking-widest">
             CP
           </span>
@@ -309,30 +362,38 @@ const SignUpForm = () => {
 
         {step === "signup" ? (
           <>
-            <h1 className="hero-title text-3xl md:text-4xl font-black mb-2 tracking-tight text-white font-poppins">
+            <h1 className={`text-3xl md:text-4xl font-black mb-2 tracking-tight transition-colors duration-300 ${
+              isDarkMode ? 'text-white' : 'text-gray-900'
+            } font-poppins`}>
               {language === 'hi' ? 'Sign up' : 'Sign up'}
             </h1>
-            <p className="text-md text-white mb-2">
+            <p className={`text-md mb-8 font-medium transition-colors duration-300 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-600'
+            }`}>
               {language === 'hi' 
                 ? `${getRoleDisplayName()} के रूप में खाता बनाएं`
                 : `Create your account as a ${getRoleDisplayName()}`
               }
             </p>
-            <p className="text-sm text-yellow-300 mb-6 font-semibold">
-              {role === 'CREATOR' ? '👨‍💼 Creator Account' : '👤 Fan Account'}
-            </p>
 
             {/* Signup Method Toggle */}
-            <div className="flex w-full mb-6 bg-white/20 rounded-xl p-1 backdrop-blur-sm border border-white/30">
+            <div className={`flex w-full mb-6 rounded-xl p-1 transition-colors duration-300 ${
+              isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+            }`}>
               <button
                 type="button"
                 onClick={() => setSignupMethod("email")}
                 className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
                   signupMethod === "email"
-                    ? "bg-white text-blue-600 shadow-md"
-                    : "text-white hover:bg-white/10"
+                    ? isDarkMode
+                      ? 'bg-gray-600 text-purple-400 shadow-md'
+                      : 'bg-white text-purple-600 shadow-md'
+                    : isDarkMode
+                      ? 'text-gray-300 hover:bg-gray-600'
+                      : 'text-gray-600 hover:bg-gray-200'
                 }`}
               >
+                <Mail className="w-4 h-4 inline mr-2" />
                 {language === 'hi' ? 'ईमेल' : 'Email'}
               </button>
               <button
@@ -340,50 +401,89 @@ const SignUpForm = () => {
                 onClick={() => setSignupMethod("phone")}
                 className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
                   signupMethod === "phone"
-                    ? "bg-white text-blue-600 shadow-md"
-                    : "text-white hover:bg-white/10"
+                    ? isDarkMode
+                      ? 'bg-gray-600 text-purple-400 shadow-md'
+                      : 'bg-white text-purple-600 shadow-md'
+                    : isDarkMode
+                      ? 'text-gray-300 hover:bg-gray-600'
+                      : 'text-gray-600 hover:bg-gray-200'
                 }`}
               >
+                <Phone className="w-4 h-4 inline mr-2" />
                 {language === 'hi' ? 'फोन' : 'Phone'}
               </button>
             </div>
 
             <form className="w-full flex flex-col gap-4" onSubmit={handleSubmit}>
-              <label className="font-semibold text-white">
-                {language === 'hi' ? 'नाम' : 'Name'}
-                <input
-                  name="name"
-                  type="text"
-                  value={form.name}
-                  onChange={handleChange}
-                  placeholder={language === 'hi' ? 'आपका नाम' : 'Your name'}
-                  required
-                  className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white text-gray-800"
-                />
-              </label>
+              <div className="relative">
+                <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  {language === 'hi' ? 'नाम' : 'Name'}
+                </label>
+                <div className="relative">
+                  <User className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                  }`} />
+                  <input
+                    name="name"
+                    type="text"
+                    value={form.name}
+                    onChange={handleChange}
+                    placeholder={language === 'hi' ? 'आपका नाम' : 'Your name'}
+                    required
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                      isDarkMode 
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                        : 'border-gray-300'
+                    }`}
+                  />
+                </div>
+              </div>
 
               {signupMethod === "email" ? (
-                <label className="font-semibold text-white">
-                  {language === 'hi' ? 'ईमेल' : 'Email'}
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    placeholder={language === 'hi' ? 'आप@email.com' : 'you@email.com'}
-                    required
-                    className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white text-gray-800"
-                  />
-                </label>
+                <div className="relative">
+                  <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    {language === 'hi' ? 'ईमेल' : 'Email'}
+                  </label>
+                  <div className="relative">
+                    <Mail className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                    }`} />
+                    <input
+                      name="email"
+                      type="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      placeholder={language === 'hi' ? 'आप@email.com' : 'you@email.com'}
+                      required
+                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                        isDarkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                          : 'border-gray-300'
+                      }`}
+                    />
+                  </div>
+                </div>
               ) : (
-                <label className="font-semibold text-white">
-                  {language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
-                  <div className="mt-1 flex gap-2">
+                <div className="relative">
+                  <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    {language === 'hi' ? 'फोन नंबर' : 'Phone Number'}
+                  </label>
+                  <div className="flex gap-2">
                     <select
                       name="countryCode"
                       value={form.countryCode}
                       onChange={handleChange}
-                      className="px-3 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white text-gray-800"
+                      className={`px-3 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                        isDarkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white' 
+                          : 'border-gray-300'
+                      }`}
                     >
                       {countryCodes.map((country) => (
                         <option key={country.code} value={country.code}>
@@ -391,82 +491,154 @@ const SignUpForm = () => {
                         </option>
                       ))}
                     </select>
-                    <input
-                      name="phone"
-                      type="tel"
-                      value={form.phone}
-                      onChange={handleChange}
-                      placeholder="9876543210"
-                      required
-                      maxLength={10}
-                      className="flex-1 px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white text-gray-800"
-                    />
+                    <div className="relative flex-1">
+                      <Phone className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                      }`} />
+                      <input
+                        name="phone"
+                        type="tel"
+                        value={form.phone}
+                        onChange={handleChange}
+                        placeholder="9876543210"
+                        required
+                        maxLength={10}
+                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                          isDarkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                            : 'border-gray-300'
+                        }`}
+                      />
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-200 mt-1 bg-black/20 p-2 rounded-lg backdrop-blur-sm">
+                  <p className={`text-xs mt-1 transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
                     {language === 'hi'
                       ? 'केवल 10 अंक (6,7,8,9 से शुरू)'
                       : 'Only 10 digits (starting with 6,7,8,9)'
                     }
-                  </div>
-                </label>
+                  </p>
+                </div>
               )}
 
-              <label className="font-semibold text-white">
-                {language === 'hi' ? 'पासवर्ड' : 'Password'}
-                <input
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  placeholder={language === 'hi' ? 'पासवर्ड (कम से कम 6 अक्षर)' : 'Password (at least 6 characters)'}
-                  required
-                  className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white text-gray-800"
-                />
-              </label>
+              <div className="relative">
+                <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  {language === 'hi' ? 'पासवर्ड' : 'Password'}
+                </label>
+                <div className="relative">
+                  <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                  }`} />
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={handleChange}
+                    placeholder={language === 'hi' ? 'पासवर्ड (कम से कम 6 अक्षर)' : 'Password (at least 6 characters)'}
+                    required
+                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                      isDarkMode 
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                        : 'border-gray-300'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors duration-300 ${
+                      isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
 
-              <label className="font-semibold text-white">
-                {language === 'hi' ? 'पासवर्ड कन्फर्म करें' : 'Confirm Password'}
-                <input
-                  name="confirm_password"
-                  type="password"
-                  value={form.confirm_password}
-                  onChange={handleChange}
-                  placeholder={language === 'hi' ? 'पासवर्ड दुबारा लिखें' : 'Re-enter password'}
-                  required
-                  className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white text-gray-800"
-                />
-              </label>
+              <div className="relative">
+                <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  {language === 'hi' ? 'पासवर्ड कन्फर्म करें' : 'Confirm Password'}
+                </label>
+                <div className="relative">
+                  <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                  }`} />
+                  <input
+                    name="confirm_password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={form.confirm_password}
+                    onChange={handleChange}
+                    placeholder={language === 'hi' ? 'पासवर्ड दुबारा लिखें' : 'Re-enter password'}
+                    required
+                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors ${
+                      isDarkMode 
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                        : 'border-gray-300'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors duration-300 ${
+                      isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
 
               <button
                 type="submit"
-                className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
+                className="mt-4 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200 flex items-center justify-center space-x-2"
                 disabled={loading}
               >
-                {loading
-                  ? (language === 'hi' ? "बन रहा है..." : "Creating...")
-                  : (language === 'hi' ? "खाता बनाएं" : "Create Account")
-                }
+                <span>
+                  {loading
+                    ? (language === 'hi' ? "बन रहा है..." : "Creating...")
+                    : (language === 'hi' ? "खाता बनाएं" : "Create Account")
+                  }
+                </span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </form>
 
             {/* Google Signup Button */}
             <button
               onClick={handleGoogleSignup}
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-2xl py-3 shadow hover:bg-gray-100 transition-colors text-gray-800 font-semibold"
+              className={`mt-4 w-full flex items-center justify-center gap-2 border rounded-2xl py-3 shadow hover:scale-105 transition-all duration-200 font-semibold ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
+                  : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-100'
+              }`}
               type="button"
             >
               <img src="/google.svg" alt="Google" className="w-5 h-5" />
               {language === 'hi' ? 'Google से Sign up करें' : 'Sign up with Google'}
             </button>
 
-            {error && <p className="mt-4 text-red-300 font-semibold bg-red-900/30 p-3 rounded-xl border border-red-400">{error}</p>}
-            {success && <p className="mt-4 text-green-300 font-semibold bg-green-900/30 p-3 rounded-xl border border-green-400">{success}</p>}
+            {error && <p className={`mt-4 font-semibold p-3 rounded-lg border transition-colors duration-300 ${
+              isDarkMode 
+                ? 'text-red-400 bg-red-900/30 border-red-700' 
+                : 'text-red-600 bg-red-50 border-red-200'
+            }`}>{error}</p>}
+            {success && <p className={`mt-4 font-semibold p-3 rounded-lg border transition-colors duration-300 ${
+              isDarkMode 
+                ? 'text-green-400 bg-green-900/30 border-green-700' 
+                : 'text-green-600 bg-green-50 border-green-200'
+            }`}>{success}</p>}
 
-            <p className="mt-6 text-sm text-white">
+            <p className={`mt-6 text-sm transition-colors duration-300 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-600'
+            }`}>
               {language === 'hi' ? "पहले से खाता है?" : "Already have an account?"}{" "}
               <a
                 href="/login"
-                className="text-yellow-300 font-bold hover:text-yellow-100 hover:underline transition-colors duration-200"
+                className="text-purple-600 font-semibold hover:text-purple-800 hover:underline transition-colors duration-200"
               >
                 {language === 'hi' ? "लॉगिन करें" : "Sign in"}
               </a>
@@ -475,10 +647,14 @@ const SignUpForm = () => {
         ) : (
           /* OTP Verification Step */
           <>
-            <h1 className="hero-title text-3xl md:text-4xl font-black mb-4 tracking-tight text-white font-poppins">
+            <h1 className={`text-3xl md:text-4xl font-black mb-4 tracking-tight transition-colors duration-300 ${
+              isDarkMode ? 'text-white' : 'text-gray-900'
+            } font-poppins`}>
               {language === 'hi' ? 'OTP सत्यापन' : 'OTP Verification'}
             </h1>
-            <p className="text-md text-white mb-6">
+            <p className={`text-md mb-6 transition-colors duration-300 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-600'
+            }`}>
               {language === 'hi'
                 ? `OTP भेजा गया ${otpData.phone} पर`
                 : `OTP sent to ${otpData.phone}`
@@ -486,8 +662,12 @@ const SignUpForm = () => {
             </p>
 
             <form className="w-full flex flex-col gap-4" onSubmit={handleOtpSubmit}>
-              <label className="font-semibold text-white">
-                {language === 'hi' ? 'OTP दर्ज करें' : 'Enter OTP'}
+              <div className="relative">
+                <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  {language === 'hi' ? 'OTP दर्ज करें' : 'Enter OTP'}
+                </label>
                 <input
                   name="otp"
                   type="text"
@@ -496,13 +676,17 @@ const SignUpForm = () => {
                   placeholder={language === 'hi' ? '6 अंकों का OTP' : '6-digit OTP'}
                   required
                   maxLength={6}
-                  className="mt-1 w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none text-center text-2xl tracking-widest bg-white text-gray-800"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-center text-2xl tracking-widest transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                      : 'border-gray-300'
+                  }`}
                 />
-              </label>
+              </div>
 
               <button
                 type="submit"
-                className="mt-4 bg-gradient-to-r from-blue-600 via-orange-400 to-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
+                className="mt-4 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-bold py-3 rounded-2xl shadow-lg hover:scale-105 transition transform duration-200"
                 disabled={otpLoading}
               >
                 {otpLoading
@@ -517,8 +701,12 @@ const SignUpForm = () => {
                 disabled={resendTimer > 0 || resendLoading}
                 className={`mt-2 py-2 px-4 rounded-xl font-semibold transition ${
                   resendTimer > 0 || resendLoading
-                    ? "bg-gray-600 text-gray-300 cursor-not-allowed"
-                    : "bg-gray-200 text-gray-800 hover:bg-gray-100"
+                    ? isDarkMode
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : isDarkMode
+                      ? 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {resendLoading
@@ -530,42 +718,39 @@ const SignUpForm = () => {
               </button>
             </form>
 
-            {error && <p className="mt-4 text-red-300 font-semibold bg-red-900/30 p-3 rounded-xl border border-red-400">{error}</p>}
-            {success && <p className="mt-4 text-green-300 font-semibold bg-green-900/30 p-3 rounded-xl border border-green-400">{success}</p>}
+            {error && <p className={`mt-4 font-semibold p-3 rounded-lg border transition-colors duration-300 ${
+              isDarkMode 
+                ? 'text-red-400 bg-red-900/30 border-red-700' 
+                : 'text-red-600 bg-red-50 border-red-200'
+            }`}>{error}</p>}
+            {success && <p className={`mt-4 font-semibold p-3 rounded-lg border transition-colors duration-300 ${
+              isDarkMode 
+                ? 'text-green-400 bg-green-900/30 border-green-700' 
+                : 'text-green-600 bg-green-50 border-green-200'
+            }`}>{success}</p>}
 
             <button
               onClick={() => setStep("signup")}
-              className="mt-4 text-sm text-white hover:text-yellow-300 hover:underline transition-colors duration-200"
+              className={`mt-4 text-sm hover:underline transition-colors duration-200 ${
+                isDarkMode ? 'text-gray-300 hover:text-purple-400' : 'text-gray-600 hover:text-purple-600'
+              }`}
             >
               ← {language === 'hi' ? 'वापस जाएं' : 'Go back'}
             </button>
           </>
         )}
 
-        <div className="mt-4 text-xs text-white/80 text-center bg-black/20 p-3 rounded-xl backdrop-blur-sm">
+        <div className={`mt-4 text-xs text-center p-3 rounded-xl transition-colors duration-300 ${
+          isDarkMode 
+            ? 'text-gray-400 bg-gray-700' 
+            : 'text-gray-500 bg-gray-50'
+        }`}>
           {language === 'hi'
             ? 'खाता बनाकर आप हमारी Terms of Service और Privacy Policy से सहमत हैं।'
             : 'By creating an account, you agree to our Terms of Service and Privacy Policy.'
           }
         </div>
       </main>
-      
-      <style jsx global>{`
-        .font-inter {
-          font-family: "Inter", sans-serif;
-        }
-        .font-poppins,
-        .hero-title {
-          font-family: "Poppins", sans-serif;
-        }
-        .glass {
-          background: rgba(0, 0, 0, 0.4);
-          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-          backdrop-filter: blur(20px);
-          border-radius: 2rem;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-      `}</style>
     </div>
   );
 };
