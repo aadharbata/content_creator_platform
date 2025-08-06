@@ -72,6 +72,8 @@ export interface ClientToServerEvents {
   send_community_message: (data: { communityId: string; content: string }) => void
   community_typing_start: (data: { communityId: string }) => void
   community_typing_stop: (data: { communityId: string }) => void
+  join_community: (data: { communityId: string }) => void
+  leave_community: (data: { communityId: string }) => void
 }
 
 // Server to Client Events
@@ -97,6 +99,14 @@ export interface ServerToClientEvents {
   community_new_message: (data: CommunityNewMessageData) => void
   community_user_typing: (data: { communityId: string; userId: string; userName: string }) => void
   community_user_stopped_typing: (data: { communityId: string; userId: string }) => void
+  community_joined: (data: { communityId: string; message: string }) => void
+  community_left: (data: { communityId: string; message: string }) => void
+  
+  // Test chat events
+  receiveMessage: (data: { id: string; text: string; senderId: string; senderName: string; timestamp: Date }) => void
+  autoCreateChat: (data: { targetUserId: string; targetUserName: string; roomId: string }) => void
+  userJoined: (data: { userId: string; userName: string }) => void
+  userLeft: (data: { userId: string; userName: string }) => void
   
   // Connection events
   connected: (data: { userId: string; timestamp: Date }) => void

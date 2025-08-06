@@ -26,6 +26,28 @@ interface TokenPayload {
 
 // JWT authentication middleware for Socket.io
 export async function authenticateSocket(socket: Socket, next: (err?: Error) => void) {
+  // TEMPORARY: Bypass authentication for testing
+  if (process.env.NODE_ENV === 'development') {
+    // Use provided user data or default test data
+    const testUserId = socket.handshake.auth?.userId || 'test-user-' + Date.now();
+    const testUserName = socket.handshake.auth?.userName || 'Test User';
+    
+    (socket as AuthenticatedSocket).data = {
+      userId: testUserId,
+      userName: testUserName,
+      userRole: 'CONSUMER', // Default to CONSUMER for testing
+    };
+
+    socketLogger.info('Authentication bypassed for development', {
+      socketId: socket.id,
+      userId: testUserId,
+      userName: testUserName,
+      mode: 'DEVELOPMENT_BYPASS'
+    });
+
+    return next();
+  }
+
   const cookieString = socket.handshake.headers.cookie;
 
   if (!cookieString) {

@@ -29,17 +29,23 @@ const joinConversationSchema = z.object({
 
 const markAsReadSchema = z.object({
   type: z.enum(['conversation', 'community']),
-  id: z.string().uuid('Invalid ID format'),
+  id: process.env.NODE_ENV === 'development'
+    ? z.string().min(1, 'ID cannot be empty')
+    : z.string().uuid('Invalid ID format'),
 })
 
 // Community validation schemas
 const sendCommunityMessageSchema = z.object({
-  communityId: z.string().uuid('Invalid community ID format'),
+  communityId: process.env.NODE_ENV === 'development' 
+    ? z.string().min(1, 'Community ID cannot be empty')
+    : z.string().uuid('Invalid community ID format'),
   content: z.string().min(1, 'Message content cannot be empty').max(500, 'Message is too long'),
 })
 
 const communityTypingSchema = z.object({
-  communityId: z.string().uuid('Invalid community ID format')
+  communityId: process.env.NODE_ENV === 'development'
+    ? z.string().min(1, 'Community ID cannot be empty') 
+    : z.string().uuid('Invalid community ID format')
 })
 
 export class MessageHandler {
@@ -53,6 +59,16 @@ export class MessageHandler {
   // Auto-join user to their community rooms on connection
   async handleAutoJoinCommunities(socket: AuthenticatedSocket): Promise<void> {
     try {
+      // DEVELOPMENT MODE: Skip database lookup
+      if (process.env.NODE_ENV === 'development') {
+        messageLogger.info('Skipping auto-join communities in development mode', {
+          socketId: socket.id,
+          userId: socket.data.userId
+        })
+        return;
+      }
+
+      // PRODUCTION MODE: Get user's community memberships from database
       const memberships = await databaseUtils.getUserCommunityMemberships(socket.data.userId)
       
       for (const membership of memberships) {
@@ -418,6 +434,34 @@ export class MessageHandler {
       // Sanitize community message content
       const cleanContent = this.profanityFilter.clean(content)
 
+      // DEVELOPMENT MODE: Skip database checks and create mock message
+      if (process.env.NODE_ENV === 'development') {
+        const message = {
+          id: `dev-msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          content: cleanContent,
+          createdAt: new Date(),
+          senderId: userId,
+          communityId: communityId,
+          sender: {
+            id: userId,
+            name: socket.data.userName,
+            avatarUrl: null
+          }
+        };
+
+        // Broadcast the new message to all members of the community room using community-specific event
+        this.io.to(`community:${communityId}`).emit('community_new_message', message);
+
+        messageLogger.info('Community message sent (development mode)', {
+          socketId: socket.id,
+          userId,
+          communityId,
+          messageId: message.id,
+        });
+        return;
+      }
+
+      // PRODUCTION MODE: Full database validation
       // Security check: ensure user is a member of the community
       const member = await databaseUtils.getCommunityMembership(communityId, userId);
       if (!member) {
@@ -435,8 +479,8 @@ export class MessageHandler {
         senderId: userId,
       });
 
-      // Broadcast the new message to all members of the community room
-      this.io.to(`community:${communityId}`).emit('new_message', message);
+      // Broadcast the new message to all members of the community room using community-specific event
+      this.io.to(`community:${communityId}`).emit('community_new_message', message);
 
       // Trigger a conversation update for all members for sorting/unread counts
       this.io.to(`community:${communityId}`).emit('conversation_updated', {
@@ -475,6 +519,18 @@ export class MessageHandler {
         return
       }
 
+      // DEVELOPMENT MODE: Skip database membership check
+      if (process.env.NODE_ENV === 'development') {
+        // Broadcast typing to other community members
+        socket.to(`community:${communityId}`).emit('community_user_typing', {
+          communityId,
+          userId: socket.data.userId,
+          userName: socket.data.userName
+        })
+        return;
+      }
+
+      // PRODUCTION MODE: Check membership
       const membership = await databaseUtils.getCommunityMembership(communityId, socket.data.userId)
       if (!membership) return
 
@@ -498,6 +554,17 @@ export class MessageHandler {
       const validatedData = communityTypingSchema.parse(data)
       const { communityId } = validatedData
 
+      // DEVELOPMENT MODE: Skip database membership check
+      if (process.env.NODE_ENV === 'development') {
+        // Broadcast stop typing to other community members
+        socket.to(`community:${communityId}`).emit('community_user_stopped_typing', {
+          communityId,
+          userId: socket.data.userId
+        })
+        return;
+      }
+
+      // PRODUCTION MODE: Check membership
       const membership = await databaseUtils.getCommunityMembership(communityId, socket.data.userId)
       if (!membership) return
 
@@ -510,6 +577,104 @@ export class MessageHandler {
     } catch (error) {
       messageLogger.debug('Community typing stop error', {
         socketId: socket.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
+
+  // Handle joining a specific community
+  async handleJoinCommunity(socket: AuthenticatedSocket, data: unknown): Promise<void> {
+    try {
+      const validatedData = communityTypingSchema.parse(data) // Use same schema as it validates communityId
+      const { communityId } = validatedData
+
+      // DEVELOPMENT MODE: Allow joining any community without validation
+      if (process.env.NODE_ENV === 'development') {
+        await socket.join(`community:${communityId}`)
+        
+        messageLogger.info('User joined community (development mode)', {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          communityId
+        })
+
+        // Send confirmation to the user
+        socket.emit('community_joined', {
+          communityId,
+          message: `Successfully joined community ${communityId}`
+        })
+        return;
+      }
+
+      // PRODUCTION MODE: Validate membership
+      const membership = await databaseUtils.getCommunityMembership(communityId, socket.data.userId)
+      if (!membership) {
+        socket.emit('error', {
+          message: 'You are not a member of this community',
+          code: 'COMMUNITY_ACCESS_DENIED'
+        })
+        return
+      }
+
+      await socket.join(`community:${communityId}`)
+      
+      messageLogger.info('User joined community', {
+        socketId: socket.id,
+        userId: socket.data.userId,
+        communityId
+      })
+
+      // Send confirmation to the user
+      socket.emit('community_joined', {
+        communityId,
+        message: `Successfully joined community ${communityId}`
+      })
+
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errorMessage = error.errors.map(e => e.message).join(', ')
+        socket.emit('error', { 
+          message: errorMessage,
+          code: 'VALIDATION_ERROR'
+        })
+      } else {
+        socket.emit('error', { 
+          message: 'Failed to join community',
+          code: 'JOIN_COMMUNITY_FAILED'
+        })
+        messageLogger.error('Error joining community', {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        })
+      }
+    }
+  }
+
+  // Handle leaving a specific community
+  async handleLeaveCommunity(socket: AuthenticatedSocket, data: unknown): Promise<void> {
+    try {
+      const validatedData = communityTypingSchema.parse(data)
+      const { communityId } = validatedData
+
+      await socket.leave(`community:${communityId}`)
+
+      messageLogger.info('User left community', {
+        socketId: socket.id,
+        userId: socket.data.userId,
+        communityId
+      })
+
+      // Send confirmation to the user
+      socket.emit('community_left', {
+        communityId,
+        message: `Left community ${communityId}`
+      })
+
+    } catch (error) {
+      messageLogger.error('Error leaving community', {
+        socketId: socket.id,
+        userId: socket.data.userId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
     }

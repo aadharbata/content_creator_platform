@@ -33,6 +33,13 @@ export default withAuth(
             tokenSub: token?.sub 
           });
         }
+
+        // FOR TESTING PURPOSES
+        
+        // Allow chat-test route without any auth requirement
+        if (req.nextUrl.pathname.startsWith('/chat-test')) {
+          return true;
+        }
         
         // Always return true to allow all requests
         // Session validation will be handled by individual pages/APIs
