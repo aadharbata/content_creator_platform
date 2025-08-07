@@ -1,0 +1,76 @@
+// services/MediasoupService.ts
+import * as mediasoup from 'mediasoup';
+import { types as mediasoupTypes } from 'mediasoup';
+import { MEDIA_CODECS, TRANSPORT_CONFIG } from '../config/media';
+
+export class MediasoupService {
+  private worker?: mediasoupTypes.Worker;
+  private router?: mediasoupTypes.Router;
+
+  async initialize(): Promise<void> {
+    try {
+      this.worker = await mediasoup.createWorker({
+        logLevel: 'warn',
+        rtcMinPort: 10000,
+        rtcMaxPort: 10100,
+      });
+
+      this.worker.on('died', () => {
+        console.error('mediasoup worker has died');
+        setTimeout(() => process.exit(1), 2000);
+      });
+
+      this.router = await this.worker.createRouter({ 
+        mediaCodecs: MEDIA_CODECS 
+      });
+
+      console.log('Mediasoup worker and router initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize mediasoup:', error);
+      throw error;
+    }
+  }
+
+  getRouter(): mediasoupTypes.Router {
+    if (!this.router) {
+      throw new Error('Router not initialized');
+    }
+    return this.router;
+  }
+
+  getWorker(): mediasoupTypes.Worker {
+    if (!this.worker) {
+      throw new Error('Worker not initialized');
+    }
+    return this.worker;
+  }
+
+  async createWebRtcTransport(): Promise<mediasoupTypes.WebRtcTransport> {
+    if (!this.router) {
+      throw new Error('Router not initialized');
+    }
+
+    const transport = await this.router.createWebRtcTransport({
+      listenIps: TRANSPORT_CONFIG.listenIps,
+      enableUdp: TRANSPORT_CONFIG.enableUdp,
+      enableTcp: TRANSPORT_CONFIG.enableTcp,
+      preferUdp: TRANSPORT_CONFIG.preferUdp,
+      initialAvailableOutgoingBitrate: TRANSPORT_CONFIG.initialAvailableOutgoingBitrate,
+    });
+
+    transport.setMaxIncomingBitrate(TRANSPORT_CONFIG.maxIncomingBitrate);
+    
+    // Add transport error handling
+    transport.on('routerclose', () => {
+      console.log('Transport router closed');
+    });
+
+    transport.on('dtlsstatechange', (dtlsState) => {
+      if (dtlsState === 'failed') {
+        console.error('Transport DTLS failed');
+      }
+    });
+    
+    return transport;
+  }
+}
