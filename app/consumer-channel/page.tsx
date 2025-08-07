@@ -36,6 +36,7 @@ import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Socket, io } from "socket.io-client";
 
 interface SessionUser {
   id: string;
@@ -116,6 +117,18 @@ export default function ConsumerChannelPage() {
   const [tipInput, setTipInput] = useState('');
   const [submittingTip, setSubmittingTip] = useState(false);
   const [subscriptionFilter, setSubscriptionFilter] = useState<'paid' | 'trial' | 'cancelled'>('paid');
+  
+  // DM Chat (chat-test style) state
+  interface TestMessage { id: string; text: string; senderId: string; senderName: string; timestamp: Date }
+  interface DmTab { id: string; targetUserId: string; targetUserName?: string; roomId: string; messages: TestMessage[]; unreadCount: number }
+  const [dmSocket, setDmSocket] = useState<Socket | null>(null);
+  const [dmTabs, setDmTabs] = useState<DmTab[]>([]);
+  const [activeDmTabId, setActiveDmTabId] = useState<string | null>(null);
+  const [pendingDmMessages, setPendingDmMessages] = useState<TestMessage[]>([]);
+  const [processedDmIds, setProcessedDmIds] = useState<Set<string>>(new Set());
+  const [newChatUserId, setNewChatUserId] = useState("");
+  const [messageInput, setMessageInput] = useState("");
+  const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2,11)}-${Math.random().toString(36).slice(2,6)}`;
 
   const sidebarLinks = [
     { id: "feed", label: t?.feed || "Feed", href: "#", icon: <Home className="w-6 h-6" /> },
@@ -184,6 +197,92 @@ export default function ConsumerChannelPage() {
       });
     }
   }, [post, comments]);
+
+  // --- DM Chat: auto-connect using session user ---
+  const activeDmTab = dmTabs.find(t => t.id === activeDmTabId) || null;
+  useEffect(() => {
+    if (activeTab !== 'chats' || status !== 'authenticated' || !user) return;
+    // Create socket instance
+    const URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:3001';
+    const s = io(URL, { reconnectionAttempts: 5, reconnectionDelay: 1000, autoConnect: false, withCredentials: false });
+    setDmSocket(s);
+    s.on('connect', () => {
+      s.emit('join', { userId: user.id, userName: user.name || 'User' });
+    });
+    s.on('disconnect', () => {
+      setDmTabs([]); setActiveDmTabId(null); setPendingDmMessages([]); setProcessedDmIds(new Set());
+    });
+    s.on('connect_error', () => {
+      // no alert spam in integrated UI
+      console.error('WebSocket connect error - ensure server running on 3001');
+    });
+    s.on('receiveMessage', (message: TestMessage) => {
+      if (processedDmIds.has(message.id)) return;
+      setProcessedDmIds(prev => new Set(prev).add(message.id));
+      setDmTabs(prev => {
+        const existing = prev.find(t => t.targetUserId === message.senderId);
+        if (existing) {
+          const exists = existing.messages.some(m => m.id === message.id);
+          if (exists) return prev;
+          return prev.map(t => t.targetUserId === message.senderId ? { ...t, messages: [...t.messages, message], unreadCount: t.id === activeDmTabId ? 0 : t.unreadCount + 1 } : t);
+        } else {
+          setPendingDmMessages(p => p.some(m => m.id === message.id) ? p : [...p, message]);
+          return prev;
+        }
+      });
+    });
+    s.on('autoCreateChat', (data: { targetUserId: string; targetUserName: string; roomId: string }) => {
+      setDmTabs(prev => {
+        const exists = prev.find(t => t.targetUserId === data.targetUserId);
+        if (exists) return prev;
+        const tabId = generateId();
+        const newTab: DmTab = { id: tabId, targetUserId: data.targetUserId, targetUserName: data.targetUserName, roomId: data.roomId, messages: [{ id: generateId(), text: `🏠 Chat created with ${data.targetUserName || data.targetUserId}`, senderId: 'system', senderName: 'System', timestamp: new Date() }], unreadCount: 1 };
+        s.emit('joinRoom', { roomId: data.roomId, userId: user.id, targetUserId: data.targetUserId });
+        return [...prev, newTab];
+      });
+      setPendingDmMessages(prev => {
+        const toThis = prev.filter(m => m.senderId === data.targetUserId);
+        if (toThis.length) {
+          setDmTabs(current => current.map(t => t.targetUserId === data.targetUserId ? { ...t, messages: [...t.messages, ...toThis], unreadCount: t.unreadCount + toThis.length } : t));
+        }
+        return prev.filter(m => m.senderId !== data.targetUserId);
+      });
+    });
+    s.connect();
+    return () => { try { s.disconnect(); } catch {} };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, status, user?.id]);
+
+  const createNewChat = () => {
+    if (!dmSocket || !newChatUserId || !user) return;
+    if (newChatUserId === user.id) return;
+    const participants = [user.id, newChatUserId].sort();
+    const roomId = `dm_${participants.join('_')}`;
+    const tabId = generateId();
+    dmSocket.emit('joinRoom', { roomId, userId: user.id, targetUserId: newChatUserId });
+    const newTab: DmTab = { id: tabId, targetUserId: newChatUserId, roomId, messages: [{ id: generateId(), text: `🏠 Started chat with ${newChatUserId}`, senderId: 'system', senderName: 'System', timestamp: new Date() }], unreadCount: 0 };
+    setDmTabs(prev => [...prev, newTab]);
+    setActiveDmTabId(tabId);
+    setNewChatUserId("");
+  };
+
+  const sendDm = () => {
+    if (!dmSocket || !activeDmTab || !user || !messageInput.trim()) return;
+    const message: TestMessage = { id: generateId(), text: messageInput.trim(), senderId: user.id, senderName: user.name || 'User', timestamp: new Date() };
+    dmSocket.emit('sendMessage', { ...message, roomId: activeDmTab.roomId, targetUserId: activeDmTab.targetUserId });
+    setDmTabs(prev => prev.map(t => t.id === activeDmTabId ? { ...t, messages: [...t.messages, message] } : t));
+    setProcessedDmIds(prev => new Set(prev).add(message.id));
+    setMessageInput("");
+  };
+  const handleDmKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDm(); } };
+
+  const handleResolveChatId = (oldId: string, newId: string) => {
+    // Update chat id when placeholder conversation is created
+    setChats((prev) => prev.map((c) => (c.id === oldId ? { ...c, id: newId, placeholder: false } as ChatListItem : c)));
+    if (activeChatItem && activeChatItem.id === oldId) {
+      setActiveChatItem({ ...activeChatItem, id: newId, placeholder: false } as ChatListItem);
+    }
+  };
 
   const fetchTopCreators = async () => {
     try {
@@ -1266,9 +1365,72 @@ export default function ConsumerChannelPage() {
                 )}
 
                 {activeTab === "chats" && (
-                  <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Chats</h2>
-                    <p className="text-gray-500 dark:text-gray-400">Connect with creators and other users through chat.</p>
+                  <div className="space-y-4">
+                    <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+                      <div className="bg-blue-600 text-white p-4">
+                        <h3 className="text-xl font-bold">Direct Messages</h3>
+                        <p className="text-blue-100 text-sm">Chat with creators or users in real-time</p>
+                      </div>
+                      <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-800">
+                        <div className="flex gap-3 items-end">
+                          <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start New Chat (User ID)</label>
+                            <input value={newChatUserId} onChange={(e)=>setNewChatUserId(e.target.value)} placeholder="Enter user ID to chat with" className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          </div>
+                          <Button onClick={createNewChat} disabled={!newChatUserId} className="bg-blue-600 hover:bg-blue-700 text-white">Start Chat</Button>
+                        </div>
+                        <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">You are signed in as <span className="font-semibold">{user?.id}</span></div>
+                      </div>
+                      {dmTabs.length > 0 && (
+                        <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                          <div className="flex overflow-x-auto">
+                            {dmTabs.map(tab => (
+                              <div key={tab.id} className={`flex-shrink-0 border-b-2 ${activeDmTabId===tab.id?'border-blue-500 bg-white dark:bg-gray-900':'border-transparent'}`}>
+                                <div className="flex items-center">
+                                  <button onClick={()=>{setActiveDmTabId(tab.id); setDmTabs(p=>p.map(t=>t.id===tab.id?{...t, unreadCount:0}:t));}} className={`px-4 py-2 text-sm font-medium ${activeDmTabId===tab.id?'text-blue-600':'text-gray-600 dark:text-gray-300 hover:text-gray-800'}`}>
+                                    <div className="flex items-center gap-2">
+                                      <span>{tab.targetUserName || tab.targetUserId}</span>
+                                      {tab.unreadCount>0 && (<span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] h-5 flex items-center justify-center">{tab.unreadCount}</span>)}
+                                    </div>
+                                  </button>
+                                  <button onClick={()=>{setDmTabs(p=>p.filter(t=>t.id!==tab.id)); if(activeDmTabId===tab.id){ const remaining=dmTabs.filter(t=>t.id!==tab.id); setActiveDmTabId(remaining[0]?.id||null);} }} className="px-2 py-2 text-gray-400 hover:text-gray-600">×</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="h-96 overflow-y-auto p-4 bg-white dark:bg-gray-900 space-y-3">
+                        {dmTabs.length===0 ? (
+                          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                            <div className="text-center">
+                              <p>No active chats</p>
+                              <p className="text-sm">Start a new chat to begin messaging</p>
+                            </div>
+                          </div>
+                        ) : !activeDmTab ? (
+                          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">Select a chat tab to view messages</div>
+                        ) : (
+                          activeDmTab.messages.map(m => (
+                            <div key={m.id} className={`flex ${m.senderId===user?.id?'justify-end':'justify-start'}`}>
+                              <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${m.senderId==='system'?'bg-gray-200 text-gray-700 text-center italic':(m.senderId===user?.id?'bg-blue-600 text-white':'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100')}`}>
+                                {m.senderId!=='system' && m.senderId!==user?.id && (<div className="text-xs font-semibold mb-1">{m.senderName}</div>)}
+                                <div className="break-words">{m.text}</div>
+                                <div className="text-xs opacity-75 mt-1">{new Date(m.timestamp).toLocaleTimeString()}</div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {activeDmTab && (
+                        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                          <div className="flex gap-2">
+                            <Input value={messageInput} onChange={(e)=>setMessageInput(e.target.value)} onKeyPress={handleDmKey} placeholder={`Type a message to ${activeDmTab.targetUserName||activeDmTab.targetUserId}...`} className="flex-1" />
+                            <Button onClick={sendDm} disabled={!messageInput.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">Send</Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
