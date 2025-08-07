@@ -28,6 +28,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Get language preference from query parameter or default to English
+    const url = new URL(request.url);
+    const language = url.searchParams.get("lang") || "en";
+
     // Fetch posts with creator, media, likes, comments, and tips
     const posts = await prisma.post.findMany({
       orderBy: { createdAt: "desc" },
@@ -83,6 +87,17 @@ export async function GET(request: NextRequest) {
 
     const subscribedCreatorIds = new Set(userSubscriptions.map(sub => sub.creatorId));
 
+    // Helper function to parse multilingual content
+    const parseMultilingualContent = (content: string, language: string) => {
+      try {
+        const parsed = JSON.parse(content);
+        return parsed[language] || parsed.en || content; // Fallback to English or original content
+      } catch {
+        // If not JSON, return original content (for backward compatibility)
+        return content;
+      }
+    };
+
     // Transform posts to match frontend requirements
     const transformed = posts.map((post) => {
       const creatorUser = post.creator.user;
@@ -101,6 +116,9 @@ export async function GET(request: NextRequest) {
       // Calculate total tip amount for this post
       const totalTipAmount = post.tip.reduce((sum, tip) => sum + tip.amount, 0);
       
+      // Parse multilingual content
+      const content = parseMultilingualContent(post.content, language);
+      
       return {
         id: post.id,
         creator: {
@@ -114,7 +132,7 @@ export async function GET(request: NextRequest) {
             )}&background=random`,
         },
         time: post.createdAt,
-        content: post.content,
+        content: content,
         image:
           post.media && post.media.length > 0 ? post.media[0].url : undefined,
         isPaid: shouldShowLocked,
@@ -172,6 +190,8 @@ export async function POST(request: NextRequest) {
     const creatorId = formData.get("creatorId") as string;
     const content = formData.get("content") as string;
     const title = formData.get("title") as string;
+    const contentHi = formData.get("contentHi") as string; // Hindi content
+    const titleHi = formData.get("titleHi") as string; // Hindi title
     const isPaidOnly = formData.get("isPaidOnly") === "true";
 
     if (!creatorId || !content || !title) {
@@ -203,11 +223,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the post
+    // Create multilingual content object
+    const multilingualContent = {
+      en: content,
+      hi: contentHi || content // Use English content as fallback if Hindi not provided
+    };
+
+    const multilingualTitle = {
+      en: title,
+      hi: titleHi || title // Use English title as fallback if Hindi not provided
+    };
+
+    // Create the post with multilingual content stored as JSON
     const post = await prisma.post.create({
       data: {
-        title,
-        content,
+        title: JSON.stringify(multilingualTitle),
+        content: JSON.stringify(multilingualContent),
         creatorId: creatorProfile.id,
         isPaidOnly,
       },
@@ -246,8 +277,8 @@ export async function POST(request: NextRequest) {
       message: "Post created successfully",
       post: {
         id: post.id,
-        title: post.title,
-        content: post.content,
+        title: multilingualTitle,
+        content: multilingualContent,
       },
     });
   } catch (error) {

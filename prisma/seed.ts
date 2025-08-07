@@ -318,6 +318,163 @@ async function main() {
     }
   }
 
+  // Create creator profiles for the creators
+  console.log('🌱  Creating creator profiles...');
+  const creatorProfiles = [];
+  for (const creator of creators) {
+    const existingProfile = await prisma.creatorProfile.findUnique({
+      where: { userId: creator.id }
+    });
+
+    if (!existingProfile) {
+      const creatorProfile = await prisma.creatorProfile.create({
+        data: {
+          userId: creator.id,
+          subscriptionPrice: 999, // ₹999 per month
+          IsLive: Math.random() > 0.5, // Randomly set some as live
+        }
+      });
+      creatorProfiles.push(creatorProfile);
+      console.log(`  • Created creator profile for: ${creator.name}`);
+    } else {
+      creatorProfiles.push(existingProfile);
+    }
+  }
+
+  // Create sample posts for creators
+  console.log('🌱  Creating sample posts...');
+  const postData = [
+    {
+      title: 'My Latest Fashion Haul',
+      content: 'Just got back from shopping and I\'m so excited to share these amazing finds with you! Check out these gorgeous pieces that are perfect for the season ✨ #fashion #style #haul',
+      image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&h=600&fit=crop',
+      isPaidOnly: false
+    },
+    {
+      title: 'Behind the Scenes',
+      content: 'Here\'s what goes on behind the camera! The process of creating content is just as fun as the final result. Thanks for being part of this journey 📸',
+      image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&h=600&fit=crop',
+      isPaidOnly: true
+    },
+    {
+      title: 'Morning Workout Routine',
+      content: 'Starting the day with some energy! Here\'s my current morning workout routine that keeps me motivated and strong 💪 What\'s your favorite way to start the day?',
+      image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop',
+      isPaidOnly: false
+    },
+    {
+      title: 'Exclusive Training Tips',
+      content: 'For my subscribers only! Here are my top 5 training tips that have helped me build strength and endurance. These techniques took me years to perfect!',
+      image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&h=600&fit=crop',
+      isPaidOnly: true
+    },
+    {
+      title: 'New Art Project Reveal',
+      content: 'I\'ve been working on this piece for weeks and I\'m finally ready to share it! This digital art piece represents my journey as an artist 🎨',
+      image: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&h=600&fit=crop',
+      isPaidOnly: false
+    },
+    {
+      title: 'Digital Art Tutorial',
+      content: 'Step-by-step process of how I create my art! This exclusive tutorial shows my complete workflow from concept to finished piece. Perfect for aspiring digital artists!',
+      image: 'https://images.unsplash.com/photo-1550859492-d5da9d8e45f3?w=800&h=600&fit=crop',
+      isPaidOnly: true
+    },
+    {
+      title: 'Latest Tech Review',
+      content: 'Just unboxed the newest smartphone and I have thoughts! Here\'s my first impression and what I think about the camera quality 📱',
+      image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&h=600&fit=crop',
+      isPaidOnly: false
+    },
+    {
+      title: 'Detailed Tech Analysis',
+      content: 'Deep dive into the specs and performance! My subscribers get access to detailed benchmarks and real-world usage scenarios.',
+      image: 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&h=600&fit=crop',
+      isPaidOnly: true
+    },
+    {
+      title: 'Travel Diary: Bali',
+      content: 'What an incredible week in Bali! The culture, food, and scenery were absolutely breathtaking. Swipe through for some of my favorite moments 🌍',
+      image: 'https://images.unsplash.com/photo-1537953773345-d172ccf13cf1?w=800&h=600&fit=crop',
+      isPaidOnly: false
+    },
+    {
+      title: 'Hidden Gems of Bali',
+      content: 'My exclusive travel guide! Here are the secret spots and local experiences that most tourists never discover. Complete with maps and insider tips!',
+      image: 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=800&h=600&fit=crop',
+      isPaidOnly: true
+    },
+    {
+      title: 'Weekend Vibes',
+      content: 'Relaxing weekend ahead! Sometimes it\'s nice to just slow down and enjoy the simple things in life. How are you spending your weekend?',
+      image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop',
+      isPaidOnly: false
+    },
+    {
+      title: 'Styling Tips',
+      content: 'Quick styling session! Here are 3 ways to style the same outfit for different occasions. Fashion is all about creativity and confidence ✨',
+      image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&h=600&fit=crop',
+      isPaidOnly: false
+    }
+  ];
+
+  for (let i = 0; i < postData.length; i++) {
+    const postInfo = postData[i];
+    const creator = creators[i % creators.length];
+    
+    // Find the creator profile
+    const creatorProfile = creatorProfiles.find(cp => cp.userId === creator.id);
+    
+    if (creatorProfile) {
+      const post = await prisma.post.create({
+        data: {
+          title: postInfo.title,
+          content: postInfo.content,
+          creatorId: creatorProfile.id,
+          isPaidOnly: postInfo.isPaidOnly,
+        }
+      });
+
+      // Add media if image exists
+      if (postInfo.image) {
+        await prisma.postMedia.create({
+          data: {
+            url: postInfo.image,
+            type: 'photo',
+            postId: post.id,
+          }
+        });
+      }
+
+      // Add some random likes
+      const likesCount = Math.floor(Math.random() * 50) + 5;
+      const randomFans = faker.helpers.arrayElements(fans, Math.min(likesCount, fans.length));
+      for (const fan of randomFans) {
+        await prisma.like.create({
+          data: {
+            postId: post.id,
+            userId: fan.id,
+          }
+        });
+      }
+
+      // Add some random tips
+      if (Math.random() > 0.7) {
+        const tipAmount = Math.floor(Math.random() * 500) + 50;
+        const randomFan = faker.helpers.arrayElement(fans);
+        await prisma.tip.create({
+          data: {
+            postId: post.id,
+            userId: randomFan.id,
+            amount: tipAmount,
+          }
+        });
+      }
+
+      console.log(`  • Created post: "${postInfo.title}" by ${creator.name}`);
+    }
+  }
+
   console.log('\n🌱  Seeded Creator Accounts (use password "testing")');
   creators.forEach((c) => console.log(`  • ${c.email}`));
 

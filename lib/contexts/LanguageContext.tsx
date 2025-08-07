@@ -27,14 +27,29 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
   const [language, setLanguageState] = useState<Language>('en')
 
   useEffect(() => {
-    // Force reset to English for all users
-    localStorage.setItem('language', 'en');
-    setLanguageState('en');
+    // Read language preference from localStorage
+    // Check both 'selectedLanguage' (from landing page) and 'language' (from app)
+    const savedLanguage = localStorage.getItem('selectedLanguage') || localStorage.getItem('language') || 'en'
+    
+    // Validate that the saved language is supported
+    if (savedLanguage === 'en' || savedLanguage === 'hi') {
+      setLanguageState(savedLanguage as Language)
+      // Ensure both keys are set for consistency
+      localStorage.setItem('language', savedLanguage)
+      localStorage.setItem('selectedLanguage', savedLanguage)
+    } else {
+      // Default to English if invalid language
+      setLanguageState('en')
+      localStorage.setItem('language', 'en')
+      localStorage.setItem('selectedLanguage', 'en')
+    }
   }, [])
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang)
+    // Save to both keys for consistency
     localStorage.setItem('language', lang)
+    localStorage.setItem('selectedLanguage', lang)
   }
 
   const translations = getTranslations(language)

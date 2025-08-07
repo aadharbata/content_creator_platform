@@ -29,17 +29,25 @@ export async function GET(
         isPaid: true,
         subscriptionPrice: 0,
         trialDuration: null,
+        enableFreeTrial: false,
       });
     }
 
     console.log('✅ Found creator profile:', creatorProfile);
 
+    // Determine if free trial is enabled based on subscription type
+    // Handle legacy 'trial' type by converting it to 'paid' with enableFreeTrial
+    const isTrialType = creatorProfile.subscriptionType === 'trial';
+    const enableFreeTrial = isTrialType || (creatorProfile.subscriptionType === 'paid' && creatorProfile.trialDuration !== null);
+    const actualSubscriptionType = isTrialType ? 'paid' : creatorProfile.subscriptionType;
+
     // Return subscription settings for public viewing
     const responseData = {
-      subscriptionType: creatorProfile.subscriptionType || 'paid',
+      subscriptionType: actualSubscriptionType || 'paid',
       isPaid: creatorProfile.isPaid,
       subscriptionPrice: creatorProfile.subscriptionPrice,
       trialDuration: creatorProfile.trialDuration,
+      enableFreeTrial: enableFreeTrial,
     };
 
     console.log('📤 Returning public subscription data:', responseData);

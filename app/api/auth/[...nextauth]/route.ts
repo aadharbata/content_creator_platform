@@ -158,10 +158,10 @@ export const authOptions = {
     async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
       console.log('🔐 Redirect callback:', { url, baseUrl });
       
-      // For OAuth callbacks, let the frontend handle the redirect
+      // For OAuth callbacks, redirect to home page
       if (url.includes('callback') || url === baseUrl || url === `${baseUrl}/`) {
-        console.log('🔐 OAuth completed - defaulting to login page for frontend redirect');
-        return `${baseUrl}/login`;
+        console.log('🔐 OAuth completed - redirecting to home page');
+        return `${baseUrl}/`;
       }
       
       // For other redirects, use default behavior  
