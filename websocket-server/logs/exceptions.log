@@ -81,3 +81,1011 @@ Error: listen EADDRINUSE: address already in use :::3001
     }
   ]
 }
+2025-08-08 21:48:30 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 08 2025 21:48:30 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 17536,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 89047040,
+      "heapTotal": 34185216,
+      "heapUsed": 17736232,
+      "external": 3657259,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 381322.625
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-08 21:50:04 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 08 2025 21:50:04 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 23124,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 96268288,
+      "heapTotal": 35483648,
+      "heapUsed": 19103656,
+      "external": 3657259,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 381417.359
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-08 23:39:48 [ERROR]: uncaughtException: Cannot read properties of undefined (reading 'length')
+TypeError: Cannot read properties of undefined (reading 'length')
+    at Socket.<anonymous> (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:421:32)
+    at Socket.emit (node:events:524:28)
+    at Socket.emitUntyped (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\typed-events.js:69:22)
+    at C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\socket.js:697:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+TypeError: Cannot read properties of undefined (reading 'length')
+    at Socket.<anonymous> (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:421:32)
+    at Socket.emit (node:events:524:28)
+    at Socket.emitUntyped (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\typed-events.js:69:22)
+    at C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\socket.js:697:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+{
+  "error": {},
+  "exception": true,
+  "date": "Fri Aug 08 2025 23:39:48 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 25664,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 18681856,
+      "heapTotal": 20553728,
+      "heapUsed": 18276600,
+      "external": 3528457,
+      "arrayBuffers": 72727
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 388000.562
+  },
+  "trace": [
+    {
+      "column": 32,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": null,
+      "line": 421,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 28,
+      "file": "node:events",
+      "function": "Socket.emit",
+      "line": 524,
+      "method": "emit",
+      "native": false
+    },
+    {
+      "column": 22,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\typed-events.js",
+      "function": "Socket.emitUntyped",
+      "line": 69,
+      "method": "emitUntyped",
+      "native": false
+    },
+    {
+      "column": 39,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\socket.js",
+      "function": null,
+      "line": 697,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 11,
+      "file": "node:internal/process/task_queues",
+      "function": "process.processTicksAndRejections",
+      "line": 85,
+      "method": "processTicksAndRejections",
+      "native": false
+    }
+  ]
+}
+2025-08-08 23:48:16 [ERROR]: uncaughtException: Cannot read properties of undefined (reading 'length')
+TypeError: Cannot read properties of undefined (reading 'length')
+    at Socket.<anonymous> (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:421:32)
+    at Socket.emit (node:events:524:28)
+    at Socket.emitUntyped (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\typed-events.js:69:22)
+    at C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\socket.js:697:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+TypeError: Cannot read properties of undefined (reading 'length')
+    at Socket.<anonymous> (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:421:32)
+    at Socket.emit (node:events:524:28)
+    at Socket.emitUntyped (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\typed-events.js:69:22)
+    at C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\socket.js:697:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+{
+  "error": {},
+  "exception": true,
+  "date": "Fri Aug 08 2025 23:48:16 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 8628,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 75804672,
+      "heapTotal": 20803584,
+      "heapUsed": 18424832,
+      "external": 3520101,
+      "arrayBuffers": 64371
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 388508.968
+  },
+  "trace": [
+    {
+      "column": 32,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": null,
+      "line": 421,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 28,
+      "file": "node:events",
+      "function": "Socket.emit",
+      "line": 524,
+      "method": "emit",
+      "native": false
+    },
+    {
+      "column": 22,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\typed-events.js",
+      "function": "Socket.emitUntyped",
+      "line": 69,
+      "method": "emitUntyped",
+      "native": false
+    },
+    {
+      "column": 39,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\socket.js",
+      "function": null,
+      "line": 697,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 11,
+      "file": "node:internal/process/task_queues",
+      "function": "process.processTicksAndRejections",
+      "line": 85,
+      "method": "processTicksAndRejections",
+      "native": false
+    }
+  ]
+}
+2025-08-08 23:49:39 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 08 2025 23:49:39 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 16572,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 102830080,
+      "heapTotal": 37249024,
+      "heapUsed": 21269448,
+      "external": 3636725,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 388591.421
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-08 23:50:48 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 08 2025 23:50:48 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 21660,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 101265408,
+      "heapTotal": 37249024,
+      "heapUsed": 21329856,
+      "external": 3636725,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 388661.203
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-08 23:51:38 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 08 2025 23:51:38 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 27700,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 101838848,
+      "heapTotal": 37249024,
+      "heapUsed": 21273672,
+      "external": 3636725,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 388711.343
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-08 23:51:48 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 08 2025 23:51:48 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 29876,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 101330944,
+      "heapTotal": 37249024,
+      "heapUsed": 21268848,
+      "external": 3636725,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 388720.5
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-08 23:54:24 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 08 2025 23:54:24 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 22332,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 105099264,
+      "heapTotal": 37249024,
+      "heapUsed": 21325944,
+      "external": 3636725,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 388876.953
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-09 13:19:03 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:645:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Sat Aug 09 2025 13:19:03 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 28700,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 98766848,
+      "heapTotal": 37249024,
+      "heapUsed": 21372672,
+      "external": 3636725,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 437156
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 645,
+      "method": null,
+      "native": false
+    }
+  ]
+}
+2025-08-09 13:30:50 [ERROR]: uncaughtException: Cannot read properties of undefined (reading 'length')
+TypeError: Cannot read properties of undefined (reading 'length')
+    at Socket.<anonymous> (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:421:32)
+    at Socket.emit (node:events:524:28)
+    at Socket.emitUntyped (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\typed-events.js:69:22)
+    at C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\socket.js:697:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+TypeError: Cannot read properties of undefined (reading 'length')
+    at Socket.<anonymous> (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:421:32)
+    at Socket.emit (node:events:524:28)
+    at Socket.emitUntyped (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\typed-events.js:69:22)
+    at C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\node_modules\socket.io\dist\socket.js:697:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+{
+  "error": {},
+  "exception": true,
+  "date": "Sat Aug 09 2025 13:30:50 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 10088,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 15044608,
+      "heapTotal": 21331968,
+      "heapUsed": 18895216,
+      "external": 3520285,
+      "arrayBuffers": 64555
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 437863.062
+  },
+  "trace": [
+    {
+      "column": 32,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": null,
+      "line": 421,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 28,
+      "file": "node:events",
+      "function": "Socket.emit",
+      "line": 524,
+      "method": "emit",
+      "native": false
+    },
+    {
+      "column": 22,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\typed-events.js",
+      "function": "Socket.emitUntyped",
+      "line": 69,
+      "method": "emitUntyped",
+      "native": false
+    },
+    {
+      "column": 39,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\node_modules\\socket.io\\dist\\socket.js",
+      "function": null,
+      "line": 697,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 11,
+      "file": "node:internal/process/task_queues",
+      "function": "process.processTicksAndRejections",
+      "line": 85,
+      "method": "processTicksAndRejections",
+      "native": false
+    }
+  ]
+}
+2025-08-09 14:00:00 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:629:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:629:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Sat Aug 09 2025 14:00:00 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 13200,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 95199232,
+      "heapTotal": 35487744,
+      "heapUsed": 19044888,
+      "external": 3657259,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 439612.64
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 629,
+      "method": null,
+      "native": false
+    }
+  ]
+}

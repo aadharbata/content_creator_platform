@@ -128,6 +128,79 @@ export default function ConsumerChannelPage() {
   const [processedDmIds, setProcessedDmIds] = useState<Set<string>>(new Set());
   const [newChatUserId, setNewChatUserId] = useState("");
   const [messageInput, setMessageInput] = useState("");
+
+  // Load chat tabs from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      const savedTabs = localStorage.getItem(`dmTabs_${user.id}`);
+      const savedActiveTab = localStorage.getItem(`activeDmTab_${user.id}`);
+      
+      if (savedTabs) {
+        try {
+          const parsedTabs = JSON.parse(savedTabs);
+          // Convert timestamp strings back to Date objects
+          const tabsWithDates = parsedTabs.map((tab: any) => ({
+            ...tab,
+            messages: tab.messages.map((msg: any) => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp)
+            }))
+          }));
+          
+          // Use setTimeout to avoid state updates during render
+          setTimeout(() => {
+            setDmTabs(tabsWithDates);
+            
+            if (savedActiveTab && tabsWithDates.find((tab: any) => tab.id === savedActiveTab)) {
+              setActiveDmTabId(savedActiveTab);
+            }
+
+            // Refresh messages for all tabs from database
+            tabsWithDates.forEach(async (tab: DmTab) => {
+              try {
+                const messagesResponse = await axios.get(`/api/messages?roomId=${tab.roomId}`);
+                if (messagesResponse.data.success && messagesResponse.data.messages.length > 0) {
+                  setDmTabs(prevTabs => 
+                    prevTabs.map(prevTab => 
+                      prevTab.id === tab.id 
+                        ? { ...prevTab, messages: messagesResponse.data.messages }
+                        : prevTab
+                    )
+                  );
+                }
+              } catch (error) {
+                console.log(`No new messages found for room ${tab.roomId}`);
+              }
+            });
+          }, 0);
+        } catch (error) {
+          console.error('Error loading saved chat tabs:', error);
+        }
+      }
+    }
+  }, [user?.id]);
+
+  // Save chat tabs to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id && dmTabs.length > 0) {
+      localStorage.setItem(`dmTabs_${user.id}`, JSON.stringify(dmTabs));
+    }
+  }, [dmTabs, user?.id]);
+
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id && activeDmTabId) {
+      localStorage.setItem(`activeDmTab_${user.id}`, activeDmTabId);
+    }
+  }, [activeDmTabId, user?.id]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2,11)}-${Math.random().toString(36).slice(2,6)}`;
 
   const sidebarLinks = [
@@ -207,30 +280,97 @@ export default function ConsumerChannelPage() {
     const s = io(URL, { reconnectionAttempts: 5, reconnectionDelay: 1000, autoConnect: false, withCredentials: false });
     setDmSocket(s);
     s.on('connect', () => {
+      console.log('WebSocket connected, rejoining rooms');
       s.emit('join', { userId: user.id, userName: user.name || 'User' });
+      
+      // Rejoin all existing chat rooms
+      dmTabs.forEach(tab => {
+        s.emit('joinRoom', { roomId: tab.roomId, userId: user.id, targetUserId: tab.targetUserId });
+      });
     });
     s.on('disconnect', () => {
-      setDmTabs([]); setActiveDmTabId(null); setPendingDmMessages([]); setProcessedDmIds(new Set());
+      console.log('WebSocket disconnected - chat tabs preserved');
+      // Don't clear chat tabs on disconnect - they're persisted in localStorage
     });
     s.on('connect_error', () => {
       // no alert spam in integrated UI
       console.error('WebSocket connect error - ensure server running on 3001');
     });
-    s.on('receiveMessage', (message: TestMessage) => {
+    s.on('receiveMessage', (message: any) => {
+      console.log('Received new message:', message);
       if (processedDmIds.has(message.id)) return;
       setProcessedDmIds(prev => new Set(prev).add(message.id));
+      
+      // Convert server message format to our format
+      const convertedMessage: TestMessage = {
+        id: message.id,
+        text: message.text,
+        senderId: message.senderId,
+        senderName: message.senderName,
+        timestamp: new Date(message.timestamp)
+      };
+      
+      // Don't show messages from yourself (they're already added when sending)
+      if (message.senderId === user.id) return;
+      
       setDmTabs(prev => {
         const existing = prev.find(t => t.targetUserId === message.senderId);
         if (existing) {
           const exists = existing.messages.some(m => m.id === message.id);
           if (exists) return prev;
-          return prev.map(t => t.targetUserId === message.senderId ? { ...t, messages: [...t.messages, message], unreadCount: t.id === activeDmTabId ? 0 : t.unreadCount + 1 } : t);
+          return prev.map(t => t.targetUserId === message.senderId ? { ...t, messages: [...t.messages, convertedMessage], unreadCount: t.id === activeDmTabId ? 0 : t.unreadCount + 1 } : t);
         } else {
-          setPendingDmMessages(p => p.some(m => m.id === message.id) ? p : [...p, message]);
-          return prev;
+          // Auto-create new chat tab for incoming message
+          console.log('Creating new chat tab for incoming message from:', message.senderName);
+          const participants = [user.id, message.senderId].sort();
+          const roomId = `dm_${participants.join('_')}`;
+          const tabId = generateId();
+          
+          const newTab: DmTab = { 
+            id: tabId, 
+            targetUserId: message.senderId, 
+            targetUserName: message.senderName,
+            roomId, 
+            messages: [
+              { id: generateId(), text: `🏠 Started chat with ${message.senderName}`, senderId: 'system', senderName: 'System', timestamp: new Date() },
+              convertedMessage
+            ], 
+            unreadCount: 1 // Mark as unread since it's a new message
+          };
+          
+          return [...prev, newTab];
         }
       });
+      
+      // Show a notification for the new message
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification(`New message from ${message.senderName}`, {
+            body: message.text,
+            icon: '/favicon.ico'
+          });
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              new Notification(`New message from ${message.senderName}`, {
+                body: message.text,
+                icon: '/favicon.ico'
+              });
+            }
+          });
+        }
+      }
     });
+    
+    s.on('message_sent', (message: any) => {
+      console.log('Message sent confirmation:', message);
+      // This is just a confirmation, the message is already added to UI
+    });
+    
+    s.on('error', (error: any) => {
+      console.error('WebSocket error:', error);
+    });
+    
     s.on('autoCreateChat', (data: { targetUserId: string; targetUserName: string; roomId: string }) => {
       setDmTabs(prev => {
         const exists = prev.find(t => t.targetUserId === data.targetUserId);
@@ -253,35 +393,200 @@ export default function ConsumerChannelPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, status, user?.id]);
 
-  const createNewChat = () => {
-    if (!dmSocket || !newChatUserId || !user) return;
-    if (newChatUserId === user.id) return;
-    const participants = [user.id, newChatUserId].sort();
-    const roomId = `dm_${participants.join('_')}`;
-    const tabId = generateId();
-    dmSocket.emit('joinRoom', { roomId, userId: user.id, targetUserId: newChatUserId });
-    const newTab: DmTab = { id: tabId, targetUserId: newChatUserId, roomId, messages: [{ id: generateId(), text: `🏠 Started chat with ${newChatUserId}`, senderId: 'system', senderName: 'System', timestamp: new Date() }], unreadCount: 0 };
-    setDmTabs(prev => [...prev, newTab]);
-    setActiveDmTabId(tabId);
-    setNewChatUserId("");
+  const createNewChat = async () => {
+    if (!dmSocket || !newChatUserId || !user) {
+      console.log("Cannot create chat:", { dmSocket: !!dmSocket, newChatUserId, user: !!user });
+      return;
+    }
+    if (newChatUserId === user.id) {
+      console.log("Cannot chat with yourself");
+      return;
+    }
+    
+    console.log("Creating new chat with:", newChatUserId);
+    
+    try {
+      // Try to get user name from search results first (if clicked from search)
+      let targetUserName = newChatUserId;
+      
+      // Check if we have this user in search results
+      const foundUser = searchResults.find(u => u.id === newChatUserId);
+      if (foundUser) {
+        targetUserName = foundUser.name;
+        console.log("Found user in search results:", foundUser.name);
+      } else {
+        // Try to fetch user details from API by exact ID
+        try {
+          const response = await axios.get(`/api/users/search?id=${newChatUserId}`);
+          if (response.data.success && response.data.users.length > 0) {
+            const targetUser = response.data.users[0];
+            targetUserName = targetUser.name;
+            console.log("Found user via API by ID:", targetUser.name);
+          }
+        } catch (apiError) {
+          console.error("Error fetching user details:", apiError);
+        }
+      }
+      
+      const participants = [user.id, newChatUserId].sort();
+      const roomId = `dm_${participants.join('_')}`;
+      const tabId = generateId();
+      
+      console.log("Joining room:", roomId);
+      dmSocket.emit('joinRoom', { roomId, userId: user.id, targetUserId: newChatUserId });
+      
+      // Load existing messages for this room
+      let existingMessages: TestMessage[] = [];
+      try {
+        const messagesResponse = await axios.get(`/api/messages?roomId=${roomId}`);
+        if (messagesResponse.data.success) {
+          existingMessages = messagesResponse.data.messages;
+          console.log("Loaded existing messages:", existingMessages.length);
+        }
+      } catch (error) {
+        console.log("No existing messages found for this room");
+      }
+      
+      const newTab: DmTab = { 
+        id: tabId, 
+        targetUserId: newChatUserId, 
+        targetUserName: targetUserName,
+        roomId, 
+        messages: existingMessages.length > 0 ? existingMessages : [{ id: generateId(), text: `🏠 Started chat with ${targetUserName}`, senderId: 'system', senderName: 'System', timestamp: new Date() }], 
+        unreadCount: 0 
+      };
+      
+      console.log("Creating new tab:", newTab);
+      setDmTabs(prev => [...prev, newTab]);
+      setActiveDmTabId(tabId);
+      setNewChatUserId("");
+      
+      console.log("Chat created successfully!");
+    } catch (error) {
+      console.error("Error creating chat:", error);
+      // Fallback to using user ID if name fetch fails
+      const participants = [user.id, newChatUserId].sort();
+      const roomId = `dm_${participants.join('_')}`;
+      const tabId = generateId();
+      dmSocket.emit('joinRoom', { roomId, userId: user.id, targetUserId: newChatUserId });
+      const newTab: DmTab = { 
+        id: tabId, 
+        targetUserId: newChatUserId, 
+        targetUserName: newChatUserId,
+        roomId, 
+        messages: [{ id: generateId(), text: `🏠 Started chat with ${newChatUserId}`, senderId: 'system', senderName: 'System', timestamp: new Date() }], 
+        unreadCount: 0 
+      };
+      setDmTabs(prev => [...prev, newTab]);
+      setActiveDmTabId(tabId);
+      setNewChatUserId("");
+    }
   };
 
-  const sendDm = () => {
+  const sendDm = async () => {
     if (!dmSocket || !activeDmTab || !user || !messageInput.trim()) return;
-    const message: TestMessage = { id: generateId(), text: messageInput.trim(), senderId: user.id, senderName: user.name || 'User', timestamp: new Date() };
-    dmSocket.emit('sendMessage', { ...message, roomId: activeDmTab.roomId, targetUserId: activeDmTab.targetUserId });
-    setDmTabs(prev => prev.map(t => t.id === activeDmTabId ? { ...t, messages: [...t.messages, message] } : t));
-    setProcessedDmIds(prev => new Set(prev).add(message.id));
-    setMessageInput("");
+    
+    const messageText = messageInput.trim();
+    setMessageInput(""); // Clear input immediately
+    
+    // Create message object for UI
+    const message: TestMessage = { 
+      id: generateId(), 
+      text: messageText, 
+      senderId: user.id, 
+      senderName: user.name || 'User', 
+      timestamp: new Date() 
+    };
+    
+    // Add message to UI immediately
+    setDmTabs(prev => prev.map(t => t.id === activeDmTabId ? { 
+      ...t, 
+      messages: [...t.messages, message] 
+    } : t));
+    
+    try {
+      // Save message to database
+      const response = await axios.post('/api/messages', {
+        roomId: activeDmTab.roomId,
+        content: messageText
+      });
+      
+      if (response.data.success) {
+        console.log("Message saved to database successfully");
+      }
+    } catch (error) {
+      console.error("Error saving message to database:", error);
+      // Message is still in UI, just not saved to DB
+    }
+    
+    // Send to websocket for real-time delivery (optional)
+    try {
+      dmSocket.emit('sendMessage', { 
+        conversationId: activeDmTab.roomId,
+        content: messageText
+      });
+      console.log("Message sent via websocket");
+    } catch (wsError) {
+      console.error("Error sending via websocket:", wsError);
+      // Message is still in UI and saved to DB
+    }
   };
   const handleDmKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDm(); } };
 
   const handleResolveChatId = (oldId: string, newId: string) => {
     // Update chat id when placeholder conversation is created
-    setChats((prev) => prev.map((c) => (c.id === oldId ? { ...c, id: newId, placeholder: false } as ChatListItem : c)));
-    if (activeChatItem && activeChatItem.id === oldId) {
-      setActiveChatItem({ ...activeChatItem, id: newId, placeholder: false } as ChatListItem);
+    // This function is kept for compatibility with existing DM functionality
+  };
+
+  // Search users function
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
     }
+
+    try {
+      setIsSearching(true);
+      const response = await axios.get(`/api/users/search?q=${encodeURIComponent(query)}`);
+      if (response.data.success) {
+        setSearchResults(response.data.users);
+      }
+    } catch (error) {
+      console.error("Error searching users:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    if (query.trim()) {
+      searchUsers(query);
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  // Start chat with selected user
+  const startChatWithUser = (user: { id: string; name: string; email: string; role: string }) => {
+    if (!user || user.id === (session?.user as any)?.id) return;
+    
+    console.log("Starting chat with user:", user);
+    
+    // Fill the manual entry field with the selected user's ID
+    setNewChatUserId(user.id);
+    
+    // Clear search results and query
+    setSearchQuery("");
+    setSearchResults([]);
+    
+    // Automatically create the chat
+    setTimeout(() => {
+      createNewChat();
+    }, 100);
   };
 
   const fetchTopCreators = async () => {
@@ -1371,16 +1676,79 @@ export default function ConsumerChannelPage() {
                         <h3 className="text-xl font-bold">Direct Messages</h3>
                         <p className="text-blue-100 text-sm">Chat with creators or users in real-time</p>
                       </div>
+                      
+                      {/* Search Section */}
                       <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-800">
-                        <div className="flex gap-3 items-end">
-                          <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start New Chat (User ID)</label>
-                            <input value={newChatUserId} onChange={(e)=>setNewChatUserId(e.target.value)} placeholder="Enter user ID to chat with" className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search Users</label>
+                          <div className="relative">
+                            <input 
+                              value={searchQuery} 
+                              onChange={handleSearchChange}
+                              placeholder="Search by name or email..." 
+                              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                            />
+                            {isSearching && (
+                              <div className="absolute right-3 top-2">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                              </div>
+                            )}
                           </div>
-                          <Button onClick={createNewChat} disabled={!newChatUserId} className="bg-blue-600 hover:bg-blue-700 text-white">Start Chat</Button>
+                          
+                          {/* Search Results */}
+                          {searchResults.length > 0 && (
+                            <div className="mt-2 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800">
+                              {searchResults.map((result) => (
+                                <div 
+                                  key={result.id}
+                                  onClick={() => {
+                                    console.log("Clicked on user:", result);
+                                    startChatWithUser(result);
+                                  }}
+                                  className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors active:bg-blue-100 dark:active:bg-blue-900/40"
+                                  style={{ userSelect: 'none' }}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="font-medium text-gray-900 dark:text-gray-100">{result.name}</div>
+                                      <div className="text-sm text-gray-500 dark:text-gray-400">{result.email}</div>
+                                    </div>
+                                    <Badge variant="secondary" className="text-xs ml-2">
+                                      {result.role}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">You are signed in as <span className="font-semibold">{user?.id}</span></div>
+                        
+                        {/* Manual User ID Entry */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start New Chat (User ID)</label>
+                          <div className="flex gap-2">
+                            <input 
+                              value={newChatUserId} 
+                              onChange={(e) => setNewChatUserId(e.target.value)} 
+                              placeholder="Enter user ID to chat with" 
+                              className="flex-1 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                            />
+                            <Button 
+                              onClick={createNewChat} 
+                              disabled={!newChatUserId} 
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Start Chat
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+                          Hey <span className="font-semibold">{user?.name}</span>! Ready to chat?
+                        </div>
                       </div>
+
+                      {/* Chat Tabs */}
                       {dmTabs.length > 0 && (
                         <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                           <div className="flex overflow-x-auto">
@@ -1400,33 +1768,62 @@ export default function ConsumerChannelPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Chat Messages */}
                       <div className="h-96 overflow-y-auto p-4 bg-white dark:bg-gray-900 space-y-3">
                         {dmTabs.length===0 ? (
                           <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
                             <div className="text-center">
-                              <p>No active chats</p>
-                              <p className="text-sm">Start a new chat to begin messaging</p>
+                              <div className="text-6xl mb-4">💬</div>
+                              <p className="text-lg font-medium">No active chats</p>
+                              <p className="text-sm mt-2">Search for users to start chatting</p>
                             </div>
                           </div>
                         ) : !activeDmTab ? (
-                          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">Select a chat tab to view messages</div>
+                          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                            <div className="text-center">
+                              <div className="text-6xl mb-4">💬</div>
+                              <p className="text-lg font-medium">Select a chat to start messaging</p>
+                              <p className="text-sm mt-2">Click on a chat tab above to begin a conversation</p>
+                            </div>
+                          </div>
                         ) : (
                           activeDmTab.messages.map(m => (
                             <div key={m.id} className={`flex ${m.senderId===user?.id?'justify-end':'justify-start'}`}>
                               <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${m.senderId==='system'?'bg-gray-200 text-gray-700 text-center italic':(m.senderId===user?.id?'bg-blue-600 text-white':'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100')}`}>
-                                {m.senderId!=='system' && m.senderId!==user?.id && (<div className="text-xs font-semibold mb-1">{m.senderName}</div>)}
+                                {m.senderId!=='system' && m.senderId!==user?.id && (
+                                  <div className="text-xs font-semibold mb-1 text-blue-600 dark:text-blue-400">
+                                    {m.senderName}
+                                  </div>
+                                )}
                                 <div className="break-words">{m.text}</div>
-                                <div className="text-xs opacity-75 mt-1">{new Date(m.timestamp).toLocaleTimeString()}</div>
+                                <div className="text-xs opacity-75 mt-1">
+                                  {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
                               </div>
                             </div>
                           ))
                         )}
                       </div>
+
+                      {/* Message Input */}
                       {activeDmTab && (
                         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                           <div className="flex gap-2">
-                            <Input value={messageInput} onChange={(e)=>setMessageInput(e.target.value)} onKeyPress={handleDmKey} placeholder={`Type a message to ${activeDmTab.targetUserName||activeDmTab.targetUserId}...`} className="flex-1" />
-                            <Button onClick={sendDm} disabled={!messageInput.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">Send</Button>
+                            <Input 
+                              value={messageInput} 
+                              onChange={(e) => setMessageInput(e.target.value)} 
+                              onKeyPress={handleDmKey} 
+                              placeholder={`Type a message to ${activeDmTab.targetUserName || activeDmTab.targetUserId}...`} 
+                              className="flex-1" 
+                            />
+                            <Button 
+                              onClick={sendDm} 
+                              disabled={!messageInput.trim()} 
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Send
+                            </Button>
                           </div>
                         </div>
                       )}

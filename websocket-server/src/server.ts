@@ -8,6 +8,9 @@ import rateLimit from 'express-rate-limit'
 import { checkDatabaseConnection, disconnectDatabase } from './utils/database'
 import { logger, socketLogger } from './utils/logger'
 import { authenticateSocket, AuthenticatedSocket } from './middleware/auth'
+
+// Helper function to generate unique IDs
+const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2,11)}-${Math.random().toString(36).slice(2,6)}`;
 import { MessageHandler } from './handlers/messageHandler'
 import { 
   ClientToServerEvents, 
@@ -157,7 +160,22 @@ const socketToUser = new Map<string, string>() // socketId -> userId
 
 // Socket connection handling
 io.on('connection', (socket: AuthenticatedSocket) => {
-  const { userId, userName, userRole } = socket.data
+  // Safely extract user data with null checking
+  const userId = socket.data?.userId;
+  const userName = socket.data?.userName;
+  const userRole = socket.data?.userRole;
+  
+  if (!userId || !userName || !userRole) {
+    socketLogger.error('Socket connection without proper authentication data', {
+      socketId: socket.id,
+      hasSocketData: !!socket.data,
+      userId,
+      userName,
+      userRole
+    });
+    socket.disconnect(true);
+    return;
+  }
   
   socketLogger.info('User connected', {
     socketId: socket.id,
@@ -413,106 +431,76 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     })
   })
 
-  socket.on('sendMessage', (data: { id: string, text: string, senderId: string, senderName: string, timestamp: Date, roomId: string, targetUserId: string }) => {
-    socketLogger.info('Test message sent', {
+  socket.on('sendMessage', (data: { conversationId: string, content: string }) => {
+    // Use the real user data from the join event instead of fake test data
+    const realUserId = (socket as any).testUserId || userId;
+    const realUserName = (socket as any).testUserName || userName;
+    
+    if (!realUserId || !realUserName) {
+      socketLogger.error('Socket user data not available', {
+        socketId: socket.id,
+        userId: realUserId,
+        userName: realUserName,
+        hasTestData: !!((socket as any).testUserId),
+        hasAuthData: !!(userId)
+      });
+      return;
+    }
+    
+    if (!data || !data.content || !data.conversationId) {
+      socketLogger.error('Invalid message data received', {
+        socketId: socket.id,
+        userId: realUserId,
+        data: data
+      });
+      return;
+    }
+
+    socketLogger.info('Direct message sent', {
       socketId: socket.id,
-      userId: data.senderId,
-      roomId: data.roomId,
-      messageLength: data.text.length,
-      targetUserId: data.targetUserId
+      userId: realUserId,
+      conversationId: data.conversationId,
+      messageLength: data.content.length
     })
     
     const message = {
-      id: data.id,
-      text: data.text,
-      senderId: data.senderId,
-      senderName: data.senderName,
-      timestamp: data.timestamp
+      id: generateId(),
+      text: data.content,
+      senderId: realUserId as string, // We've validated this is not null/undefined above
+      senderName: realUserName as string, // We've validated this is not null/undefined above
+      timestamp: new Date()
     }
     
-    // Check if target user is connected
-    const targetSocketId = connectedUsers.get(data.targetUserId)
-    
-    socketLogger.info('Checking target user connection', {
-      targetUserId: data.targetUserId,
-      targetSocketId,
-      connectedUsersCount: connectedUsers.size,
-      connectedUsersList: Array.from(connectedUsers.keys())
-    })
-    
-    if (targetSocketId) {
-      socketLogger.info('Target user is online', {
-        targetUserId: data.targetUserId,
-        targetSocketId
-      })
-      
-      // Target user is online - send message to room
-      socket.to(data.roomId).emit('receiveMessage', message)
-      
-      // Check if target user has joined the room, if not send directly and auto-create chat
-      const targetSocket = io.sockets.sockets.get(targetSocketId)
-      if (targetSocket) {
-        // Check if target user is in the room
-        const isInRoom = targetSocket.rooms.has(data.roomId)
-        
-        if (!isInRoom) {
-          // Target user hasn't joined the room yet, send directly and auto-create chat
-          targetSocket.emit('receiveMessage', message)
-          targetSocket.emit('autoCreateChat', {
-            targetUserId: data.senderId,
-            targetUserName: data.senderName,
-            roomId: data.roomId
-          })
-        }
-        // If they're in the room, they'll get the message via socket.to(data.roomId).emit above
-      }
-    } else {
-      socketLogger.info('Target user is offline, storing message', {
-        targetUserId: data.targetUserId,
-        messageId: data.id,
-        currentOfflineMessagesCount: offlineMessages.get(data.targetUserId)?.length || 0
-      })
-      
-      // Target user is offline - store message for delivery
-      if (!offlineMessages.has(data.targetUserId)) {
-        offlineMessages.set(data.targetUserId, [])
-        socketLogger.info('Created new offline message queue', {
-          targetUserId: data.targetUserId
-        })
-      }
-      
-      const userMessages = offlineMessages.get(data.targetUserId)!
-      
-      // Check for duplicate messages to prevent storing the same message twice
-      const messageExists = userMessages.some(msg => msg.id === data.id)
-      if (!messageExists) {
-        userMessages.push({
-          id: data.id,
-          text: data.text,
-          senderId: data.senderId,
-          senderName: data.senderName,
-          timestamp: data.timestamp,
-          roomId: data.roomId
-        })
-        
-        socketLogger.info('Message stored for offline user', {
-          targetUserId: data.targetUserId,
-          senderId: data.senderId,
-          offlineMessageCount: userMessages.length,
-          messageId: data.id,
-          allOfflineQueues: Array.from(offlineMessages.keys()).map(userId => ({
-            userId,
-            messageCount: offlineMessages.get(userId)?.length || 0
-          }))
-        })
-      } else {
-        socketLogger.info('Duplicate message not stored - message already exists', {
-          targetUserId: data.targetUserId,
-          messageId: data.id,
-          senderId: data.senderId
-        })
-      }
+    // Extract target user ID from conversationId (format: dm_userId1_userId2)
+    const roomParts = data.conversationId.split('_');
+    let targetUserId = '';
+    if (roomParts.length === 3 && roomParts[0] === 'dm') {
+      // Find the other user ID (not the sender)
+      targetUserId = roomParts[1] === (realUserId as string) ? roomParts[2] : roomParts[1];
     }
+    
+    if (!targetUserId) {
+      socketLogger.error('Could not extract target user ID from conversation ID', {
+        conversationId: data.conversationId,
+        senderId: realUserId
+      });
+      return;
+    }
+    
+    // Send message to all users in the room using the receiveMessage event
+    io.to(data.conversationId).emit('receiveMessage', message);
+    
+    // Also emit to sender for confirmation
+    socket.emit('message_sent', {
+      messageId: message.id,
+      status: 'delivered'
+    });
+    
+         socketLogger.info('Message sent to room', {
+       conversationId: data.conversationId,
+       targetUserId,
+       messageId: message.id
+     })
   })
 
   // Handle client errors

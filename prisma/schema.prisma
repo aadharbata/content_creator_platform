@@ -119,6 +119,7 @@ model User {
   ownedCommunities     Community[]        @relation("CreatorCommunities")
   communityMemberships CommunityMember[]
   communityMessages    CommunityMessage[] @relation("CommunityMessages")
+  directMessages       DirectMessage[] @relation("DirectMessages")
 
   @@index([name])
 }
@@ -387,6 +388,22 @@ model CommunityMessage {
   sender       User                  @relation("CommunityMessages", fields: [senderId], references: [id])
 
   @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+// Direct messages for simple chat system
+model DirectMessage {
+  id        String   @id @default(uuid())
+  content   String
+  roomId    String   // Simple room identifier
+  senderId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sender User @relation("DirectMessages", fields: [senderId], references: [id])
+
+  @@index([roomId, createdAt])
   @@index([senderId])
 }
 

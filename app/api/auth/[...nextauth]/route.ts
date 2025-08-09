@@ -158,15 +158,35 @@ export const authOptions = {
     async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
       console.log('🔐 Redirect callback:', { url, baseUrl });
       
-      // For OAuth callbacks, redirect to home page
-      if (url.includes('callback') || url === baseUrl || url === `${baseUrl}/`) {
-        console.log('🔐 OAuth completed - redirecting to home page');
-        return `${baseUrl}/`;
+      // For OAuth callbacks, redirect to login page so it can handle role-based redirection
+      if (url.includes('/api/auth/callback') || (url.includes('callback') && url.includes('oauth'))) {
+        console.log('🔐 OAuth callback - redirecting to login for role-based routing');
+        return `${baseUrl}/login?oauth_success=true`;
       }
       
-      // For other redirects, use default behavior  
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      return baseUrl;
+      // For successful sign-in, redirect to login page for role-based routing
+      if (url.includes('/api/auth/signin') && url.includes('?')) {
+        console.log('🔐 Sign-in success - redirecting to login for role-based routing');
+        return `${baseUrl}/login?signin_success=true`;
+      }
+      
+      // For any OAuth completion (when URL is just the base URL), redirect to login
+      if (url === baseUrl || url === `${baseUrl}/`) {
+        console.log('🔐 OAuth completed - redirecting to login for role-based routing');
+        return `${baseUrl}/login?oauth_success=true`;
+      }
+      
+      // For direct page navigation, don't interfere
+      if (url.startsWith('/')) {
+        console.log('🔐 Direct navigation - allowing:', url);
+        return `${baseUrl}${url}`;
+      }
+      
+
+      
+      // Default behavior
+      console.log('🔐 Default redirect behavior');
+      return url.startsWith("/") ? `${baseUrl}${url}` : baseUrl;
     },
     async signIn({ user, account, profile }: { user: User; account: Account | null; profile?: any }) {
       console.log('🔐 SignIn callback triggered:', { provider: account?.provider, email: user.email });

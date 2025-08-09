@@ -39,25 +39,38 @@ const Login = () => {
     console.log("🔍 Login page - Session status:", status);
     console.log("🔍 Login page - Session data:", session);
     
+    // Only redirect if user just logged in successfully, not if they manually navigated to login page
     if (status === 'authenticated' && session?.user) {
       const userRole = (session.user as any).role;
       const userId = (session.user as any).id;
       
-      console.log("✅ Session authenticated, redirecting...", { userRole, userId });
+      // Check if this is a fresh login (has a success message, came from sign-in, or OAuth success)
+      const isFromSignIn = searchParams?.get('from') === 'signin' || success || 
+                           searchParams?.get('oauth_success') === 'true' || 
+                           searchParams?.get('signin_success') === 'true';
       
-      // Redirect to appropriate dashboard based on role
-      if (userRole === 'CREATOR' && userId) {
-        console.log("👨‍💻 Directing to creator dashboard!");
-        router.push(`/creator/${userId}/dashboard`);
-      } else if (userRole === 'CONSUMER') {
-        console.log("👤 Directing to consumer channel!");
-        router.push('/consumer-channel');
+      console.log("✅ Session authenticated", { userRole, userId, isFromSignIn });
+      
+      // Only auto-redirect if this was a successful login, not manual navigation
+      if (isFromSignIn) {
+        console.log("🔄 Auto-redirecting after successful login...");
+        
+        // Redirect to appropriate dashboard based on role
+        if (userRole === 'CREATOR' && userId) {
+          console.log("👨‍💻 Directing to creator dashboard!");
+          router.push(`/creator/${userId}/dashboard`);
+        } else if (userRole === 'CONSUMER') {
+          console.log("👤 Directing to consumer channel!");
+          router.push('/consumer-channel');
+        } else {
+          console.log("❓ Unknown role, directing to home");
+          router.push('/');
+        }
       } else {
-        console.log("❓ Unknown role, directing to home");
-        router.push('/');
+        console.log("🔍 User manually navigated to login page while authenticated - allowing");
       }
     }
-  }, [session, status, router]);
+  }, [session, status, router, searchParams, success]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });

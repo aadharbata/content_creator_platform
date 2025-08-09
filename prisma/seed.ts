@@ -285,8 +285,7 @@ async function main() {
         rating: productInfo.rating,
         salesCount: productInfo.salesCount,
         status: 'PUBLISHED',
-        creatorId: creator.id,
-        categoryId: category?.id
+        creatorId: creator.id
       }
     });
 
