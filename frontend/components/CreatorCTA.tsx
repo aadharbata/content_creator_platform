@@ -14,53 +14,79 @@ export default function CreatorCTA({ language, translations }: CreatorCTAProps) 
   const router = useRouter()
 
   return (
-    <section className="py-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white relative overflow-hidden">
-      <div className="absolute inset-0 bg-black/20" />
-      <div className="absolute inset-0 bg-[url('/placeholder.svg?height=600&width=1200')] opacity-10" />
-
+    <section className="py-20 bg-gradient-to-r from-blue-900 via-purple-600 to-pink-600 dark:from-blue-800 dark:via-purple-700 dark:to-pink-700 text-white relative overflow-hidden">
       <div className="container mx-auto px-4 relative">
         <div className="text-center max-w-4xl mx-auto">
-          <h2 className="text-4xl lg:text-6xl font-bold mb-6">{t.forCreators}</h2>
-          <p className="text-xl lg:text-2xl mb-12 opacity-90">{t.creatorCTA}</p>
+          {/* Main Headline */}
+          <h2 className="text-4xl lg:text-5xl font-bold mb-6">
+            {language === 'hi' ? 'बेचना शुरू करने के लिए तैयार हैं?' : 'Ready to Start Selling?'}
+          </h2>
+          
+          {/* Subtitle */}
+          <p className="text-xl text-blue-100 dark:text-blue-200 mb-12 max-w-2xl mx-auto">
+            {language === 'hi' 
+              ? 'हजारों क्रिएटर्स में शामिल हों जो अपने जुनून से कमाई कर रहे हैं'
+              : 'Join thousands of creators earning from their passion'
+            }
+          </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          {/* Three Steps */}
+          <div className="grid md:grid-cols-3 gap-8 mb-12">
+            {/* Step 1 */}
             <div className="text-center">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
-                <Upload className="w-8 h-8" />
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Upload className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">{language === "en" ? "Upload Content" : "कंटेंट अपलोड करें"}</h3>
-              <p className="opacity-80">
-                {language === "en" ? "Share your knowledge with the world" : "दुनिया के साथ अपना ज्ञान साझा करें"}
+              <h3 className="text-xl font-semibold mb-2">
+                {language === 'hi' ? 'कंटेंट अपलोड करें' : 'Upload Content'}
+              </h3>
+              <p className="text-blue-100 dark:text-blue-200">
+                {language === 'hi' 
+                  ? 'दुनिया के साथ अपना ज्ञान साझा करें'
+                  : 'Share your knowledge with the world'
+                }
               </p>
             </div>
 
+            {/* Step 2 */}
             <div className="text-center">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8" />
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">{language === "en" ? "Build Audience" : "ऑडियंस बनाएं"}</h3>
-              <p className="opacity-80">
-                {language === "en" ? "Connect with learners globally" : "दुनियाभर के शिक्षार्थियों से जुड़ें"}
+              <h3 className="text-xl font-semibold mb-2">
+                {language === 'hi' ? 'ऑडियंस बनाएं' : 'Build Audience'}
+              </h3>
+              <p className="text-blue-100 dark:text-blue-200">
+                {language === 'hi' 
+                  ? 'विश्व स्तर पर सीखने वालों से जुड़ें'
+                  : 'Connect with learners globally'
+                }
               </p>
             </div>
 
+            {/* Step 3 */}
             <div className="text-center">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="w-8 h-8" />
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingUp className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">{language === "en" ? "Earn Revenue" : "आय अर्जित करें"}</h3>
-              <p className="opacity-80">
-                {language === "en" ? "Keep up to 90% of your earnings" : "अपनी कमाई का 90% तक रखें"}
+              <h3 className="text-xl font-semibold mb-2">
+                {language === 'hi' ? 'राजस्व कमाएं' : 'Earn Revenue'}
+              </h3>
+              <p className="text-blue-100 dark:text-blue-200">
+                {language === 'hi' 
+                  ? 'अपनी कमाई का 90% तक रखें'
+                  : 'Keep up to 90% of your earnings'
+                }
               </p>
             </div>
           </div>
 
-          <Button 
-            size="lg" 
-            className="bg-white text-blue-600 hover:bg-gray-100 text-xl px-12 py-6 h-auto font-bold cursor-pointer"
-            onClick={() => router.push('/signup')}
+          {/* CTA Button */}
+          <Button
+            onClick={() => router.push('/signup-creator')}
+            className="bg-white text-purple-600 hover:bg-gray-100 dark:hover:bg-gray-200 px-8 py-4 text-lg font-semibold rounded-lg transition-all duration-200 hover:shadow-xl"
           >
-            {t.getStarted}
+            {language === 'hi' ? 'मुफ्त में शुरू करें' : 'Get Started Free'}
           </Button>
         </div>
       </div>

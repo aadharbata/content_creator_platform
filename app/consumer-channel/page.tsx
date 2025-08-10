@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -36,7 +36,9 @@ import {
   Mail,
   Loader2,
   Save,
-  Trash2
+  Trash2,
+  Package,
+  Star
 } from "lucide-react";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
@@ -154,6 +156,14 @@ export default function ConsumerChannelPage() {
   const [processedDmIds, setProcessedDmIds] = useState<Set<string>>(new Set());
   const [newChatUserId, setNewChatUserId] = useState("");
   const [messageInput, setMessageInput] = useState("");
+
+  // My Products state
+  const [myProducts, setMyProducts] = useState<any[]>([]);
+  const [myProductsLoading, setMyProductsLoading] = useState(false);
+
+  // Product Store state
+  const [storeProducts, setStoreProducts] = useState<any[]>([]);
+  const [storeProductsLoading, setStoreProductsLoading] = useState(false);
 
   // Load chat tabs from localStorage on mount
   useEffect(() => {
@@ -317,31 +327,44 @@ export default function ConsumerChannelPage() {
             setUserData(profileData);
             setDisplayUserData(profileData); // Also set display data
           } else {
-            console.error('Failed to fetch profile, status:', response.status);
-            // Fallback to session data
-            const fallbackData = {
-              name: (session.user as any).name || '',
-              email: (session.user as any).email || '',
-              avatarUrl: (session.user as any).image || null
+            console.log('Profile fetch failed, using session data');
+            const sessionData = {
+              name: session.user?.name || '',
+              email: session.user?.email || '',
+              avatarUrl: session.user?.image || null
             };
-            setUserData(fallbackData);
-            setDisplayUserData(fallbackData);
+            setUserData(sessionData);
+            setDisplayUserData(sessionData);
           }
         } catch (error) {
-          console.error('Failed to fetch user profile:', error);
-          // Fallback to session data on error
-          const fallbackData = {
-            name: (session.user as any).name || '',
-            email: (session.user as any).email || '',
-            avatarUrl: (session.user as any).image || null
+          console.error('Error fetching user profile:', error);
+          const sessionData = {
+            name: session.user?.name || '',
+            email: session.user?.email || '',
+            avatarUrl: session.user?.image || null
           };
-          setUserData(fallbackData);
-          setDisplayUserData(fallbackData);
+          setUserData(sessionData);
+          setDisplayUserData(sessionData);
         }
       };
+
       fetchUserProfile();
     }
   }, [session]);
+
+  // Fetch my products when tab is active
+  useEffect(() => {
+    if (activeTab === 'my-products') {
+      fetchMyProducts();
+    }
+  }, [activeTab]);
+
+  // Fetch store products when tab is active
+  useEffect(() => {
+    if (activeTab === 'product-store' && storeProducts.length === 0 && !storeProductsLoading) {
+      fetchStoreProducts();
+    }
+  }, [activeTab, storeProducts.length, storeProductsLoading]);
 
   // --- DM Chat: auto-connect using session user ---
   const activeDmTab = dmTabs.find(t => t.id === activeDmTabId) || null;
@@ -713,18 +736,60 @@ export default function ConsumerChannelPage() {
 
   const fetchUserTips = async () => {
     try {
-      const response = await axios.get("/api/user/tips");
-      if (response.data.success) {
-        const tipsMap: { [key: string]: number } = {};
-        response.data.tips.forEach((tip: any) => {
-          tipsMap[tip.postId] = tip.amount;
-        });
-        setTipAmounts(tipsMap);
+      const response = await fetch('/api/user/tips');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const tipsMap: { [key: string]: number } = {};
+          data.tips.forEach((tip: any) => {
+            tipsMap[tip.postId] = tip.amount;
+          });
+          setTipAmounts(tipsMap);
+        }
       }
     } catch (error) {
-      console.error("Error fetching user tips:", error);
+      console.error('Error fetching user tips:', error);
     }
   };
+
+  const fetchMyProducts = async () => {
+    try {
+      setMyProductsLoading(true);
+      const response = await fetch('/api/my-products?page=1&limit=50');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMyProducts(data.products || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching my products:', error);
+    } finally {
+      setMyProductsLoading(false);
+    }
+  };
+
+  const fetchStoreProducts = useCallback(async () => {
+    try {
+      // Prevent multiple simultaneous requests
+      if (storeProductsLoading) return;
+      
+      setStoreProductsLoading(true);
+      const response = await fetch('/api/products?page=1&limit=50', {
+        cache: 'force-cache' // Use Next.js caching
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setStoreProducts(data.products || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching store products:', error);
+    } finally {
+      setStoreProductsLoading(false);
+    }
+  }, [storeProductsLoading]);
 
   const handleLogout = async () => {
     try {
@@ -1880,15 +1945,231 @@ export default function ConsumerChannelPage() {
 
                 {activeTab === "product-store" && (
                   <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Product Store</h2>
-                    <p className="text-gray-500 dark:text-gray-400">Browse and purchase amazing products from creators.</p>
+                    <div className="text-center mb-8">
+                      <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Product Store</h2>
+                      <p className="text-gray-500 dark:text-gray-400 text-lg">Browse and purchase amazing products from creators.</p>
+                    </div>
+                    
+                    {storeProductsLoading ? (
+                      <div className="flex items-center justify-center py-16">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                          <p className="text-gray-500 dark:text-gray-400 text-lg">Loading amazing products...</p>
+                        </div>
+                      </div>
+                    ) : storeProducts.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                        {storeProducts.map((product) => (
+                          <div key={product.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700 group min-w-0">
+                            {/* Product Image */}
+                            <div className="relative h-56 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+                              {product.thumbnail && product.thumbnail !== '/placeholder.svg' ? (
+                                <img 
+                                  src={product.thumbnail} 
+                                  alt={product.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const fallback = target.parentElement?.querySelector('.image-fallback') as HTMLElement;
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              
+                              {/* Fallback for missing/broken images */}
+                              <div 
+                                className={`image-fallback w-full h-full flex items-center justify-center ${product.thumbnail && product.thumbnail !== '/placeholder.svg' ? 'hidden' : ''}`}
+                              >
+                                <div className="text-center">
+                                  <Package className="w-16 h-16 text-gray-400 mx-auto mb-2" />
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">No Image</p>
+                                </div>
+                              </div>
+                              
+                              {/* Product Type Badge */}
+                              <div className="absolute top-3 right-3">
+                                <span className="bg-orange-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-lg">
+                                  {product.type}
+                                </span>
+                              </div>
+                              
+                              {/* Price Badge */}
+                              <div className="absolute bottom-3 left-3">
+                                <span className="bg-white dark:bg-gray-800 text-orange-500 text-lg font-bold px-3 py-1 rounded-lg shadow-lg">
+                                  ₹{product.price}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Product Info */}
+                            <div className="p-6">
+                              {/* Title */}
+                              <h3 className="font-bold text-gray-900 dark:text-gray-100 text-lg mb-3 line-clamp-2 group-hover:text-orange-500 transition-colors">
+                                {product.title}
+                              </h3>
+                              
+                              {/* Description */}
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-5 line-clamp-3">
+                                {product.description}
+                              </p>
+                              
+                              {/* Creator Info */}
+                              <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center">
+                                    <span className="text-white text-sm font-bold">
+                                      {product.creator.name.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                      {product.creator.name}
+                                    </p>
+                                    <div className="flex items-center">
+                                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                                        {product.rating || 0}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="text-right">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {product.sales || 0} sales
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {/* Buy Button */}
+                              <button 
+                                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                              >
+                                Buy Now
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-16">
+                        <div className="w-24 h-24 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900 dark:to-orange-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <Package className="w-12 h-12 text-orange-500" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                          No products available
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400 text-lg max-w-md mx-auto">
+                          Check back later for amazing products from our talented creators.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {activeTab === "my-products" && (
                   <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">My Products</h2>
-                    <p className="text-gray-500 dark:text-gray-400">Manage your purchased products and digital content.</p>
+                    <div className="text-center mb-8">
+                      <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">My Products</h2>
+                      <p className="text-gray-500 dark:text-gray-400 text-lg">Manage your purchased products and digital content.</p>
+                    </div>
+                    
+                    {myProductsLoading ? (
+                      <div className="flex items-center justify-center py-16">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                          <p className="text-gray-500 dark:text-gray-400">Loading your products...</p>
+                        </div>
+                      </div>
+                    ) : myProducts.length > 0 ? (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+                        {myProducts.map((product) => (
+                          <div key={product.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 w-full">
+                            <div className="h-64 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 relative group">
+                              {product.thumbnail && product.thumbnail !== '' ? (
+                                <img 
+                                  src={product.thumbnail} 
+                                  alt={product.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const fallback = target.nextElementSibling as HTMLElement;
+                                    if (fallback) fallback.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : null}
+                              <div className={`w-full h-full flex items-center justify-center text-gray-400 ${product.thumbnail && product.thumbnail !== '' ? 'hidden' : ''}`}>
+                                <Package className="w-20 h-20" />
+                              </div>
+                              <div className="absolute top-3 right-3">
+                                <span className="bg-orange-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-lg">
+                                  {product.type}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="p-8">
+                              <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-4 text-xl line-clamp-2 leading-tight">
+                                {product.title}
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 line-clamp-3 leading-relaxed">
+                                {product.description}
+                              </p>
+                              
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-4">
+                                    <span className="text-2xl font-bold text-orange-500">
+                                      ₹{product.price}
+                                    </span>
+                                    <div className="flex items-center space-x-1">
+                                      <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        {product.rating}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-sm">
+                                  <div className="text-gray-500 dark:text-gray-400">
+                                    <span className="font-medium">Purchased:</span> {new Date(product.purchaseDate).toLocaleDateString()}
+                                  </div>
+                                </div>
+                                
+                                <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">by</span>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                      {product.creator.name}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-16">
+                        <Package className="w-20 h-20 text-gray-400 mx-auto mb-6" />
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                          No products purchased yet
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                          Start exploring the product store to find amazing content from creators.
+                        </p>
+                        <button 
+                          onClick={() => setActiveTab('product-store')}
+                          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg transition-colors font-medium shadow-lg hover:shadow-xl"
+                        >
+                          Browse Products
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 

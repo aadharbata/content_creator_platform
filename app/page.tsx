@@ -10,61 +10,43 @@ import TopCoursesSection from "@/frontend/components/TopCoursesSection"
 import TopCreatorsSection from "@/frontend/components/TopCreatorsSection"
 import CreatorCTA from "@/frontend/components/CreatorCTA"
 import Footer from "@/frontend/components/Footer"
-import { translations } from "@/frontend/data/translations"
-// import { topCourses } from "@/frontend/data/courses"
 import { topCreators } from "@/frontend/data/creators"
 import { categories } from "@/frontend/data/categories"
-import axios from 'axios';
 
-interface TopCourses {
-  id: string,
-  title: string,
-  description: string,
-  price: number,
-  rating: number,
-  reviewCount: number,
-  salesCount: number,
-  duration: number,
-  imgURL: string,
-  category: string,
-  author: {
-    id: string,
-    name: string,
-    avatarUrl: string
-  },
-  badge?: string | null,
-  isFeatured: boolean
-}
+export default function HomePage() {
+  const { data: session } = useSession()
+  const { language, setLanguage, translations: appTranslations } = useLanguage()
+  const [mounted, setMounted] = useState(false)
 
-export default function LandingPage() {
-  const { language, setLanguage } = useLanguage();
-  const [topCourses, setTopCourses] = useState<TopCourses[]>([]);
-  const { data: session, status } = useSession();
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  const fetchTopCourses = async () => {
-    try {
-      const res = await axios.get("/api/courses/topcourses");
-      console.log("Top courses: ", res.data.courses);
-      setTopCourses(res.data.courses);
-    } catch (error) {
-      console.log("Error in fetching top courses: ", error);
-      setTopCourses([]);
-    }
+  if (!mounted) {
+    return null
   }
 
-  useEffect(()=>{
-    fetchTopCourses();
-  }, []);
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <Header language={language} setLanguage={setLanguage} translations={translations} />
-      <Hero language={language} translations={translations} />
-      <SearchSection language={language} translations={translations} categories={categories} />
-      <TopCoursesSection language={language} translations={translations} topCourses={topCourses} />
-      <TopCreatorsSection language={language} translations={translations} topCreators={topCreators} />
-      <CreatorCTA language={language} translations={translations} />
-      <Footer language={language} />
+    <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <Header 
+        language={language} 
+        setLanguage={setLanguage} 
+        translations={appTranslations} 
+      />
+      
+      <main>
+        <Hero language={language} translations={appTranslations} />
+        <SearchSection language={language} translations={appTranslations} categories={categories} />
+        <TopCoursesSection language={language} translations={appTranslations} topCourses={[]} />
+        <TopCreatorsSection 
+          language={language} 
+          translations={appTranslations}
+          topCreators={topCreators}
+        />
+        <CreatorCTA language={language} translations={appTranslations} />
+      </main>
+      
+      <Footer language={language} translations={appTranslations} />
     </div>
   )
 }

@@ -15,43 +15,52 @@ export default function Hero({ language, translations }: HeroProps) {
 
   return (
     <section className="relative overflow-hidden py-20 lg:py-32">
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10" />
-      <div className="absolute inset-0 bg-[url('/placeholder.svg?height=800&width=1200')] opacity-5" />
-
       <div className="container mx-auto px-4 relative">
         <div className="text-center max-w-4xl mx-auto">
-          <h1 className="text-5xl lg:text-7xl font-bold mb-6 leading-tight">
-            <span className="bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent">
-              {t.heroTitle}
+          {/* New Resources Banner */}
+          <div className="inline-flex items-center space-x-2 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-full px-4 py-2 mb-8">
+            <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+            <span className="text-sm font-medium text-pink-700 dark:text-pink-300">
+              {language === 'hi' ? 'नया: 10,000+ प्रीमियम संसाधनों का अन्वेषण करें' : 'New: Explore 10,000+ premium resources'}
             </span>
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              {t.heroSubtitle}
+          </div>
+
+          {/* Main Headline */}
+          <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 dark:text-white mb-8 leading-tight">
+            <span className="block">
+              {language === 'hi' ? 'दुनिया के सर्वश्रेष्ठ क्रिएटर्स से' : 'Discover & Learn from'}
+            </span>
+            <span className="block">
+              <span className="text-purple-600 dark:text-purple-400">
+                {language === 'hi' ? 'दुनिया के' : 'World\'s'}
+              </span>{" "}
+              <span className="text-blue-600 dark:text-blue-400">
+                {language === 'hi' ? 'सर्वश्रेष्ठ' : 'Best'}
+              </span>{" "}
+              <span className="text-teal-600 dark:text-teal-400">
+                {language === 'hi' ? 'क्रिएटर्स' : 'Creators'}
+              </span>
             </span>
           </h1>
 
-          <p className="text-xl lg:text-2xl text-gray-600 mb-12 leading-relaxed">{t.heroDescription}</p>
+          {/* Subtitle */}
+          <p className="text-xl lg:text-2xl text-gray-600 dark:text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+            {language === 'hi' 
+              ? 'दुनिया भर के शीर्ष क्रिएटर्स से प्रीमियम कोर्स, ईबुक, टेम्पलेट और डिजिटल प्रोडक्ट्स तक पहुंचें। आज सीखना शुरू करें।'
+              : 'Access premium courses, ebooks, templates, and digital products from top creators worldwide. Start learning today.'
+            }
+          </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Button
-              size="lg"
-              onClick={() => router.push('/home')}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-4 h-auto"
-            >
-              <Play className="w-5 h-5 mr-2" />
-              {t.startLearning}
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              onClick={() => router.push('/home')}
-              className="text-lg px-8 py-4 h-auto border-2 hover:bg-gray-50"
-            >
-              {t.viewAll}
-            </Button>
-          </div>
+          {/* CTA Button */}
+          <Button
+            onClick={() => router.push('/consumer-channel')}
+            className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 px-8 py-3 text-lg font-medium rounded-lg transition-all duration-200 hover:shadow-lg"
+          >
+            {language === 'hi' ? 'सभी देखें' : 'View All'}
+          </Button>
         </div>
       </div>
     </section>
   )
 }
+

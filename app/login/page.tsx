@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { signIn, useSession, signOut } from "next-auth/react";
-import { Mail, Lock, Eye, EyeOff, Moon } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Moon, ArrowLeft, Home } from "lucide-react";
 
 const Login = () => {
   const [form, setForm] = useState({ identifier: "", password: "" });
@@ -121,6 +121,21 @@ const Login = () => {
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 relative ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200'}`}>
+      {/* Go Home button */}
+      <div className="absolute top-4 left-4">
+        <button
+          onClick={() => router.push('/')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 ${
+            isDarkMode 
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white' 
+              : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white'
+          }`}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="font-medium">Go Home</span>
+        </button>
+      </div>
+
       {/* Dark mode toggle */}
       <div className="absolute top-4 right-4">
         <button

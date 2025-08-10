@@ -10,14 +10,24 @@ import { useRouter } from "next/navigation"
 interface SearchSectionProps {
   language: "en" | "hi"
   translations: any
-  categories: any[]
+  categories?: any[]
 }
 
-export default function SearchSection({ language, translations, categories }: SearchSectionProps) {
+export default function SearchSection({ language, translations, categories = [] }: SearchSectionProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
-  const t = translations[language]
   const router = useRouter()
+
+  // Fallback values for missing translations
+  const searchPlaceholder = language === 'hi' 
+    ? 'कोर्स, क्रिएटर, विषय खोजें...' 
+    : 'Search courses, creators, topics...'
+  
+  const browseText = language === 'hi'
+    ? 'या श्रेणियों के माध्यम से ब्राउज़ करें'
+    : 'Or browse through categories'
+
+  const allCategoriesText = language === 'hi' ? 'सभी श्रेणियां' : 'All Categories'
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -28,8 +38,8 @@ export default function SearchSection({ language, translations, categories }: Se
         params.set('category', selectedCategory)
       }
       
-      // Redirect to home page with search results
-      router.push(`/home?${params.toString()}`)
+      // Redirect to consumer channel with search results
+      router.push(`/consumer-channel?${params.toString()}`)
     }
   }
 
@@ -51,7 +61,7 @@ export default function SearchSection({ language, translations, categories }: Se
       params.set('category', categoryName)
     }
     
-    router.push(`/home?${params.toString()}`)
+    router.push(`/consumer-channel?${params.toString()}`)
   }
 
   return (
@@ -59,24 +69,24 @@ export default function SearchSection({ language, translations, categories }: Se
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
           <div className="relative">
-            <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 w-6 h-6" />
+            <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-6 h-6" />
             <Input
               type="text"
-              placeholder={t.searchPlaceholder}
+              placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="pl-16 pr-6 py-6 text-lg rounded-2xl border-2 border-gray-200 focus:border-blue-500 shadow-lg"
+              className="pl-16 pr-6 py-6 text-lg rounded-2xl border-2 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400 shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             />
             <Button 
               onClick={handleSearch}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl"
             >
-              Search
+              {language === 'hi' ? 'खोजें' : 'Search'}
             </Button>
           </div>
 
-          <p className="text-center text-gray-600 mt-4 text-lg">{t.browseText}</p>
+          <p className="text-center text-gray-600 dark:text-gray-300 mt-4 text-lg">{browseText}</p>
         </div>
       </div>
 
@@ -84,7 +94,7 @@ export default function SearchSection({ language, translations, categories }: Se
       <div className="relative mt-12">
         {/* Colorful curved gradient background */}
         <div 
-          className="w-full h-48 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600"
+          className="w-full h-48 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-700 dark:via-purple-700 dark:to-pink-700"
           style={{
             borderRadius: "0 0 50% 50% / 0 0 100px 100px",
           }}
@@ -103,7 +113,7 @@ export default function SearchSection({ language, translations, categories }: Se
                     : "bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm"
                 }`}
               >
-                {t.allCategories}
+                {allCategoriesText}
               </Button>
               {categories.map((category) => (
                 <Button
@@ -116,18 +126,20 @@ export default function SearchSection({ language, translations, categories }: Se
                       : "bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm"
                   }`}
                 >
-                  <category.icon className="w-4 h-4 mr-2" />
-                  {language === "en" ? category.name : category.nameHi}
-                  <Badge 
-                    variant="secondary" 
-                    className={`ml-2 ${
-                      selectedCategory === category.name
-                        ? "bg-gray-200 text-gray-700"
-                        : "bg-white/20 text-white"
-                    }`}
-                  >
-                    {category.count}
-                  </Badge>
+                  {category.icon && <category.icon className="w-4 h-4 mr-2" />}
+                  {language === "en" ? category.name : (category.nameHi || category.name)}
+                  {category.count && (
+                    <Badge 
+                      variant="secondary" 
+                      className={`ml-2 ${
+                        selectedCategory === category.name
+                          ? "bg-gray-200 text-gray-700"
+                          : "bg-white/20 text-white"
+                      }`}
+                    >
+                      {category.count}
+                    </Badge>
+                  )}
                 </Button>
               ))}
             </div>

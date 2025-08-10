@@ -1,4 +1,8 @@
-import prisma from '../lib/prisma';
+import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
+
+const prisma = new PrismaClient();
 
 const sampleProducts = [
   {
@@ -6,131 +10,112 @@ const sampleProducts = [
     description: "A curated collection of 50+ high-resolution nature photographs perfect for your creative projects. Includes landscapes, wildlife, and macro shots.",
     price: 29.99,
     type: "IMAGE",
-    thumbnail: "/product-images/nature-collection.jpg",
-    category: "Photography"
+    thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop"]
   },
   {
-    title: "Complete Web Development Course",
-    description: "Master modern web development with this comprehensive course covering HTML, CSS, JavaScript, React, and Node.js. 40+ hours of content.",
+    title: "Digital Marketing Masterclass",
+    description: "Complete digital marketing course covering SEO, social media, email marketing, and paid advertising. 15+ hours of content with practical exercises.",
     price: 199.99,
     type: "COURSE",
-    thumbnail: "/product-images/web-dev-course.jpg",
-    category: "Education"
+    thumbnail: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop"]
   },
   {
-    title: "Meditation & Mindfulness Audio Series",
-    description: "10 guided meditation sessions to reduce stress and improve focus. Each session is 15-30 minutes long with soothing background music.",
-    price: 24.99,
-    type: "AUDIO",
-    thumbnail: "/product-images/meditation-audio.jpg",
-    category: "Health & Wellness"
-  },
-  {
-    title: "Social Media Templates Bundle",
-    description: "200+ professionally designed templates for Instagram, Facebook, and Twitter. Includes posts, stories, and cover designs.",
-    price: 39.99,
-    type: "TEMPLATE",
-    thumbnail: "/product-images/social-templates.jpg",
-    category: "Design"
-  },
-  {
-    title: "Fitness Workout Video Series",
-    description: "12-week progressive fitness program with detailed workout videos. Suitable for all fitness levels with modifications provided.",
-    price: 79.99,
+    title: "Fitness Workout Videos",
+    description: "30-day fitness challenge with daily workout videos. Suitable for all fitness levels with modifications and progress tracking.",
+    price: 49.99,
     type: "VIDEO",
-    thumbnail: "/product-images/fitness-videos.jpg",
-    category: "Health & Wellness"
+    thumbnail: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop"]
   },
   {
-    title: "Digital Marketing eBook",
-    description: "The complete guide to digital marketing strategies for small businesses. 250+ pages covering SEO, social media, and email marketing.",
+    title: "Logo Design Templates",
+    description: "Professional logo design templates in various styles. Includes source files for easy customization and multiple formats.",
+    price: 79.99,
+    type: "TEMPLATE",
+    thumbnail: "https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=400&h=300&fit=crop"]
+  },
+  {
+    title: "Meditation Audio Collection",
+    description: "Guided meditation sessions for stress relief, sleep, and mindfulness. 20+ audio tracks with different durations and themes.",
+    price: 39.99,
+    type: "AUDIO",
+    thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop"]
+  },
+  {
+    title: "Social Media Templates",
+    description: "Ready-to-use social media templates for Instagram, Facebook, and Twitter. Includes Canva templates and design elements.",
+    price: 59.99,
+    type: "TEMPLATE",
+    thumbnail: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&h=300&fit=crop"]
+  },
+  {
+    title: "Web Development Course",
+    description: "Learn web development from scratch. Covers HTML, CSS, JavaScript, React, and Node.js with real-world projects.",
+    price: 299.99,
+    type: "COURSE",
+    thumbnail: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&h=300&fit=crop"]
+  },
+  {
+    title: "Photo Editing Plugin",
+    description: "Professional photo editing plugin with advanced filters and effects. Compatible with Photoshop and Lightroom.",
+    price: 89.99,
+    type: "SOFTWARE",
+    thumbnail: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop"]
+  },
+  {
+    title: "Cooking Masterclass",
+    description: "Learn to cook like a professional chef. 50+ recipes with step-by-step video instructions and cooking tips.",
+    price: 149.99,
+    type: "COURSE",
+    thumbnail: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=300&fit=crop"]
+  },
+  {
+    title: "Ceramic Mugs Collection",
+    description: "Handcrafted ceramic mugs with unique designs. Perfect for coffee lovers and home decoration.",
+    price: 24.99,
+    type: "PHYSICAL",
+    thumbnail: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop"]
+  },
+  {
+    title: "E-book: Creative Writing Guide",
+    description: "Comprehensive guide to creative writing. Includes writing prompts, techniques, and publishing advice.",
     price: 19.99,
     type: "EBOOK",
-    thumbnail: "/product-images/digital-marketing-ebook.jpg",
-    category: "Business"
+    thumbnail: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop"]
   },
   {
-    title: "Photo Editing Software Plugin",
-    description: "Professional photo editing plugin with advanced filters and effects. Compatible with Photoshop and Lightroom.",
-    price: 49.99,
-    type: "SOFTWARE",
-    thumbnail: "/product-images/photo-plugin.jpg",
-    category: "Photography"
-  },
-  {
-    title: "Handmade Ceramic Mug Set",
-    description: "Beautiful set of 4 handcrafted ceramic mugs with unique glazed finishes. Perfect for coffee lovers or as a gift.",
-    price: 89.99,
-    type: "PHYSICAL",
-    thumbnail: "/product-images/ceramic-mugs.jpg",
-    category: "Arts & Crafts"
-  },
-  {
-    title: "Business Logo Design Package",
-    description: "Professional logo design service with 3 concepts, unlimited revisions, and final files in multiple formats.",
-    price: 299.99,
+    title: "Custom Website Design Service",
+    description: "Professional website design service with custom coding, responsive design, and SEO optimization. Includes 3 months of support.",
+    price: 599.99,
     type: "OTHER",
-    thumbnail: "/product-images/logo-design.jpg",
-    category: "Design"
+    thumbnail: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop"]
   },
   {
-    title: "Cooking Masterclass Video Collection",
-    description: "Learn to cook like a professional chef with this comprehensive video collection. 25+ recipes with step-by-step instructions.",
-    price: 149.99,
-    type: "VIDEO",
-    thumbnail: "/product-images/cooking-masterclass.jpg",
-    category: "Food & Cooking"
+    title: "Productivity App Bundle",
+    description: "Collection of productivity apps for time management, project tracking, and team collaboration.",
+    price: 129.99,
+    type: "SOFTWARE",
+    thumbnail: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop",
+    images: ["https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop"]
   }
 ];
 
-async function createProductImages() {
-  console.log('📸 Creating product images...');
-  
-  // Create placeholder images for products
-  const fs = require('fs');
-  const path = require('path');
-  
-  const publicDir = path.join(process.cwd(), 'public');
-  const productImagesDir = path.join(publicDir, 'product-images');
-  
-  // Create product-images directory if it doesn't exist
-  if (!fs.existsSync(productImagesDir)) {
-    fs.mkdirSync(productImagesDir, { recursive: true });
-  }
-  
-  // Create placeholder images with product names
-  const imageNames = [
-    'nature-collection.jpg',
-    'web-dev-course.jpg',
-    'meditation-audio.jpg',
-    'social-templates.jpg',
-    'fitness-videos.jpg',
-    'digital-marketing-ebook.jpg',
-    'photo-plugin.jpg',
-    'ceramic-mugs.jpg',
-    'logo-design.jpg',
-    'cooking-masterclass.jpg'
-  ];
-  
-  for (const imageName of imageNames) {
-    const imagePath = path.join(productImagesDir, imageName);
-    if (!fs.existsSync(imagePath)) {
-      // Create a simple placeholder text file (you can replace these with actual images later)
-      fs.writeFileSync(imagePath, `Placeholder image for ${imageName}`);
-    }
-  }
-  
-  console.log('✅ Product images created successfully!');
-}
-
 async function main() {
-  console.log('🛍️ Starting product seeding...');
-  
+  console.log('🌱 Starting product seeding...');
+
   try {
-    // Create product images
-    await createProductImages();
-    
-    // Get all creators from the database
+    // Get all creators (users with CREATOR role)
     const creators = await prisma.user.findMany({
       where: {
         role: 'CREATOR'
@@ -140,98 +125,175 @@ async function main() {
         name: true
       }
     });
-    
+
     if (creators.length === 0) {
-      console.log('❌ No creators found! Please create some creator users first.');
-      return;
-    }
-    
-    console.log(`📋 Found ${creators.length} creators`);
-    
-    // Create product categories
-    const categoryNames = [
-      'Photography',
-      'Education', 
-      'Health & Wellness',
-      'Design',
-      'Business',
-      'Arts & Crafts',
-      'Food & Cooking'
-    ];
-    
-    console.log('🏷️ Creating product categories...');
-    const categories = [];
-    
-    for (const categoryName of categoryNames) {
-      const existingCategory = await prisma.productCategory.findUnique({
-        where: { name: categoryName }
+      console.log('❌ No creators found. Creating a test creator first...');
+      
+      // Create a test creator if none exist
+      const testCreator = await prisma.user.create({
+        data: {
+          name: 'Test Creator',
+          email: 'creator@test.com',
+          role: 'CREATOR'
+        }
       });
       
-      if (!existingCategory) {
-        const category = await prisma.productCategory.create({
-          data: {
-            name: categoryName,
-            description: `Products related to ${categoryName.toLowerCase()}`
-          }
-        });
-        categories.push(category);
-        console.log(`  • Created category: ${category.name}`);
-      } else {
-        categories.push(existingCategory);
-        console.log(`  • Category already exists: ${existingCategory.name}`);
-      }
+      creators.push({
+        id: testCreator.id,
+        name: testCreator.name
+      });
+      
+      console.log('✅ Created test creator:', testCreator.name);
     }
-    
+
+    console.log(`📝 Found ${creators.length} creators`);
+
     // Create products
-    console.log('🛍️ Creating products...');
-    
+    const createdProducts = [];
     for (let i = 0; i < sampleProducts.length; i++) {
       const productData = sampleProducts[i];
-      
-      // Assign creator in round-robin fashion
-      const assignedCreator = creators[i % creators.length];
-      
-      // Find the category
-      const category = categories.find(cat => cat.name === productData.category);
-      
+      const creator = creators[i % creators.length]; // Distribute products among creators
+
       const product = await prisma.product.create({
         data: {
           title: productData.title,
           description: productData.description,
           price: productData.price,
-          type: productData.type as any, // Cast to ProductType enum
+          type: productData.type,
           thumbnail: productData.thumbnail,
-          status: 'PUBLISHED', // Set to PUBLISHED so it appears in API
-          rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // Random rating between 3.0-5.0
-          salesCount: Math.floor(Math.random() * 50), // Random sales count 0-49
-          creatorId: assignedCreator.id,
-          categoryId: category?.id || null
+          images: productData.images,
+          status: 'PUBLISHED',
+          creatorId: creator.id
         }
       });
-      
-      console.log(`  • Created product: "${product.title}" (assigned to ${assignedCreator.name})`);
+
+      createdProducts.push(product);
+      console.log(`✅ Created product: "${product.title}" by ${creator.name}`);
     }
-    
-    console.log('✅ Product seeding completed successfully!');
-    
-    // Display summary
-    const totalProducts = await prisma.product.count();
-    const totalCategories = await prisma.productCategory.count();
-    
-    console.log(`📊 Summary:`);
-    console.log(`  - Total products: ${totalProducts}`);
-    console.log(`  - Total categories: ${totalCategories}`);
-    console.log(`  - Total creators: ${creators.length}`);
-    
+
+    console.log(`\n🎉 Successfully created ${createdProducts.length} products!`);
+
+    // Create some sample purchases for testing "My Products"
+    await createSamplePurchases(createdProducts, creators);
+
+    // Create some sample reviews
+    await createSampleReviews(createdProducts, creators);
+
+    console.log('\n✨ Product seeding completed successfully!');
+    console.log('🌐 You can now visit the product store at: http://localhost:3000/consumer-channel');
+
   } catch (error) {
-    console.error('❌ Error seeding products:', error);
-    process.exit(1);
+    console.error('❌ Error during seeding:', error);
+    throw error;
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-}); 
+async function createSamplePurchases(products: any[], creators: any[]) {
+  console.log('\n🛒 Creating sample purchases for My Store testing...');
+  
+  // Get some consumers (users with CONSUMER role)
+  const consumers = await prisma.user.findMany({
+    where: {
+      role: 'CONSUMER'
+    },
+    select: {
+      id: true,
+      name: true
+    }
+  });
+
+  if (consumers.length === 0) {
+    console.log('⚠️ No consumers found. Skipping sample purchases.');
+    return;
+  }
+
+  // Create purchases for first 5 products
+  for (let i = 0; i < Math.min(5, products.length); i++) {
+    const product = products[i];
+    const consumer = consumers[i % consumers.length];
+    
+    await prisma.productSale.create({
+      data: {
+        productId: product.id,
+        buyerId: consumer.id,
+        amount: product.price,
+        currency: 'INR',
+        status: 'SUCCEEDED'
+      }
+    });
+    
+    await prisma.product.update({
+      where: { id: product.id },
+      data: {
+        salesCount: {
+          increment: 1
+        }
+      }
+    });
+    
+    console.log(`  • Created purchase: ${consumer.name} bought "${product.title}"`);
+  }
+  
+  console.log('✅ Sample purchases created successfully!');
+}
+
+async function createSampleReviews(products: any[], creators: any[]) {
+  console.log('\n⭐ Creating sample reviews...');
+  
+  const reviewComments = [
+    "Amazing quality! Highly recommend this product.",
+    "Great value for money. Exactly what I was looking for.",
+    "Excellent product, fast delivery. Will buy again!",
+    "Very satisfied with this purchase. Great work!",
+    "Outstanding quality and service. Love it!",
+    "Perfect for my needs. Highly satisfied!",
+    "Great product, exceeded my expectations.",
+    "Wonderful experience. Definitely worth the price.",
+    "Fantastic quality and great customer service.",
+    "Excellent product, highly recommend!"
+  ];
+  
+  // Get consumers for reviews
+  const consumers = await prisma.user.findMany({
+    where: {
+      role: 'CONSUMER'
+    },
+    select: {
+      id: true,
+      name: true
+    }
+  });
+
+  if (consumers.length === 0) {
+    console.log('⚠️ No consumers found. Skipping sample reviews.');
+    return;
+  }
+
+  for (let i = 0; i < Math.min(8, products.length); i++) {
+    const product = products[i];
+    const consumer = consumers[i % consumers.length];
+    const rating = Math.floor(Math.random() * 2) + 4; // 4-5 stars
+    const comment = reviewComments[i % reviewComments.length];
+    
+    await prisma.productReview.create({
+      data: {
+        productId: product.id,
+        userId: consumer.id,
+        rating: rating,
+        comment: comment
+      }
+    });
+    
+    console.log(`  • Created review: ${consumer.name} gave ${rating} stars to "${product.title}"`);
+  }
+  
+  console.log('✅ Sample reviews created successfully!');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Seeding failed:', e);
+    process.exit(1);
+  }); 

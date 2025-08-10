@@ -1,8 +1,9 @@
 "use client"
-import { BookOpen } from "lucide-react"
-// import { Button } from "@/components/ui/button"
+import { BookOpen, ChevronDown, Sun, Moon } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
+import { useLanguage } from "@/lib/contexts/LanguageContext"
+import { useDarkMode } from "@/lib/contexts/DarkModeContext"
 
 interface HeaderProps {
   language: "en" | "hi"
@@ -13,47 +14,77 @@ interface HeaderProps {
 export default function Header({ language, setLanguage, translations }: HeaderProps) {
   const t = translations[language]
   const router = useRouter()
+  const { isDarkMode, toggleDarkMode } = useDarkMode()
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-white/20">
+    <header className="sticky top-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        {/* Logo */}
         <div className="flex items-center space-x-2">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-            <BookOpen className="w-6 h-6 text-white" />
+          <div className="flex space-x-1">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-sm">C</span>
+            </div>
+            <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-sm">P</span>
+            </div>
           </div>
-          <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            LearnHub
-          </span>
         </div>
 
+        {/* Navigation */}
+        <nav className="hidden md:flex items-center space-x-8">
+          <a href="#explore" className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer">
+            Explore Creators
+          </a>
+          <a href="#how-it-works" className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer">
+            How it works
+          </a>
+          <a href="#benefits" className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer">
+            Benefits
+          </a>
+        </nav>
+
+        {/* Right side controls */}
         <div className="flex items-center space-x-4">
+          {/* Language Selector */}
           <Select value={language} onValueChange={(value: "en" | "hi") => setLanguage(value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
+            <SelectTrigger className="w-32 bg-transparent border-gray-300 dark:border-gray-600 cursor-pointer">
+              <SelectValue placeholder="Language" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="en">🇺🇸 English</SelectItem>
-              <SelectItem value="hi">🇮🇳 हिंदी</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="hi">हिंदी</SelectItem>
             </SelectContent>
           </Select>
 
-          <div
-            className="px-6 py-3 bg-purple-500 text-white font-semibold rounded-lg shadow-md hover:bg-purple-600 transition-colors duration-300"
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            aria-label="Toggle theme"
           >
-            <span
-              className="cursor-pointer hover:text-purple-200"
-              onClick={() => router.push('/login')}
-            >
-              {language === 'hi' ? 'क्रिएटर लॉगिन' : 'CREATOR LOGIN'}
-            </span>
-            <span className="mx-2">/</span>
-            <span
-              className="cursor-pointer hover:text-purple-200"
-              onClick={() => router.push('/signup')}
-            >
-              {language === 'hi' ? 'साइन अप' : 'SIGN UP'}
-            </span>
-          </div>
+            {isDarkMode ? (
+              <Sun className="w-5 h-5 text-yellow-500" />
+            ) : (
+              <Moon className="w-5 h-5 text-gray-600" />
+            )}
+          </button>
+
+          {/* Login Button */}
+          <button
+            onClick={() => router.push('/login')}
+            className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer px-4 py-2 rounded-lg font-medium"
+          >
+            {language === 'hi' ? 'लॉगिन' : 'Login'}
+          </button>
+
+          {/* Sign Up Button */}
+          <button
+            onClick={() => router.push('/signup')}
+            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-6 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2 cursor-pointer"
+          >
+            <span>{language === 'hi' ? 'साइन अप' : 'Sign Up'}</span>
+          </button>
         </div>
       </div>
     </header>

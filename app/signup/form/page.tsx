@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { signIn } from 'next-auth/react';
-import { Mail, Phone, User, Lock, Eye, EyeOff, ArrowRight, Moon } from 'lucide-react';
+import { Mail, Phone, User, Lock, Eye, EyeOff, ArrowRight, Moon, ArrowLeft } from 'lucide-react';
 
 const countryCodes = [
   { code: "+1", name: "US/Canada", flag: "🇺🇸" },
@@ -322,6 +322,21 @@ const SignUpForm = () => {
         ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
         : 'bg-gradient-to-br from-white via-gray-50 to-purple-50'
     }`}>
+      {/* Go Back button */}
+      <div className="absolute top-4 left-4">
+        <button
+          onClick={() => router.push('/signup')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 ${
+            isDarkMode 
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white' 
+              : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white'
+          }`}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="font-medium">Go Back</span>
+        </button>
+      </div>
+
       {/* Progress Indicator */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
         <div className="flex space-x-2 mb-2">

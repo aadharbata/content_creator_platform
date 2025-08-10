@@ -85,22 +85,18 @@ export async function GET(request: NextRequest) {
               name: true,
               profile: {
                 select: {
-                  avatarUrl: true,
-                },
-              },
-            },
-          },
-          category: {
-            select: {
-              id: true,
-              name: true,
-            },
+                  avatarUrl: true
+                }
+              }
+            }
           },
           _count: {
             select: {
-              reviews: true,
-            },
+              reviews: true
+            }
           },
+          reviews: true,
+          sales: true
         },
         orderBy,
         skip,
@@ -109,26 +105,25 @@ export async function GET(request: NextRequest) {
       prisma.product.count({ where })
     ]);
 
-    // Transform the data with proper type safety
-    const transformedProducts = products.map((product) => ({
+    // Transform the data to match the expected format
+    const transformedProducts = products.map(product => ({
       id: product.id,
       title: product.title,
+      description: product.description,
       price: product.price,
-      type: product.type.toLowerCase(),
+      type: product.type,
+      thumbnail: product.thumbnail,
+      images: product.images,
+      status: product.status,
+      rating: product.rating || 0,
+      sales: product.salesCount || 0,
       creator: {
         id: product.creator.id,
         name: product.creator.name,
-        avatar: product.creator.profile?.avatarUrl || '',
-        verified: true, // You can add a verified field to User model if needed
+        avatar: product.creator.profile?.avatarUrl || null
       },
-      thumbnail: product.thumbnail || '',
-      rating: product.rating,
-      sales: product.salesCount,
-      description: product.description,
-      category: product.category?.name,
-      reviewCount: product._count.reviews,
       createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
+      updatedAt: product.updatedAt
     }));
 
     return NextResponse.json({

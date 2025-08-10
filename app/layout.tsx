@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/contexts/LanguageContext";
+import { DarkModeProvider } from "@/lib/contexts/DarkModeContext";
 import SessionWrapper from "@/components/SessionWrapper";
 
 const geistSans = Geist({
@@ -34,9 +35,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SessionWrapper>
-          <LanguageProvider>
-            {children}
-          </LanguageProvider>
+          <DarkModeProvider>
+            <LanguageProvider>
+              {children}
+            </LanguageProvider>
+          </DarkModeProvider>
         </SessionWrapper>
       </body>
     </html>
