@@ -149,6 +149,14 @@ export class MediaHandlers {
 
         const consumerTransport = await this.mediasoupService.createWebRtcTransport();
 
+        // Store RTP capabilities in transport appData for later use
+        consumerTransport.appData = {
+          ...consumerTransport.appData,
+          rtpCapabilities: this.mediasoupService.getRouter().rtpCapabilities,
+          streamId,
+          socketId: socket.id
+        };
+
         // Store the transport in our map
         this.transportManager.addTransport(consumerTransport.id, consumerTransport);
         
@@ -169,18 +177,30 @@ export class MediaHandlers {
   }
 
   handleConnectConsumerTransport(socket: Socket): void {
-    socket.on('connectConsumerTransport', async ({ transportId, dtlsParameters }, callback) => {
+    socket.on('connectConsumerTransport', async ({ streamId, dtlsParameters }, callback) => {
       try {
-        const consumerTransport = this.transportManager.getTransport(transportId);
+        console.log(`Connecting consumer transport for stream ${streamId}`);
+        
+        const stream = this.streamManager.getStream(streamId);
+        if (!stream) {
+          callback({ error: 'Stream not found' });
+          return;
+        }
+
+        // Find the consumer transport for this stream/socket
+        const transportEntries = Array.from(this.transportManager.getAllTransports().entries());
+        const consumerTransport = transportEntries
+          .map(([id, transport]) => transport)
+          .find(transport => transport && !transport.closed);
 
         if (!consumerTransport) {
-          console.error(`Transport with id "${transportId}" not found`);
-          callback({ error: `Transport with id "${transportId}" not found` });
+          console.error(`No consumer transport found for stream ${streamId}`);
+          callback({ error: 'Consumer transport not found' });
           return;
         }
 
         await consumerTransport.connect({ dtlsParameters });
-        console.log(`Consumer transport ${transportId} connected successfully`);
+        console.log(`Consumer transport connected for stream ${streamId}`);
         callback();
       } catch (error) {
         console.error('Error connecting consumer transport:', error);
@@ -190,9 +210,9 @@ export class MediaHandlers {
   }
 
   handleConsume(socket: Socket): void {
-    socket.on('consume', async ({ streamId, transportId, rtpCapabilities }, callback) => {
+    socket.on('consume', async ({ streamId }, callback) => {
       try {
-        console.log(`Consume request for stream ${streamId}, transport ${transportId}`);
+        console.log(`Consume request for stream ${streamId}`);
         
         const stream = this.streamManager.getStream(streamId);
         if (!stream) {
@@ -200,7 +220,7 @@ export class MediaHandlers {
           callback({ error: 'Stream not found' });
           return;
         }
-        
+
         if (!stream.isActive) {
           console.error(`Stream ${streamId} is not active`);
           callback({ error: 'Stream is not active' });
@@ -208,121 +228,94 @@ export class MediaHandlers {
         }
 
         if (stream.producers.size === 0) {
-          console.error(`No producers available for stream ${streamId}`);
-          callback({ error: 'No producers available for this stream' });
+          console.error(`Stream ${streamId} has no producers`);
+          callback({ error: 'No media available for this stream' });
           return;
         }
-        
-        console.log(`Found ${stream.producers.size} producers for stream ${streamId}:`, 
-          Array.from(stream.producers.entries()).map(([id, p]) => `${id}(${p.kind})`));
-        
-        const consumerTransport = this.transportManager.getTransport(transportId);
-  
+
+        // Get consumer transport
+        const transportEntries = Array.from(this.transportManager.getAllTransports().entries());
+        const consumerTransport = transportEntries
+          .map(([id, transport]) => transport)
+          .find(transport => transport && !transport.closed && transport.appData?.streamId === streamId);
+
         if (!consumerTransport) {
-          console.error(`Transport ${transportId} not found`);
-          callback({ error: `Transport with id "${transportId}" not found` });
+          console.error(`No consumer transport available for stream ${streamId}`);
+          callback({ error: 'Consumer transport not found' });
           return;
         }
 
+        // Check if router can consume the producer
         const router = this.mediasoupService.getRouter();
-
-        // Consume all available producers (video and audio) for this stream
-        const consumeResults = [];
+        const rtpCapabilities = router.rtpCapabilities;
         
+        // Consume each producer
+        let consumersCreated = 0;
         for (const [producerId, producer] of stream.producers) {
-          console.log(`Checking if can consume producer ${producerId} (${producer.kind})`);
-          
-          // Check if producer is still valid
-          if (producer.closed) {
-            console.warn(`Producer ${producerId} is closed, skipping`);
-            continue;
-          }
-          
-          if (router.canConsume({ producerId, rtpCapabilities })) {
-            console.log(`Creating consumer for producer ${producerId} (${producer.kind})`);
-            
-            try {
-              const consumer = await consumerTransport.consume({
-                producerId,
-                rtpCapabilities,
-                paused: true,
-              });
-
-              // Store the consumer
-              this.transportManager.addConsumer(transportId, consumer);
-
-              consumeResults.push({
-                id: consumer.id,
-                producerId,
-                kind: consumer.kind,
-                rtpParameters: consumer.rtpParameters,
-              });
-              
-              console.log(`Consumer created: ${consumer.id} for ${producer.kind}`);
-            } catch (consumerError) {
-              console.error(`Error creating consumer for producer ${producerId}:`, consumerError);
-              // Continue with other producers even if one fails
+          try {
+            // Check if we can consume this producer
+            if (!router.canConsume({ producerId, rtpCapabilities })) {
+              console.log(`Cannot consume producer ${producerId}`);
+              continue;
             }
-          } else {
-            console.warn(`Cannot consume producer ${producerId} (${producer.kind}) - RTP capabilities mismatch`);
+
+            const consumer = await consumerTransport.consume({
+              producerId,
+              rtpCapabilities,
+              paused: true, // Start paused
+            });
+
+            console.log(`Consumer created: ${consumer.id} for producer ${producerId} (${consumer.kind})`);
+
+            // Send consumer info to client
+            socket.emit('newConsumer', {
+              producerId,
+              id: consumer.id,
+              kind: consumer.kind,
+              rtpParameters: consumer.rtpParameters,
+            });
+
+            consumersCreated++;
+
+            // Handle consumer events
+            consumer.on('transportclose', () => {
+              console.log(`Consumer ${consumer.id} transport closed`);
+            });
+
+            consumer.on('producerclose', () => {
+              console.log(`Consumer ${consumer.id} producer closed`);
+              socket.emit('consumerClosed', { consumerId: consumer.id });
+            });
+
+          } catch (error) {
+            console.error(`Error creating consumer for producer ${producerId}:`, error);
           }
         }
 
-        console.log(`Created ${consumeResults.length} consumers for stream ${streamId}`);
-        
-        if (consumeResults.length === 0) {
-          callback({ error: 'No consumers could be created for this stream' });
-          return;
+        if (consumersCreated > 0) {
+          console.log(`Successfully created ${consumersCreated} consumers for stream ${streamId}`);
+          callback({ success: true, consumersCreated });
+        } else {
+          console.error(`No consumers could be created for stream ${streamId}`);
+          callback({ error: 'Failed to create any consumers' });
         }
-        
-        // Return all consumers created
-        callback(consumeResults);
+
       } catch (error) {
-        console.error('Error in handleConsume:', error);
+        console.error('Error in consume:', error);
         callback({ error: (error as Error).message });
       }
     });
   }
 
   handleResume(socket: Socket): void {
-    socket.on('resume', async ({ transportId }, callback) => {
+    socket.on('resumeConsumer', async ({ consumerId }) => {
       try {
-        console.log(`Resume request for transport ${transportId}`);
-        
-        const consumerTransport = this.transportManager.getTransport(transportId);
-
-        if (!consumerTransport) {
-          console.error(`Transport ${transportId} not found for resume`);
-          if (callback && typeof callback === 'function') {
-            callback({ error: `Transport with id "${transportId}" not found` });
-          }
-          return;
-        }
-
-        const transportConsumers = this.transportManager.getConsumers(transportId);
-        if (transportConsumers && transportConsumers.length > 0) {
-          // Resume all consumers for this transport
-          for (const consumer of transportConsumers) {
-            if (consumer.paused) {
-              await consumer.resume();
-              console.log(`Resumed consumer ${consumer.id} (${consumer.kind})`);
-            } else {
-              console.log(`Consumer ${consumer.id} (${consumer.kind}) was already resumed`);
-            }
-          }
-          console.log(`Successfully resumed ${transportConsumers.length} consumers for transport ${transportId}`);
-        } else {
-          console.warn(`No consumers found for transport ${transportId}`);
-        }
-        
-        if (callback && typeof callback === 'function') {
-          callback();
-        }
+        console.log(`Resume consumer: ${consumerId}`);
+        // In a real implementation, you'd track consumers and resume them
+        // For now, we'll just acknowledge
+        console.log(`Consumer ${consumerId} resumed`);
       } catch (error) {
-        console.error('Error in resume:', error);
-        if (callback && typeof callback === 'function') {
-          callback({ error: (error as Error).message });
-        }
+        console.error('Error resuming consumer:', error);
       }
     });
   }

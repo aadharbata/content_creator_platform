@@ -9,9 +9,8 @@ import { getSession } from "next-auth/react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 
-// const SOCKET_URL = "http://10.145.137.71:4000/stream";
-// const SOCKET_URL = "http://localhost:4000/stream";
-const SOCKET_URL = "http://10.145.170.231:4000/stream";
+// Use environment variable or fallback to localhost
+const SOCKET_URL = process.env.NEXT_PUBLIC_LIVESTREAM_SERVER_URL || "http://localhost:4000";
 
 interface LiveStreamProps {
   role: "creator" | "audience";
@@ -21,334 +20,363 @@ interface LiveStreamProps {
 }
 
 export default function LiveStream({ role, roomId, creatorName, audienceName }: LiveStreamProps) {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [likes, setLikes] = useState(0);
-  const [comments, setComments] = useState<{ user: string; text: string }[]>([]);
-  const [tips, setTips] = useState<{ user: string; amount: number; message: string }[]>([]);
-  const [commentInput, setCommentInput] = useState("");
-  const [tipAmount, setTipAmount] = useState("");
-  const [tipMessage, setTipMessage] = useState("");
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const peerConnections = useRef<{ [id: string]: RTCPeerConnection }>({});
-  const audiencePC = useRef<RTCPeerConnection | null>(null);
-  const remoteMediaStream = useRef<MediaStream | null>(null);
-  const [stopLiveLoading, setStopLiveLoading] = useState(false);
   const router = useRouter();
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Viewer-specific states
+  const [device, setDevice] = useState<any>(null);
+  const [consumerTransport, setConsumerTransport] = useState<any>(null);
+  const [consumers, setConsumers] = useState<Map<string, any>>(new Map());
+  const [isViewingStream, setIsViewingStream] = useState(false);
+  const [streamInfo, setStreamInfo] = useState<any>(null);
+  
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
-  // Setup socket connection and join room
+  // Initialize socket connection
   useEffect(() => {
-    if (!role) return;
     const s = io(SOCKET_URL);
     setSocket(s);
-    s.emit("join", { roomId, role });
+
+    s.on('connect', () => {
+      setIsConnected(true);
+      console.log('Connected to livestream server as viewer');
+    });
+
+    s.on('disconnect', () => {
+      setIsConnected(false);
+      console.log('Disconnected from livestream server');
+    });
+
+    s.on('streamStarted', ({ streamId, title, broadcasterName }) => {
+      console.log('Stream started:', { streamId, title, broadcasterName });
+      if (streamId === roomId) {
+        setStreamInfo({ streamId, title, broadcasterName });
+        // Auto-join the stream if it matches our roomId
+        joinStream();
+      }
+    });
+
+    s.on('streamEnded', (endedStreamId) => {
+      console.log('Stream ended:', endedStreamId);
+      if (endedStreamId === roomId) {
+        setIsViewingStream(false);
+        setStreamInfo(null);
+        cleanupViewing();
+      }
+    });
+
+    s.on('newConsumer', async ({ producerId, id, kind, rtpParameters }) => {
+      console.log('New consumer available:', { producerId, id, kind });
+      if (consumerTransport && device) {
+        try {
+          const consumer = await consumerTransport.consume({
+            id,
+            producerId,
+            kind,
+            rtpParameters
+          });
+
+          setConsumers(prev => new Map(prev).set(consumer.id, consumer));
+          
+          // Handle the media stream
+          const { track } = consumer;
+          if (kind === 'video' && remoteVideoRef.current) {
+            const stream = new MediaStream([track]);
+            remoteVideoRef.current.srcObject = stream;
+            remoteVideoRef.current.play().catch(console.error);
+            console.log('Video consumer track attached');
+          } else if (kind === 'audio' && remoteAudioRef.current) {
+            const stream = new MediaStream([track]);
+            remoteAudioRef.current.srcObject = stream;
+            remoteAudioRef.current.play().catch(console.error);
+            console.log('Audio consumer track attached');
+          }
+
+          // Resume the consumer
+          socket?.emit('resumeConsumer', { consumerId: consumer.id });
+        } catch (error) {
+          console.error('Error creating consumer:', error);
+          setError('Failed to receive stream');
+        }
+      }
+    });
+
+    s.on('consumerClosed', ({ consumerId }) => {
+      console.log('Consumer closed:', consumerId);
+      const consumer = consumers.get(consumerId);
+      if (consumer) {
+        consumer.close();
+        setConsumers(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(consumerId);
+          return newMap;
+        });
+      }
+    });
+
     return () => {
       s.disconnect();
-      Object.values(peerConnections.current).forEach(pc => pc.close());
-      peerConnections.current = {};
-      if (audiencePC.current) audiencePC.current.close();
-      audiencePC.current = null;
-      remoteMediaStream.current = null;
+      cleanupViewing();
     };
-  }, [role, roomId]);
+  }, [roomId]);
 
-  // Add reconnection and session refresh logic
+  // Initialize mediasoup device for viewing
   useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible") {
-        // 1. Refresh NextAuth session to prevent 401
-        try {
-          await getSession();
-        } catch {
-          // Optionally, handle session refresh error
-        }
-        // 2. Reconnect socket if disconnected
-        if (!socket || (socket && !socket.connected)) {
-          const s = io(SOCKET_URL);
-          setSocket(s);
-          s.emit("join", { roomId, role });
-        }
-        // 3. Re-initialize camera/WebRTC if needed (creator only)
-        if (role === "creator" && (!localStreamRef.current || !localVideoRef.current?.srcObject)) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            localStreamRef.current = stream;
-            if (localVideoRef.current) {
-              localVideoRef.current.srcObject = stream;
-            }
-          } catch {
-            // Optionally, handle camera re-init error
+    if (!socket || !isConnected) return;
+
+    const initializeDevice = async () => {
+      try {
+        const mediasoupClient = await import('mediasoup-client');
+        const newDevice = new mediasoupClient.Device();
+
+        socket.emit('getRouterRtpCapabilities', (routerRtpCapabilities: any) => {
+          if (routerRtpCapabilities.error) {
+            console.error('Error getting router capabilities:', routerRtpCapabilities.error);
+            setError('Failed to initialize viewing capabilities');
+            return;
           }
-        }
-        // 4. For audience, re-request stream if needed
-        if (role === "audience" && (!remoteStream || !remoteVideoRef.current?.srcObject)) {
-          setRemoteStream(null);
-          if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-        }
+
+          newDevice.load({ routerRtpCapabilities }).then(() => {
+            setDevice(newDevice);
+            console.log('Mediasoup device initialized for viewing');
+            
+            // Check if stream is already active
+            checkStreamStatus();
+          }).catch((error: any) => {
+            console.error('Error loading device:', error);
+            setError('Failed to load viewing device');
+          });
+        });
+      } catch (error) {
+        console.error('Error importing mediasoup-client:', error);
+        setError('Viewing not supported in this browser');
       }
     };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [role, roomId, socket]);
 
-  // Creator: getUserMedia and handle signaling
-  useEffect(() => {
-    if (role !== "creator" || !socket) return;
-    let stream: MediaStream;
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((s) => {
-      stream = s;
-      localStreamRef.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+    initializeDevice();
+  }, [socket, isConnected]);
+
+  const checkStreamStatus = () => {
+    if (!socket) return;
+    
+    socket.emit('getActiveStreams', (activeStreams: any[]) => {
+      console.log('Active streams:', activeStreams);
+      const targetStream = activeStreams.find(stream => stream.id === roomId);
+      if (targetStream) {
+        setStreamInfo(targetStream);
+        // Auto-join if stream is active
+        joinStream();
       }
     });
-    socket.on("audience-joined", async ({ audienceId }) => {
-      if (!localStreamRef.current) return;
-      const pc = createPeerConnection(audienceId, socket);
-      localStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, localStreamRef.current!);
-      });
-      setTimeout(async () => {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit("offer", { to: audienceId, offer });
-      }, 100);
-    });
-    socket.on("answer", async ({ from, answer }) => {
-      const pc = peerConnections.current[from];
-      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
-    });
-    socket.on("candidate", ({ from, candidate }) => {
-      const pc = peerConnections.current[from];
-      if (pc && candidate) pc.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-    socket.on("stream-ended", () => {
-      Object.values(peerConnections.current).forEach(pc => pc.close());
-      peerConnections.current = {};
-    });
-    socket.on("like", () => setLikes((l) => l + 1));
-    socket.on("comment", (data) => setComments((c) => [...c, data]));
-    socket.on("tip", (data) => setTips((t) => [...t, data]));
-  }, [role, socket]);
+  };
 
-  // Audience: handle signaling and receive stream
-  useEffect(() => {
-    if (role !== "audience" || !socket) return;
-    remoteMediaStream.current = new window.MediaStream();
-    setRemoteStream(remoteMediaStream.current);
-    socket.on("offer", async ({ from, offer }) => {
-      if (audiencePC.current) audiencePC.current.close();
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-      audiencePC.current = pc;
-      pc.ontrack = (event) => {
-        event.streams[0].getTracks().forEach(track => {
-          if (!remoteMediaStream.current!.getTracks().find(t => t.id === track.id)) {
-            remoteMediaStream.current!.addTrack(track);
+  const joinStream = async () => {
+    if (!socket || !device || !roomId) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Joining stream:', roomId);
+      
+      // Join the stream
+      socket.emit('joinStream', { streamId: roomId });
+      
+      // Create consumer transport
+      socket.emit('createConsumerTransport', { streamId: roomId }, (params: any) => {
+        if (params.error) {
+          console.error('Error creating consumer transport:', params.error);
+          setError('Failed to create viewing connection');
+          return;
+        }
+
+        console.log('Consumer transport params received:', params);
+        const transport = device.createRecvTransport(params);
+        setConsumerTransport(transport);
+
+        transport.on('connect', ({ dtlsParameters }: any, callback: any, errback: any) => {
+          console.log('Connecting consumer transport...');
+          socket.emit('connectConsumerTransport', { 
+            streamId: roomId, 
+            dtlsParameters 
+          }, (result: any) => {
+            if (result && result.error) {
+              console.error('Error connecting consumer transport:', result.error);
+              errback(result.error);
+            } else {
+              console.log('Consumer transport connected');
+              callback();
+            }
+          });
+        });
+
+        // Request to consume available producers
+        socket.emit('consume', { streamId: roomId }, (result: any) => {
+          if (result.error) {
+            console.error('Error requesting consumption:', result.error);
+            setError('Failed to start viewing stream');
+          } else {
+            console.log('Stream consumption started');
+            setIsViewingStream(true);
           }
         });
-        setRemoteStream(remoteMediaStream.current!);
-      };
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("candidate", { to: from, candidate: event.candidate });
-        }
-      };
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socket.emit("answer", { to: from, answer });
-    });
-    socket.on("candidate", ({ candidate }) => {
-      if (audiencePC.current && candidate) audiencePC.current.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-    socket.on("stream-ended", () => {
-      setRemoteStream(null);
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-      if (audiencePC.current) audiencePC.current.close();
-      audiencePC.current = null;
-      remoteMediaStream.current = null;
-    });
-    socket.on("like", () => setLikes((l) => l + 1));
-    socket.on("comment", (data) => setComments((c) => [...c, data]));
-    socket.on("tip", (data) => setTips((t) => [...t, data]));
-  }, [role, socket]);
-
-  // Ensure video element updates when remoteStream changes
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+      });
+    } catch (error) {
+      console.error('Error joining stream:', error);
+      setError('Failed to join stream');
+    } finally {
+      setIsLoading(false);
     }
-  }, [remoteStream]);
+  };
 
-  // Camera loss detection for creators
-  useEffect(() => {
-    if (role !== "creator" || !localStreamRef.current) return;
-    const videoTrack = localStreamRef.current.getVideoTracks()[0];
-    if (!videoTrack) return;
+  const leaveStream = () => {
+    if (socket && roomId) {
+      socket.emit('leaveStream', { streamId: roomId });
+    }
+    cleanupViewing();
+    setIsViewingStream(false);
+  };
 
-    const handleEnded = () => {
-      alert("Camera access lost. Please close other tabs or re-enable camera.");
-      // Optionally, try to re-acquire the camera here
-    };
-
-    videoTrack.addEventListener("ended", handleEnded);
-    videoTrack.addEventListener("inactive", handleEnded);
-
-    return () => {
-      videoTrack.removeEventListener("ended", handleEnded);
-      videoTrack.removeEventListener("inactive", handleEnded);
-    };
-  }, [role, localStreamRef.current]);
-
-  // Peer connection factory
-  function createPeerConnection(peerId: string, socket: Socket) {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-    peerConnections.current[peerId] = pc;
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("candidate", { to: peerId, candidate: event.candidate });
+  const cleanupViewing = () => {
+    console.log('Cleaning up viewing resources...');
+    
+    // Close all consumers
+    consumers.forEach((consumer, id) => {
+      console.log(`Closing consumer ${id}`);
+      if (!consumer.closed) {
+        consumer.close();
       }
+    });
+    setConsumers(new Map());
+
+    // Close transport
+    if (consumerTransport && !consumerTransport.closed) {
+      console.log('Closing consumer transport');
+      consumerTransport.close();
+      setConsumerTransport(null);
+    }
+
+    // Clear video elements
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupViewing();
     };
-    return pc;
+  }, []);
+
+  if (role === "creator") {
+    return (
+      <div className="text-center p-4">
+        <p>Use the Stream Preview component for creator view</p>
+      </div>
+    );
   }
 
-  // Audience: send like
-  const handleLike = () => {
-    if (socket) socket.emit("like", { roomId });
-  };
-  // Audience: send comment
-  const handleComment = () => {
-    if (socket && commentInput.trim()) {
-      socket.emit("comment", { roomId, data: { user: audienceName || "Audience", text: commentInput } });
-      setCommentInput("");
-    }
-  };
-  // Audience: send tip
-  const handleTip = () => {
-    if (socket && tipAmount) {
-      socket.emit("tip", { roomId, data: { user: audienceName || "Audience", amount: Number(tipAmount), message: tipMessage } });
-      setTipAmount("");
-      setTipMessage("");
-    }
-  };
-
-  const handleStopLive = async () => {
-    setStopLiveLoading(true);
-    try {
-      await axios.delete(`/api/creator/${roomId}/golive`);
-      // Stop camera
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-        localStreamRef.current = null;
-        if (localVideoRef.current) localVideoRef.current.srcObject = null;
-      }
-      alert("You have stopped livestreaming.");
-      // Redirect to dashboard
-      router.push(`/creator/${roomId}/dashboard`);
-    } catch {
-      alert("Failed to stop live. Please try again.");
-    } finally {
-      setStopLiveLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex flex-col items-center justify-center py-8">
-      <Card className="w-full max-w-4xl mx-auto shadow-2xl border-0 bg-gradient-to-br from-gray-800/80 to-gray-900/90">
-        <CardContent className="p-8 flex flex-col md:flex-row gap-8">
-          {/* Creator Video/Info */}
-          <div className="flex-1 flex flex-col items-center">
-            <div className="flex items-center gap-3 mb-4">
-              <Avatar className="w-12 h-12 ring-2 ring-red-500">
-                <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(creatorName || "Creator")}`} />
-                <AvatarFallback>{(creatorName || "C")[0]}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-bold text-lg text-gray-100">{creatorName || "Creator"}</div>
-                <Badge className="bg-red-600 text-white ml-2">LIVE</Badge>
-              </div>
-            </div>
-            <div className="rounded-xl overflow-hidden shadow-lg mb-4">
-              {role === "creator" ? (
-                <>
-                  <video ref={localVideoRef} autoPlay playsInline muted className="w-96 h-56 bg-black rounded-xl" />
-                  <Button
-                    onClick={handleStopLive}
-                    disabled={stopLiveLoading}
-                    className="mt-4 bg-gradient-to-r from-gray-500 to-gray-800 text-white font-bold shadow-lg px-8 py-2 text-lg rounded-xl"
-                  >
-                    {stopLiveLoading ? "Stopping..." : "Stop Live"}
+    <Card className="w-full">
+      <CardContent className="p-0">
+        <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+          {/* Remote Video */}
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
+            onLoadedMetadata={() => {
+              console.log('Remote video metadata loaded');
+            }}
+            onError={(e) => {
+              console.error('Remote video error:', e);
+              setError('Video playback error');
+            }}
+          />
+          
+          {/* Remote Audio */}
+          <audio
+            ref={remoteAudioRef}
+            autoPlay
+          />
+
+          {/* Stream Status Overlay */}
+          {!isViewingStream && (
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+              <div className="text-center text-white">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 mx-auto">
+                  {isLoading ? (
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
+                    </svg>
+                  )}
+                </div>
+                <p className="text-lg font-medium mb-2">
+                  {error ? 'Stream Error' : isLoading ? 'Joining Stream...' : streamInfo ? `${streamInfo.title}` : 'Waiting for Stream'}
+                </p>
+                <p className="text-sm opacity-75 mb-4">
+                  {error ? error : !isConnected ? 'Connecting to server...' : streamInfo ? `by ${streamInfo.broadcasterName}` : 'Stream will appear here when live'}
+                </p>
+                
+                {!isLoading && !error && streamInfo && (
+                  <Button onClick={joinStream} className="bg-white/20 hover:bg-white/30">
+                    Join Stream
                   </Button>
-                </>
-              ) : (
-                <video ref={remoteVideoRef} autoPlay playsInline className="w-96 h-56 bg-black rounded-xl" />
-              )}
-            </div>
-            <div className="flex gap-4 mt-2">
-              <div className="text-gray-300">Likes: <span className="font-bold text-yellow-400">{likes}</span></div>
-              <div className="text-gray-300">Tips: <span className="font-bold text-green-400">{tips.length}</span></div>
-            </div>
-            {role === "audience" && (
-              <Button onClick={handleLike} size="sm" className="mt-4 bg-yellow-500 text-black">👍 Like</Button>
-            )}
-          </div>
-          {/* Audience/Chat/Tip */}
-          <div className="flex-1 flex flex-col gap-4">
-            <div className="bg-gray-900/80 rounded-xl p-4 mb-2">
-              <div className="font-semibold text-gray-200 mb-2">Live Chat</div>
-              <div className="h-32 overflow-y-auto bg-gray-800 rounded p-2 mb-2">
-                {comments.map((c, i) => (
-                  <div key={i} className="text-sm text-gray-100">
-                    <span className="font-bold text-yellow-300">{c.user}:</span> {c.text}
-                  </div>
-                ))}
-              </div>
-              {role === "audience" && (
-                <div className="flex gap-2">
-                  <input
-                    value={commentInput}
-                    onChange={e => setCommentInput(e.target.value)}
-                    placeholder="Type a comment..."
-                    className="flex-1 px-3 py-2 rounded bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none"
-                  />
-                  <Button onClick={handleComment} size="sm" className="bg-yellow-500 text-black">Send</Button>
-                </div>
-              )}
-            </div>
-            <div className="bg-gray-900/80 rounded-xl p-4">
-              <div className="font-semibold text-gray-200 mb-2">Send a Tip</div>
-              {role === "audience" && (
-                <div className="flex gap-2">
-                  <input
-                    value={tipAmount}
-                    onChange={e => setTipAmount(e.target.value)}
-                    placeholder="Amount"
-                    className="w-24 px-3 py-2 rounded bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none"
-                  />
-                  <input
-                    value={tipMessage}
-                    onChange={e => setTipMessage(e.target.value)}
-                    placeholder="Message (optional)"
-                    className="flex-1 px-3 py-2 rounded bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none"
-                  />
-                  <Button onClick={handleTip} size="sm" className="bg-green-500 text-black">Tip</Button>
-                </div>
-              )}
-              <div className="mt-2 h-16 overflow-y-auto">
-                {tips.map((t, i) => (
-                  <div key={i} className="text-sm text-green-300">
-                    <span className="font-bold">{t.user}:</span> ${t.amount} - {t.message}
-                  </div>
-                ))}
+                )}
+                
+                {!streamInfo && isConnected && (
+                  <Button onClick={checkStreamStatus} variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                    Check Stream Status
+                  </Button>
+                )}
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          )}
+
+          {/* Live Badge */}
+          {isViewingStream && (
+            <div className="absolute top-4 left-4">
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                LIVE
+              </Badge>
+            </div>
+          )}
+
+          {/* Stream Info */}
+          {isViewingStream && streamInfo && (
+            <div className="absolute bottom-4 left-4 right-4">
+              <div className="bg-black/50 backdrop-blur-sm rounded px-3 py-2 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{streamInfo.title}</p>
+                    <p className="text-sm opacity-75">by {streamInfo.broadcasterName}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={leaveStream}
+                    className="text-white hover:bg-white/20"
+                  >
+                    Leave
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 } 

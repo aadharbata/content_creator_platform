@@ -21,7 +21,7 @@ export const LiveStreamWithChat: React.FC<LiveStreamWithChatProps> = ({
 
   useEffect(() => {
     // Connect to the livestream server
-    const newSocket = io(process.env.NEXT_PUBLIC_LIVESTREAM_SERVER_URL || 'http://localhost:3001');
+    const newSocket = io(process.env.NEXT_PUBLIC_LIVESTREAM_SERVER_URL || 'http://localhost:4000');
     
     newSocket.on('connect', () => {
       setIsConnected(true);

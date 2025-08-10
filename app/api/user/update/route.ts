@@ -1,24 +1,72 @@
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]/route';
+import prisma from '@/lib/prisma';
 
-export async function PATCH(req: NextRequest) {
+export async function PUT(request: NextRequest) {
   try {
-    const { userId, name, image } = await req.json();
-    if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
-    const data: any = {};
-    if (name) data.name = name;
-    if (image) data.image = image;
-    if (Object.keys(data).length === 0) {
-      return NextResponse.json({ error: "No update fields provided" }, { status: 400 });
+
+    const { name, email, avatarUrl } = await request.json();
+    const userId = (session.user as any).id;
+
+    // Validate input
+    if (!name || !email) {
+      return NextResponse.json(
+        { success: false, error: 'Name and email are required' },
+        { status: 400 }
+      );
     }
-    const user = await prisma.user.update({
+
+    // Update user in database
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data,
+      data: {
+        name,
+        email,
+      },
     });
-    return NextResponse.json({ user });
+
+    // Update or create user profile with avatar URL
+    if (avatarUrl !== undefined) {
+      await prisma.userProfile.upsert({
+        where: { userId },
+        update: { avatarUrl },
+        create: {
+          userId,
+          avatarUrl,
+        },
+      });
+    }
+
+    // Fetch updated profile
+    const userProfile = await prisma.userProfile.findUnique({
+      where: { userId },
+      select: { avatarUrl: true },
+    });
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        image: userProfile?.avatarUrl || null,
+      },
+    });
+
   } catch (error) {
-    return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
+    console.error('Error updating user:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 } 

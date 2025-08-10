@@ -4,15 +4,14 @@ import { useParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import io, { Socket } from "socket.io-client";
 import LiveStream from "@/components/livestream/LiveStream";
-import { StreamPreview } from "@/components/livestream/StreamPreview";
+import StreamPreview from "@/components/livestream/StreamPreview";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Users, MessageCircle, Settings, Camera, CameraOff } from "lucide-react";
 
-// const SOCKET_URL = "http://10.145.137.71:4000/stream";
-// const SOCKET_URL = "http://localhost:4000/stream";
-const SOCKET_URL = "http://10.145.170.231:4000/stream";
+// Use environment variable or fallback to localhost
+const SOCKET_URL = process.env.NEXT_PUBLIC_LIVESTREAM_SERVER_URL || "http://localhost:4000";
 
 export default function LivestreamPage() {
   const { data: session } = useSession();

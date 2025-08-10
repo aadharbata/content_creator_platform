@@ -30,7 +30,13 @@ import {
   Globe,
   X,
   Clock,
-  XCircle
+  XCircle,
+  User,
+  Camera,
+  Mail,
+  Loader2,
+  Save,
+  Trash2
 } from "lucide-react";
 import { useLanguage } from "@/lib/contexts/LanguageContext";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
@@ -118,6 +124,26 @@ export default function ConsumerChannelPage() {
   const [submittingTip, setSubmittingTip] = useState(false);
   const [subscriptionFilter, setSubscriptionFilter] = useState<'paid' | 'trial' | 'cancelled'>('paid');
   
+  // Settings state
+  const [userData, setUserData] = useState({
+    name: '',
+    email: '',
+    avatarUrl: null as string | null
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // State for sidebar display - this will be updated after successful save
+  const [displayUserData, setDisplayUserData] = useState({
+    name: '',
+    email: '',
+    avatarUrl: null as string | null
+  });
+
+  // Photo management modal state
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+
   // DM Chat (chat-test style) state
   interface TestMessage { id: string; text: string; senderId: string; senderName: string; timestamp: Date }
   interface DmTab { id: string; targetUserId: string; targetUserName?: string; roomId: string; messages: TestMessage[]; unreadCount: number }
@@ -270,6 +296,52 @@ export default function ConsumerChannelPage() {
       });
     }
   }, [post, comments]);
+
+  // Initialize user data for settings
+  useEffect(() => {
+    if (session?.user) {
+      const fetchUserProfile = async () => {
+        try {
+          console.log('Fetching user profile for session user:', session.user);
+          const response = await fetch('/api/user/profile');
+          console.log('Profile fetch response status:', response.status);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Profile data received:', data);
+            const profileData = {
+              name: data.user.name || '',
+              email: data.user.email || '',
+              avatarUrl: data.user.image || null
+            };
+            setUserData(profileData);
+            setDisplayUserData(profileData); // Also set display data
+          } else {
+            console.error('Failed to fetch profile, status:', response.status);
+            // Fallback to session data
+            const fallbackData = {
+              name: (session.user as any).name || '',
+              email: (session.user as any).email || '',
+              avatarUrl: (session.user as any).image || null
+            };
+            setUserData(fallbackData);
+            setDisplayUserData(fallbackData);
+          }
+        } catch (error) {
+          console.error('Failed to fetch user profile:', error);
+          // Fallback to session data on error
+          const fallbackData = {
+            name: (session.user as any).name || '',
+            email: (session.user as any).email || '',
+            avatarUrl: (session.user as any).image || null
+          };
+          setUserData(fallbackData);
+          setDisplayUserData(fallbackData);
+        }
+      };
+      fetchUserProfile();
+    }
+  }, [session]);
 
   // --- DM Chat: auto-connect using session user ---
   const activeDmTab = dmTabs.find(t => t.id === activeDmTabId) || null;
@@ -991,6 +1063,150 @@ export default function ConsumerChannelPage() {
     setIsDarkMode(!isDarkMode);
   };
 
+  // Settings functions
+  const handleInputChange = (field: string, value: string) => {
+    setUserData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('Image size should be less than 5MB');
+        return;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file');
+        return;
+      }
+
+      setAvatarFile(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const uploadAvatar = async (file: File): Promise<string> => {
+    try {
+      console.log('Starting avatar upload for file:', file.name, 'Size:', file.size);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'avatar');
+
+      console.log('Sending upload request to /api/upload');
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('Upload response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Upload failed with status:', response.status, 'Error:', errorText);
+        throw new Error(`Failed to upload avatar: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Upload successful, returned data:', data);
+      
+      if (!data.url) {
+        throw new Error('No URL returned from upload');
+      }
+      
+      return data.url;
+    } catch (error) {
+      console.error('Error in uploadAvatar:', error);
+      throw error;
+    }
+  };
+
+  const handleSave = async () => {
+    if (!session?.user) return;
+
+    setIsSaving(true);
+    try {
+      let avatarUrl = userData.avatarUrl;
+
+      // Upload new avatar if selected
+      if (avatarFile) {
+        console.log('Uploading new avatar file:', avatarFile.name);
+        avatarUrl = await uploadAvatar(avatarFile);
+        console.log('Avatar uploaded successfully, URL:', avatarUrl);
+      }
+
+      console.log('Updating user profile with data:', {
+        name: userData.name,
+        email: userData.email,
+        avatarUrl: avatarUrl,
+      });
+
+      // Update user data
+      const response = await fetch('/api/user/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: userData.name,
+          email: userData.email,
+          avatarUrl: avatarUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+
+      const result = await response.json();
+      console.log('Profile update successful:', result);
+
+      // Update local state with new avatar URL
+      setUserData(prev => ({
+        ...prev,
+        avatarUrl: avatarUrl,
+      }));
+
+      // Update display data for sidebar
+      setDisplayUserData({
+        name: userData.name,
+        email: userData.email,
+        avatarUrl: avatarUrl,
+      });
+
+      // Force a session refresh by calling the session API
+      await fetch('/api/auth/session', { method: 'GET' });
+      
+      // Update the session data in the component
+      if (session) {
+        // Update the session object directly
+        (session.user as any).name = userData.name;
+        (session.user as any).email = userData.email;
+        (session.user as any).image = avatarUrl;
+      }
+
+      alert('Profile updated successfully!');
+      
+      // Clean up preview URL
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setAvatarFile(null);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (status === "loading" || !t) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1021,7 +1237,9 @@ export default function ConsumerChannelPage() {
               {sidebarLinks.map((link) => (
                 <button
                   key={link.id}
-                  onClick={() => setActiveTab(link.id)}
+                  onClick={() => {
+                    setActiveTab(link.id);
+                  }}
                   className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${
                     activeTab === link.id ? "bg-orange-500 text-white" : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                   }`}
@@ -1046,15 +1264,20 @@ export default function ConsumerChannelPage() {
             </div>
 
             {/* User Profile */}
-            <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-6 pb-8 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={user?.image || undefined} alt={user?.name || "User"} />
-                  <AvatarFallback className="bg-orange-500 text-white">
-                    {user?.name?.charAt(0) || "U"}
+                  <AvatarImage 
+                    src={displayUserData.avatarUrl || user?.image || undefined} 
+                    alt={displayUserData.name || user?.name || "User"} 
+                  />
+                  <AvatarFallback className="bg-orange-500 text-white text-sm font-medium">
+                    {(displayUserData.name || user?.name || "U").charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="font-medium text-gray-900 dark:text-gray-100">{user?.name || "User"}</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {displayUserData.name || user?.name || "User"}
+                </span>
               </div>
             </div>
           </div>
@@ -1833,8 +2056,153 @@ export default function ConsumerChannelPage() {
 
                 {activeTab === "settings" && (
                   <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h2>
-                    <p className="text-gray-500 dark:text-gray-400">Manage your account settings and preferences.</p>
+                    {/* Profile Information Card */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      {/* Header with gradient */}
+                      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6">
+                        <div className="flex items-center">
+                          <User className="w-6 h-6 text-white mr-3" />
+                          <div>
+                            <h2 className="text-xl font-bold text-white">Profile Information</h2>
+                            <p className="text-blue-100 text-sm mt-1">Update your personal information and profile photo</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-6 space-y-6">
+                        {/* Profile Photo Section */}
+                        <div className="flex flex-col items-center space-y-4">
+                          <div className="relative">
+                            <div 
+                              className="w-24 h-24 rounded-full overflow-hidden cursor-pointer border-4 border-gray-200 dark:border-gray-700 hover:border-orange-300 transition-colors"
+                              onClick={() => setShowPhotoModal(true)}
+                            >
+                              {previewUrl ? (
+                                <img
+                                  src={previewUrl}
+                                  alt="Profile preview"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : userData.avatarUrl ? (
+                                <img
+                                  src={userData.avatarUrl}
+                                  alt="Profile"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
+                                  <User className="w-12 h-12 text-white" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="absolute -bottom-2 -right-2 flex gap-2">
+                              <button
+                                onClick={() => document.getElementById('avatar-upload')?.click()}
+                                className="w-8 h-8 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center shadow-lg transition-colors duration-200"
+                              >
+                                <Camera className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Profile Photo</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">JPG, PNG or GIF. Max size 5MB.</p>
+                          </div>
+                        </div>
+
+                        {/* Input Fields */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                              <User className="w-4 h-4 mr-2 text-gray-500" />
+                              Full Name
+                            </label>
+                            <Input
+                              value={userData.name}
+                              onChange={(e) => handleInputChange('name', e.target.value)}
+                              placeholder="Enter your full name"
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                              <Mail className="w-4 h-4 mr-2 text-gray-500" />
+                              Email Address
+                            </label>
+                            <Input
+                              value={userData.email}
+                              onChange={(e) => handleInputChange('email', e.target.value)}
+                              placeholder="Enter your email"
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Save Changes Button */}
+                        <div className="flex justify-end pt-4">
+                          <Button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-medium"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Changes
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Account Information Card */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      <div className="bg-blue-600 p-4">
+                        <h2 className="text-lg font-medium text-white flex items-center">
+                          <Lock className="w-5 h-5 mr-2" />
+                          Account Information
+                        </h2>
+                      </div>
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                              <span className="text-gray-500 mr-2">#</span>
+                              User ID
+                            </label>
+                            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 text-sm text-gray-600 dark:text-gray-300">
+                              {(session?.user as any)?.id || "N/A"}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Member Since
+                            </label>
+                            <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-3 text-sm text-blue-600 dark:text-blue-300">
+                              {(session?.user as any)?.createdAt ? new Date((session?.user as any).createdAt).toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              }) : "N/A"}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Account Type
+                            </label>
+                            <div className="bg-green-100 dark:bg-green-900 rounded-lg p-3 text-sm text-green-600 dark:text-green-300 font-medium">
+                              {(session?.user as any)?.role || "CONSUMER"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1976,6 +2344,83 @@ export default function ConsumerChannelPage() {
                   : (language === 'hi' ? 'टिप भेजें' : 'Send Tip')
                 }
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden file input for avatar upload */}
+      <input
+        id="avatar-upload"
+        type="file"
+        accept="image/*"
+        onChange={handleAvatarChange}
+        className="hidden"
+      />
+
+      {/* Photo Management Modal */}
+      {showPhotoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Profile Photo</h3>
+              <button
+                onClick={() => setShowPhotoModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="flex justify-center mb-6">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200 dark:border-gray-700">
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt="Profile preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : userData.avatarUrl ? (
+                  <img
+                    src={userData.avatarUrl}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
+                    <User className="w-16 h-16 text-white" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  document.getElementById('avatar-upload')?.click();
+                  setShowPhotoModal(false);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+                Update Photo
+              </button>
+              {userData.avatarUrl && (
+                <button
+                  onClick={() => {
+                    setUserData(prev => ({ ...prev, avatarUrl: null }));
+                    setPreviewUrl(null);
+                    setAvatarFile(null);
+                    setShowPhotoModal(false);
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              )}
             </div>
           </div>
         </div>

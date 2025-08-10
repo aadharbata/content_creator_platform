@@ -149,6 +149,10 @@ export class TransportManager {
     return Array.from(this.transports.keys());
   }
 
+  getAllTransports(): Map<string, mediasoupTypes.WebRtcTransport> {
+    return this.transports;
+  }
+
   getAllProducerTransportStreamIds(): string[] {
     return Array.from(this.producerTransports.keys());
   }
