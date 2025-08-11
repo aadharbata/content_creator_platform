@@ -45,7 +45,9 @@ export interface ChatMessage {
   username: string;
   message: string;
   timestamp: Date;
-  type: 'message' | 'system' | 'moderator';
+  type: 'message' | 'system' | 'moderator' | 'warning';
+  originalMessage?: string; // Store original message if profanity was filtered
+  isFiltered?: boolean; // Flag to indicate if message was filtered for profanity
 }
 
 export interface ChatUser {

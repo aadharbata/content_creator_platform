@@ -15,6 +15,7 @@ import {
   InterServerEvents, 
   SocketData 
 } from './types/events'
+import Filter from 'bad-words'
 
 // Environment variables validation
 const requiredEnvVars = ['DATABASE_URL', 'NEXTAUTH_SECRET']
@@ -155,6 +156,9 @@ const offlineMessages = new Map<string, Array<{
 const connectedUsers = new Map<string, string>() // userId -> socketId
 const socketToUser = new Map<string, string>() // socketId -> userId
 
+// Initialize the profanity filter
+const profanityFilter = new Filter()
+
 // Socket connection handling
 io.on('connection', (socket: AuthenticatedSocket) => {
   const { userId, userName, userRole } = socket.data
@@ -267,16 +271,35 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     })
 
     socket.on('test_send_community_message', (data: { communityId: string; content: string }) => {
+      const sanitizedContent = profanityFilter.clean(data.content)
+      
+      // Check if content was sanitized and notify user
+      if (data.content !== sanitizedContent) {
+        socket.emit('system_message', {
+          type: 'moderation_warning',
+          message: 'Your message contained inappropriate content and has been modified to comply with community guidelines.',
+          timestamp: new Date()
+        })
+        
+        socketLogger.info('Test community profanity detected and sanitized', {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          communityId: data.communityId,
+          originalLength: data.content.length,
+          cleanedLength: sanitizedContent.length
+        })
+      }
+
       socketLogger.info('Test community message', {
         socketId: socket.id,
         userId: socket.data.userId,
         communityId: data.communityId,
-        contentLength: data.content.length
+        contentLength: sanitizedContent.length
       })
 
       const message = {
         id: `test-msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        content: data.content,
+        content: sanitizedContent,
         createdAt: new Date(),
         senderId: socket.data.userId,
         sender: {
@@ -414,17 +437,37 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   })
 
   socket.on('sendMessage', (data: { id: string, text: string, senderId: string, senderName: string, timestamp: Date, roomId: string, targetUserId: string }) => {
+    const sanitizedText = profanityFilter.clean(data.text)
+    
+    // Check if content was sanitized and notify user
+    if (data.text !== sanitizedText) {
+      socket.emit('system_message', {
+        type: 'moderation_warning',
+        message: 'Your message contained inappropriate content and has been modified to comply with community guidelines.',
+        timestamp: new Date()
+      })
+      
+      socketLogger.info('Test message profanity detected and sanitized', {
+        socketId: socket.id,
+        userId: data.senderId,
+        roomId: data.roomId,
+        targetUserId: data.targetUserId,
+        originalLength: data.text.length,
+        cleanedLength: sanitizedText.length
+      })
+    }
+
     socketLogger.info('Test message sent', {
       socketId: socket.id,
       userId: data.senderId,
       roomId: data.roomId,
-      messageLength: data.text.length,
+      messageLength: sanitizedText.length,
       targetUserId: data.targetUserId
     })
     
     const message = {
       id: data.id,
-      text: data.text,
+      text: sanitizedText,
       senderId: data.senderId,
       senderName: data.senderName,
       timestamp: data.timestamp
@@ -671,4 +714,4 @@ process.on('unhandledRejection', (reason, promise) => {
 })
 
 // Start the server
-startServer() 
+startServer()

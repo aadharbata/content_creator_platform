@@ -108,6 +108,23 @@ export class MessageHandler {
 
       // Sanitize message content
       const cleanContent = this.profanityFilter.clean(content)
+      
+      // Check if content was sanitized and notify user
+      if (content !== cleanContent) {
+        socket.emit('system_message', {
+          type: 'moderation_warning',
+          message: 'Your message contained inappropriate content and has been modified to comply with community guidelines.',
+          timestamp: new Date()
+        })
+        
+        messageLogger.info('Profanity detected and sanitized', {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          conversationId,
+          originalLength: content.length,
+          cleanedLength: cleanContent.length
+        })
+      }
 
       messageLogger.info('Message send attempt', {
         socketId: socket.id,
@@ -433,6 +450,23 @@ export class MessageHandler {
 
       // Sanitize community message content
       const cleanContent = this.profanityFilter.clean(content)
+      
+      // Check if content was sanitized and notify user
+      if (content !== cleanContent) {
+        socket.emit('system_message', {
+          type: 'moderation_warning',
+          message: 'Your message contained inappropriate content and has been modified to comply with community guidelines.',
+          timestamp: new Date()
+        })
+        
+        messageLogger.info('Community profanity detected and sanitized', {
+          socketId: socket.id,
+          userId,
+          communityId,
+          originalLength: content.length,
+          cleanedLength: cleanContent.length
+        })
+      }
 
       // DEVELOPMENT MODE: Skip database checks and create mock message
       if (process.env.NODE_ENV === 'development') {

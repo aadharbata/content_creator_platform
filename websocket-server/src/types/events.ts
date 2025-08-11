@@ -76,12 +76,21 @@ export interface ClientToServerEvents {
   leave_community: (data: { communityId: string }) => void
 }
 
+export interface SystemMessageData {
+  type: 'moderation_warning' | 'info' | 'error' | 'success'
+  message: string
+  timestamp: Date
+}
+
 // Server to Client Events
 export interface ServerToClientEvents {
   // Message events
   message_sent: (data: MessageSentData) => void
   new_message: (data: NewMessageData) => void
   message_error: (data: { error: string; originalContent?: string }) => void
+  
+  // System events
+  system_message: (data: SystemMessageData) => void
   
   // Conversation events
   conversation_updated: (data: ConversationUpdateData) => void

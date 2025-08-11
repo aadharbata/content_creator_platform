@@ -104,10 +104,49 @@ export class ChatHandlers {
             message: result.message
           });
 
-          callback({ success: true, message: result.message });
+          // If there's a warning, send it only to the sender
+          if (result.warning) {
+            socket.emit('profanityWarning', {
+              message: result.warning.message,
+              originalMessage: result.message.originalMessage,
+              filteredMessage: result.message.message,
+              warningCount: result.warningCount || 0,
+              timestamp: new Date()
+            });
+          }
+
+          callback({ 
+            success: true, 
+            message: result.message,
+            hasWarning: !!result.warning,
+            warning: result.warning 
+          });
           
-          console.log(`Message sent in stream ${streamId} by ${username}: ${message}`);
+          console.log(`Message sent in stream ${streamId} by ${username}: ${message}${result.warning ? ' (filtered for profanity)' : ''}`);
         } else {
+          // Check if this is a profanity-related error
+          if (result.error && result.error.includes('inappropriate content')) {
+            // Send warning directly to the sender
+            socket.emit('profanityWarning', {
+              message: result.error,
+              warningCount: result.warningCount || 0,
+              timestamp: new Date()
+            });
+            
+            console.log(`Profanity warning sent to ${username} in stream ${streamId}: ${result.error}`);
+          }
+          
+          // Check if user should be blocked
+          if (result.error && result.error.includes('temporarily blocked')) {
+            socket.emit('userBlocked', {
+              message: result.error,
+              blockDuration: 300, // 5 minutes in seconds
+              timestamp: new Date()
+            });
+            
+            console.log(`User ${username} blocked in stream ${streamId}: ${result.error}`);
+          }
+          
           callback({
             success: false,
             error: result.error
@@ -250,6 +289,28 @@ export class ChatHandlers {
         callback({
           success: false,
           error: 'Failed to clear chat'
+        });
+      }
+    });
+  }
+
+  handleGetUserWarningStatus(socket: Socket): void {
+    socket.on('getUserWarningStatus', ({ streamId }, callback) => {
+      try {
+        const warningCount = this.chatManager.getUserWarningCount(socket.id);
+        const isTimedOut = this.chatManager.isUserTimedOut(socket.id);
+        
+        callback({
+          success: true,
+          warningCount,
+          isTimedOut,
+          maxWarnings: 3 // This should match MAX_WARNINGS_BEFORE_TIMEOUT
+        });
+      } catch (error) {
+        console.error('Error in getUserWarningStatus:', error);
+        callback({
+          success: false,
+          error: 'Failed to get warning status'
         });
       }
     });

@@ -95,6 +95,7 @@ io.on('connection', (socket) => {
   chatHandlers.handleGetChatUsers(socket);
   chatHandlers.handleTypingIndicator(socket);
   chatHandlers.handleClearChat(socket);
+  chatHandlers.handleGetUserWarningStatus(socket);
   
   // Handle disconnection
   connectionHandlers.handleDisconnection(socket, socketTransports);

@@ -1,6 +1,7 @@
 // services/ChatManager.ts
 import { ChatMessage, ChatUser, SendMessageData, JoinChatData } from '../types';
 import { StreamManager } from './StreamManager';
+import Filter from 'bad-words';
 
 export class ChatManager {
   private messageHistory = new Map<string, ChatMessage[]>(); // streamId -> messages
@@ -9,8 +10,21 @@ export class ChatManager {
   private rateLimitMap = new Map<string, { count: number; lastReset: number }>(); // socketId -> rate limit info
   private readonly RATE_LIMIT_WINDOW = 10000; // 10 seconds
   private readonly RATE_LIMIT_MAX_MESSAGES = 5; // 5 messages per window
+  private profanityFilter: Filter;
+  private userWarnings = new Map<string, { count: number; lastWarning: number }>(); // socketId -> warning info
+  private readonly WARNING_RESET_TIME = 300000; // 5 minutes
+  private readonly MAX_WARNINGS_BEFORE_TIMEOUT = 3;
 
-  constructor(private streamManager: StreamManager) {}
+  constructor(private streamManager: StreamManager) {
+    // Initialize profanity filter
+    this.profanityFilter = new Filter();
+    
+    // Add custom words if needed (optional)
+    // this.profanityFilter.addWords('customword1', 'customword2');
+    
+    // Remove words from filter if needed (optional)
+    // this.profanityFilter.removeWords('word1', 'word2');
+  }
 
   joinChat(socketId: string, data: JoinChatData): { success: boolean; user?: ChatUser; error?: string } {
     try {
@@ -86,7 +100,7 @@ export class ChatManager {
     }
   }
 
-  sendMessage(socketId: string, data: SendMessageData): { success: boolean; message?: ChatMessage; error?: string } {
+  sendMessage(socketId: string, data: SendMessageData): { success: boolean; message?: ChatMessage; error?: string; warning?: ChatMessage; warningCount?: number } {
     try {
       const stream = this.streamManager.getStream(data.streamId);
       if (!stream) {
@@ -100,6 +114,13 @@ export class ChatManager {
 
       // Check rate limiting (moderators are exempt)
       if (!user.isModerator) {
+        // Check if user is timed out due to excessive profanity warnings
+        if (this.isUserTimedOut(socketId)) {
+          const warningInfo = this.userWarnings.get(socketId);
+          const timeRemaining = warningInfo ? Math.ceil((this.WARNING_RESET_TIME - (Date.now() - warningInfo.lastWarning)) / 60000) : 0;
+          return { success: false, error: `You are temporarily blocked from sending messages due to excessive inappropriate language. Time remaining: ${timeRemaining} minutes.` };
+        }
+
         const rateLimitCheck = this.checkRateLimit(socketId);
         if (!rateLimitCheck.allowed) {
           return { success: false, error: `Rate limit exceeded. Please wait ${Math.ceil(rateLimitCheck.waitTime / 1000)} seconds.` };
@@ -115,19 +136,72 @@ export class ChatManager {
         return { success: false, error: 'Message too long' };
       }
 
+      const originalMessage = data.message.trim();
+      let filteredMessage = originalMessage;
+      let isFiltered = false;
+      let warningMessage: ChatMessage | undefined;
+
+      // Check for profanity (moderators are exempt from filtering)
+      if (!user.isModerator) {
+        const hasProfanity = this.profanityFilter.isProfane(originalMessage);
+        
+        if (hasProfanity) {
+          // Filter the message
+          filteredMessage = this.profanityFilter.clean(originalMessage);
+          isFiltered = true;
+
+          // Track warnings for this user
+          const warningInfo = this.trackUserWarning(socketId);
+          
+          // Create warning message for the sender
+          warningMessage = {
+            id: this.generateMessageId(),
+            streamId: data.streamId,
+            userId: 'system',
+            username: 'System',
+            message: `Warning: Your message contained inappropriate language and has been filtered. Warning ${warningInfo.count}/${this.MAX_WARNINGS_BEFORE_TIMEOUT}. ${warningInfo.count >= this.MAX_WARNINGS_BEFORE_TIMEOUT ? 'You have reached the maximum number of warnings.' : `${this.MAX_WARNINGS_BEFORE_TIMEOUT - warningInfo.count} warnings remaining.`}`,
+            timestamp: new Date(),
+            type: 'warning'
+          };
+
+          console.log(`Profanity detected from user ${user.username} (${socketId}): "${originalMessage}" -> "${filteredMessage}"`);
+          
+          // Store the warning count for returning
+          const currentWarningCount = warningInfo.count;
+          
+          const message: ChatMessage = {
+            id: this.generateMessageId(),
+            streamId: data.streamId,
+            userId: user.userId || socketId,
+            username: user.username,
+            message: filteredMessage,
+            timestamp: new Date(),
+            type: user.isModerator ? 'moderator' : 'message',
+            originalMessage: isFiltered ? originalMessage : undefined,
+            isFiltered
+          };
+
+          this.addMessage(data.streamId, message);
+
+          return { success: true, message, warning: warningMessage, warningCount: currentWarningCount };
+        }
+      }
+
       const message: ChatMessage = {
         id: this.generateMessageId(),
         streamId: data.streamId,
         userId: user.userId || socketId,
         username: user.username,
-        message: data.message.trim(),
+        message: filteredMessage,
         timestamp: new Date(),
-        type: user.isModerator ? 'moderator' : 'message'
+        type: user.isModerator ? 'moderator' : 'message',
+        originalMessage: isFiltered ? originalMessage : undefined,
+        isFiltered
       };
 
       this.addMessage(data.streamId, message);
 
-      return { success: true, message };
+      return { success: true, message, warning: warningMessage, warningCount: warningMessage ? 1 : 0 };
     } catch (error) {
       console.error('Error sending message:', error);
       return { success: false, error: 'Failed to send message' };
@@ -236,5 +310,60 @@ export class ChatManager {
   // Clean up rate limit data for disconnected users
   cleanupRateLimit(socketId: string): void {
     this.rateLimitMap.delete(socketId);
+    this.userWarnings.delete(socketId);
+  }
+
+  private trackUserWarning(socketId: string): { count: number; isMaxReached: boolean } {
+    const now = Date.now();
+    const warningInfo = this.userWarnings.get(socketId);
+
+    if (!warningInfo) {
+      // First warning for this user
+      this.userWarnings.set(socketId, { count: 1, lastWarning: now });
+      return { count: 1, isMaxReached: false };
+    }
+
+    // Check if we need to reset the warning count (after WARNING_RESET_TIME)
+    if (now - warningInfo.lastWarning >= this.WARNING_RESET_TIME) {
+      warningInfo.count = 1;
+      warningInfo.lastWarning = now;
+      return { count: 1, isMaxReached: false };
+    }
+
+    // Increment warning count
+    warningInfo.count++;
+    warningInfo.lastWarning = now;
+    
+    const isMaxReached = warningInfo.count >= this.MAX_WARNINGS_BEFORE_TIMEOUT;
+    
+    return { count: warningInfo.count, isMaxReached };
+  }
+
+  getUserWarningCount(socketId: string): number {
+    const warningInfo = this.userWarnings.get(socketId);
+    if (!warningInfo) return 0;
+
+    const now = Date.now();
+    // Reset count if warning period has expired
+    if (now - warningInfo.lastWarning >= this.WARNING_RESET_TIME) {
+      this.userWarnings.delete(socketId);
+      return 0;
+    }
+
+    return warningInfo.count;
+  }
+
+  isUserTimedOut(socketId: string): boolean {
+    const warningInfo = this.userWarnings.get(socketId);
+    if (!warningInfo) return false;
+
+    const now = Date.now();
+    // If warning period has expired, user is no longer timed out
+    if (now - warningInfo.lastWarning >= this.WARNING_RESET_TIME) {
+      this.userWarnings.delete(socketId);
+      return false;
+    }
+
+    return warningInfo.count >= this.MAX_WARNINGS_BEFORE_TIMEOUT;
   }
 }

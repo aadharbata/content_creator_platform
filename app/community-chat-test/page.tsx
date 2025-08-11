@@ -29,6 +29,13 @@ interface TypingIndicator {
   userName: string;
 }
 
+interface SystemMessage {
+  id: string;
+  type: 'moderation_warning' | 'info' | 'error' | 'success';
+  message: string;
+  timestamp: Date;
+}
+
 export default function CommunityChatTestPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [messageInput, setMessageInput] = useState('');
@@ -39,6 +46,7 @@ export default function CommunityChatTestPage() {
   const [activeCommunityId, setActiveCommunityId] = useState<string | null>(null);
   const [newCommunityId, setNewCommunityId] = useState('');
   const [newCommunityName, setNewCommunityName] = useState('');
+  const [systemMessages, setSystemMessages] = useState<SystemMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -91,6 +99,7 @@ export default function CommunityChatTestPage() {
         setIsConnected(false);
         setCommunities([]);
         setActiveCommunityId(null);
+        setSystemMessages([]);
       });
 
       socketInstance.on('connect_error', (error) => {
@@ -187,6 +196,23 @@ export default function CommunityChatTestPage() {
         console.log('Left community:', data);
       });
 
+      // System message events (including moderation warnings)
+      socketInstance.on('system_message', (data: Omit<SystemMessage, 'id'>) => {
+        console.log('Received system message:', data);
+        const systemMessage: SystemMessage = {
+          id: generateUniqueId(),
+          ...data,
+          timestamp: new Date(data.timestamp)
+        };
+        
+        setSystemMessages(prev => [...prev, systemMessage]);
+        
+        // Auto-remove the message after 10 seconds
+        setTimeout(() => {
+          setSystemMessages(prev => prev.filter(msg => msg.id !== systemMessage.id));
+        }, 10000);
+      });
+
       socketInstance.connect();
 
     } catch (error) {
@@ -202,6 +228,7 @@ export default function CommunityChatTestPage() {
       setIsConnected(false);
       setCommunities([]);
       setActiveCommunityId(null);
+      setSystemMessages([]);
     }
   };
 
@@ -551,6 +578,44 @@ export default function CommunityChatTestPage() {
                     <div ref={messagesEndRef} />
                   </div>
                 </div>
+
+                {/* System Messages Display */}
+                {systemMessages.length > 0 && (
+                  <div className="px-4 py-2 space-y-2">
+                    {systemMessages.map((sysMsg) => (
+                      <div
+                        key={sysMsg.id}
+                        className={`p-3 rounded-lg text-sm ${
+                          sysMsg.type === 'moderation_warning' 
+                            ? 'bg-yellow-100 border border-yellow-300 text-yellow-800'
+                            : sysMsg.type === 'error'
+                            ? 'bg-red-100 border border-red-300 text-red-800'
+                            : sysMsg.type === 'success'
+                            ? 'bg-green-100 border border-green-300 text-green-800'
+                            : 'bg-blue-100 border border-blue-300 text-blue-800'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {sysMsg.type === 'moderation_warning' && '⚠️ Content Warning'}
+                              {sysMsg.type === 'error' && '❌ Error'}
+                              {sysMsg.type === 'success' && '✅ Success'}
+                              {sysMsg.type === 'info' && 'ℹ️ Info'}
+                            </div>
+                            <div className="mt-1">{sysMsg.message}</div>
+                          </div>
+                          <button
+                            onClick={() => setSystemMessages(prev => prev.filter(msg => msg.id !== sysMsg.id))}
+                            className="ml-2 text-gray-500 hover:text-gray-700"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Message Input */}
                 <div className="p-4 border-t border-gray-200">
