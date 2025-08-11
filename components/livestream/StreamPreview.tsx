@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Camera, CameraOff, Monitor, Maximize2, RotateCcw } from 'lucide-react';
@@ -16,6 +17,8 @@ interface StreamPreviewProps {
 
 export default function StreamPreview({ onViewerCountChange }: StreamPreviewProps) {
   const { data: session } = useSession();
+  const params = useParams();
+  const creatorId = params.creatorId as string;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
@@ -32,13 +35,20 @@ export default function StreamPreview({ onViewerCountChange }: StreamPreviewProp
   const [producers, setProducers] = useState<Map<string, any>>(new Map());
   const [streamId, setStreamId] = useState<string | null>(null);
 
-  const isCreator = (session?.user as any)?.role === 'CREATOR';
+  // Check if current user is the creator of this stream
+  const isCreator = (session?.user as any)?.id === creatorId;
 
   useEffect(() => {
     if (!isCreator) return;
 
     console.log('Initializing socket connection to:', SOCKET_URL);
-    const newSocket = io(SOCKET_URL);
+    setConnectionStatus('connecting');
+    
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 10000,
+      forceNew: true
+    });
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -70,7 +80,15 @@ export default function StreamPreview({ onViewerCountChange }: StreamPreviewProp
         console.log('Mediasoup device loaded successfully');
       } catch (error) {
         console.error('Failed to load device:', error);
-        setError('Failed to initialize streaming device');
+        setError('Failed to initialize streaming device. Please refresh the page and try again.');
+        // Try to provide more specific error information
+        if (error instanceof Error) {
+          if (error.message.includes('mediasoup-client')) {
+            setError('Streaming library not available. Please check your internet connection and refresh the page.');
+          } else {
+            setError(`Device initialization failed: ${error.message}`);
+          }
+        }
       }
     });
 
@@ -104,7 +122,7 @@ export default function StreamPreview({ onViewerCountChange }: StreamPreviewProp
       console.log('Cleaning up socket connection');
       newSocket.disconnect();
     };
-  }, [isCreator, onViewerCountChange]);
+  }, [isCreator, creatorId, onViewerCountChange]);
 
   const startCamera = async () => {
     if (!videoRef.current) {
@@ -175,7 +193,10 @@ export default function StreamPreview({ onViewerCountChange }: StreamPreviewProp
 
       // Start streaming if device is ready
       if (device && socket) {
+        console.log('Device and socket ready, starting streaming...');
         await startStreaming(stream);
+      } else {
+        console.log('Device or socket not ready yet. Device:', !!device, 'Socket:', !!socket);
       }
 
     } catch (error: any) {
@@ -415,6 +436,44 @@ export default function StreamPreview({ onViewerCountChange }: StreamPreviewProp
               Stop Stream
             </Button>
           )}
+
+          {/* Test Connection Button */}
+          <Button
+            onClick={() => {
+              if (socket) {
+                console.log('Socket connected:', socket.connected);
+                console.log('Socket ID:', socket.id);
+                socket.emit('getRouterRtpCapabilities');
+              } else {
+                console.log('No socket available');
+              }
+            }}
+            variant="outline"
+            size="sm"
+            className="bg-gray-600 hover:bg-gray-700 text-white"
+          >
+            Test Connection
+          </Button>
+
+          {/* Test Camera Button - Works without streaming server */}
+          <Button
+            onClick={async () => {
+              try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                console.log('Camera test successful:', stream);
+                alert('Camera test successful! Camera is working.');
+                stream.getTracks().forEach(track => track.stop());
+              } catch (error) {
+                console.error('Camera test failed:', error);
+                alert(`Camera test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
+            }}
+            variant="outline"
+            size="sm"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            Test Camera
+          </Button>
         </div>
 
         {/* Quality Indicator */}
@@ -471,6 +530,38 @@ export default function StreamPreview({ onViewerCountChange }: StreamPreviewProp
           <p className="text-xs font-medium">Performance</p>
         </div>
       </div>
+
+      {/* Debug Panel - Only show if there are errors or during development */}
+      {(error || process.env.NODE_ENV === 'development') && (
+        <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <h3 className="font-semibold mb-2">Debug Info</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <strong>Connection:</strong> {connectionStatus}
+            </div>
+            <div>
+              <strong>Socket ID:</strong> {socket?.id || 'Not connected'}
+            </div>
+            <div>
+              <strong>Device Ready:</strong> {device ? 'Yes' : 'No'}
+            </div>
+            <div>
+              <strong>Camera:</strong> {isCameraOn ? 'On' : 'Off'}
+            </div>
+            <div>
+              <strong>Streaming:</strong> {isStreaming ? 'Yes' : 'No'}
+            </div>
+            <div>
+              <strong>Stream ID:</strong> {streamId || 'None'}
+            </div>
+          </div>
+          {error && (
+            <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/20 rounded text-red-700 dark:text-red-400">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 } 

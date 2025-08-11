@@ -201,29 +201,8 @@ export default function LivestreamPage() {
 
             {/* Chat & Analytics - Right Column */}
             <div className="space-y-6">
-              {/* Live Chat */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5" />
-                    Live Chat
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 bg-gray-50 rounded-lg p-4 overflow-y-auto">
-                    <div className="text-center text-gray-500 text-sm">
-                      Chat messages will appear here when you go live
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <input
-                      type="text"
-                      placeholder="Send a message to your audience..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Live Chat - removed default chat UI */}
+              {/* Intentionally left empty to keep the page focused on the live player */}
 
               {/* Tips Section - New */}
               <Card>
@@ -259,54 +238,30 @@ export default function LivestreamPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center text-gray-500 text-sm">
-                        Tips from your audience will appear here
-                      </div>
+                      <div className="text-center text-gray-500 text-sm">No tips yet</div>
                     )}
-                  </div>
-                  
-                  {/* Tips Summary */}
-                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-green-800">Total Tips Today</span>
-                      <span className="text-lg font-bold text-green-600">
-                        ${creatorTips.reduce((sum, tip) => sum + tip.amount, 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center mt-1">
-                      <span className="text-xs text-green-600">Number of tips</span>
-                      <span className="text-sm font-medium text-green-600">{creatorTips.length}</span>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Audience Stats */}
+              {/* Stream Support */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    Audience
+                    🙌 Support the Stream
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Current Viewers</span>
-                      <span className="text-lg font-bold text-blue-600">{viewerCount}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Peak Viewers</span>
-                      <span className="text-lg font-bold text-green-600">0</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Total Views</span>
-                      <span className="text-lg font-bold text-purple-600">0</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Stream Duration</span>
-                      <span className="text-lg font-bold text-orange-600">00:00:00</span>
-                    </div>
+                  <div className="grid grid-cols-4 gap-3">
+                    {streamSupportOptions.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSupport(opt.amount)}
+                        className="bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-2 text-sm font-medium"
+                      >
+                        ${opt.amount}
+                      </button>
+                    ))}
                   </div>
                 </CardContent>
               </Card>

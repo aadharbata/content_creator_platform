@@ -105,26 +105,32 @@ export async function GET(request: NextRequest) {
       prisma.product.count({ where })
     ]);
 
-    // Transform the data to match the expected format
-    const transformedProducts = products.map(product => ({
-      id: product.id,
-      title: product.title,
-      description: product.description,
-      price: product.price,
-      type: product.type,
-      thumbnail: product.thumbnail,
-      images: product.images,
-      status: product.status,
-      rating: product.rating || 0,
-      sales: product.salesCount || 0,
-      creator: {
-        id: product.creator.id,
-        name: product.creator.name,
-        avatar: product.creator.profile?.avatarUrl || null
-      },
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt
-    }));
+    // Helper to validate a usable image URL
+    const isValidUrl = (u?: string | null) => !!u && (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/'));
+
+    // Transform and filter invalid products (no title or no usable image)
+    const transformedProducts = products
+      .map(product => ({
+        id: product.id,
+        title: product.title,
+        description: product.description,
+        price: product.price,
+        type: product.type,
+        thumbnail: isValidUrl(product.thumbnail) ? product.thumbnail : '/placeholder.jpg',
+        images: product.images,
+        status: product.status,
+        rating: product.rating || 0,
+        sales: product.salesCount || 0,
+        creator: {
+          id: product.creator.id,
+          name: product.creator.name,
+          avatar: product.creator.profile?.avatarUrl || null
+        },
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt
+      }))
+      // Optionally filter out products that still have no safe thumbnail or have missing essentials
+      .filter(p => !!p.title && !!p.thumbnail);
 
     return NextResponse.json({
       success: true,

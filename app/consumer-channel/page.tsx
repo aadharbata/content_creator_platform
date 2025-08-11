@@ -242,10 +242,10 @@ export default function ConsumerChannelPage() {
   const sidebarLinks = [
     { id: "feed", label: t?.feed || "Feed", href: "#", icon: <Home className="w-6 h-6" /> },
     { id: "creators", label: t?.creators || "Creators", href: "#", icon: <Users className="w-6 h-6" /> },
-    { id: "product-store", label: t?.productStore || "Product Store", href: "#", icon: <ShoppingBag className="w-6 h-6" /> },
-    { id: "my-products", label: t?.myProducts || "My Products", href: "#", icon: <Settings className="w-6 h-6" /> },
+    { id: "product-store", label: t?.productStore || "Product Store", href: "/products-store", icon: <ShoppingBag className="w-6 h-6" /> },
+    { id: "my-products", label: t?.myProducts || "My Products", href: "/myproducts-store", icon: <Settings className="w-6 h-6" /> },
     { id: "subscriptions", label: t?.subscriptions || "Subscriptions", href: "#", icon: <CreditCard className="w-6 h-6" /> },
-    { id: "live-creators", label: t?.liveCreators || "Live Creators", href: "#", icon: <Users className="w-6 h-6" /> },
+          { id: "live-creators", label: t?.liveCreators || "Live Creators", href: "/live-creators", icon: <Users className="w-6 h-6" /> },
     { id: "chats", label: t?.chats || "Chats", href: "#", icon: <MessageCircle className="w-6 h-6" /> },
     { id: "settings", label: t?.settings || "Settings", href: "#", icon: <SettingsIcon className="w-6 h-6" /> },
   ];
@@ -1303,6 +1303,18 @@ export default function ConsumerChannelPage() {
                 <button
                   key={link.id}
                   onClick={() => {
+                    if (link.id === "product-store") {
+                      router.push("/products-store");
+                      return;
+                    }
+                    if (link.id === "my-products") {
+                      router.push("/myproducts-store");
+                      return;
+                    }
+                    if (link.id === "live-creators") {
+                      router.push("/live-creators");
+                      return;
+                    }
                     setActiveTab(link.id);
                   }}
                   className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${
@@ -1646,13 +1658,29 @@ export default function ConsumerChannelPage() {
 
                 {activeTab === "live-creators" && (
                   <div className="space-y-4">
-                    <div className="text-center mb-6">
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                        {language === 'hi' ? 'लाइव क्रिएटर्स' : 'Live Creators'}
-                      </h2>
-                      <p className="text-gray-500 dark:text-gray-400">
-                        {language === 'hi' ? 'अभी लाइव स्ट्रीमिंग कर रहे क्रिएटर्स को देखें' : 'Discover amazing creators who are streaming live right now'}
-                      </p>
+                    {/* Hero */}
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-50 via-white to-blue-50 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 p-8 mb-8 border border-gray-100 dark:border-gray-700">
+                      <div className="max-w-4xl mx-auto text-center">
+                        <div className="inline-flex items-center text-xs font-medium text-pink-600 bg-pink-50 border border-pink-200 rounded-full px-3 py-1 mb-4 dark:text-pink-300 dark:bg-pink-900/30 dark:border-pink-800">
+                          {language === 'hi' ? 'अभी लाइव स्ट्रीमिंग कर रहे क्रिएटर्स खोजें' : 'Discover amazing creators streaming right now'}
+                        </div>
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-4">
+                          Watch. Request. Connect —
+                          <br className="hidden sm:block" />
+                          {language === 'hi' ? 'सब कुछ एक ही जगह' : 'all in one place'}
+                        </h1>
+                        <p className="text-gray-600 dark:text-gray-300 mb-6">
+                          {language === 'hi' ? 'टॉप लाइव क्रिएटर्स देखें या अपने पसंदीदा क्रिएटर से स्ट्रीम के लिए अनुरोध करें' : 'Browse top live creators, jump into streams, or request your favorite creators to go live.'}
+                        </p>
+                        <div className="flex items-center justify-center gap-3 flex-wrap">
+                          <Button className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl">
+                            {language === 'hi' ? 'अभी देखें' : 'Watch Live Now'}
+                          </Button>
+                          <Button variant="outline" className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-5 py-2.5 rounded-xl">
+                            {language === 'hi' ? 'लाइवस्ट्रीम का अनुरोध करें' : 'Request a Livestream'}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     
                     {loadingLiveCreators ? (
@@ -1661,12 +1689,47 @@ export default function ConsumerChannelPage() {
                         <p className="text-gray-500 dark:text-gray-400 mt-4">Loading live creators...</p>
                       </div>
                     ) : liveCreators.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                          <TrendingUp className="w-8 h-8 text-gray-400" />
+                      <div className="py-10">
+                        <div className="text-center mb-8">
+                          <div className="w-20 h-20 mx-auto mb-4 bg-orange-50 dark:bg-gray-700 rounded-full flex items-center justify-center border border-orange-200">
+                            <TrendingUp className="w-9 h-9 text-orange-500" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">No livestreams found</h3>
+                          <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
+                            You can request a livestream from your favorite creators to go live.
+                          </p>
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Live Creators</h3>
-                        <p className="text-gray-500 dark:text-gray-400">No creators are currently live streaming.</p>
+
+                        {/* Request Livestreams from favorite creators */}
+                        <div className="max-w-6xl mx-auto">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                            Request Livestreams from Your Favorite Creators
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[ 
+                              { id:'req1', name:'Livvy Dunne', image:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=1200&auto=format&fit=crop' },
+                              { id:'req2', name:'Poo Bear', image:'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop' },
+                              { id:'req3', name:'Charley Hull', image:'https://images.unsplash.com/photo-1528763380143-65b3ac2c9f87?q=80&w=1200&auto=format&fit=crop' }
+                            ].map((c) => (
+                              <Card key={c.id} className="overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                <div className="h-44 w-full bg-gray-200 dark:bg-gray-700">
+                                  <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                                </div>
+                                <CardContent className="p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <h5 className="font-semibold text-gray-900 dark:text-gray-100">{c.name}</h5>
+                                    </div>
+                                    <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">Active</span>
+                                  </div>
+                                  <Button className="w-full mt-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 rounded-lg">
+                                    Request Livestream
+                                  </Button>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className={`grid gap-4 ${
@@ -1715,6 +1778,37 @@ export default function ConsumerChannelPage() {
                         ))}
                       </div>
                     )}
+
+                    {/* Request section is shown below even when creators are live */}
+                    <div className="mt-10 max-w-6xl mx-auto">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                        Request Livestreams from Your Favorite Creators
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[ 
+                          { id:'req1', name:'Livvy Dunne', image:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=1200&auto=format&fit=crop' },
+                          { id:'req2', name:'Poo Bear', image:'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop' },
+                          { id:'req3', name:'Charley Hull', image:'https://images.unsplash.com/photo-1528763380143-65b3ac2c9f87?q=80&w=1200&auto=format&fit=crop' }
+                        ].map((c) => (
+                          <Card key={c.id} className="overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                            <div className="h-44 w-full bg-gray-200 dark:bg-gray-700">
+                              <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                            </div>
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h5 className="font-semibold text-gray-900 dark:text-gray-100">{c.name}</h5>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">Active</span>
+                              </div>
+                              <Button className="w-full mt-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 rounded-lg">
+                                Request Livestream
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2452,15 +2546,6 @@ export default function ConsumerChannelPage() {
                       </div>
                       <div className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                              <span className="text-gray-500 mr-2">#</span>
-                              User ID
-                            </label>
-                            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 text-sm text-gray-600 dark:text-gray-300">
-                              {(session?.user as any)?.id || "N/A"}
-                            </div>
-                          </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                               Member Since
