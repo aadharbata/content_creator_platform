@@ -19,17 +19,8 @@ export default function Header({ language, setLanguage, translations }: HeaderPr
   return (
     <header className="sticky top-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center space-x-2">
-          <div className="flex space-x-1">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">P</span>
-            </div>
-          </div>
-        </div>
+        {/* Logo placeholder removed per request */}
+        <div />
 
         {/* Navigation */}
         <nav className="hidden md:flex items-center space-x-8">

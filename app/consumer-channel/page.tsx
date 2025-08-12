@@ -45,6 +45,7 @@ import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Socket, io } from "socket.io-client";
+import Link from 'next/link'
 
 interface SessionUser {
   id: string;
@@ -245,8 +246,8 @@ export default function ConsumerChannelPage() {
     { id: "product-store", label: t?.productStore || "Product Store", href: "/products-store", icon: <ShoppingBag className="w-6 h-6" /> },
     { id: "my-products", label: t?.myProducts || "My Products", href: "/myproducts-store", icon: <Settings className="w-6 h-6" /> },
     { id: "subscriptions", label: t?.subscriptions || "Subscriptions", href: "#", icon: <CreditCard className="w-6 h-6" /> },
-          { id: "live-creators", label: t?.liveCreators || "Live Creators", href: "/live-creators", icon: <Users className="w-6 h-6" /> },
-    { id: "chats", label: t?.chats || "Chats", href: "#", icon: <MessageCircle className="w-6 h-6" /> },
+    { id: "live-creators", label: t?.liveCreators || "Live Creators", href: "/live-creators", icon: <Users className="w-6 h-6" /> },
+    { id: "chats", label: t?.chats || "Chats", href: "/chat-live", icon: <MessageCircle className="w-6 h-6" /> },
     { id: "settings", label: t?.settings || "Settings", href: "#", icon: <SettingsIcon className="w-6 h-6" /> },
   ];
 
@@ -488,7 +489,14 @@ export default function ConsumerChannelPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, status, user?.id]);
 
+  const startChatViaMainPage = (targetUserId: string) => {
+    if (!targetUserId) return;
+    router.push(`/chat?to=${encodeURIComponent(targetUserId)}`);
+  };
+
   const createNewChat = async () => {
+    // Deprecated in favor of startChatViaMainPage when we have a concrete target id
+    if (!newChatUserId) return startChatViaMainPage(newChatUserId);
     if (!dmSocket || !newChatUserId || !user) {
       console.log("Cannot create chat:", { dmSocket: !!dmSocket, newChatUserId, user: !!user });
       return;
@@ -668,20 +676,9 @@ export default function ConsumerChannelPage() {
   // Start chat with selected user
   const startChatWithUser = (user: { id: string; name: string; email: string; role: string }) => {
     if (!user || user.id === (session?.user as any)?.id) return;
-    
     console.log("Starting chat with user:", user);
-    
-    // Fill the manual entry field with the selected user's ID
-    setNewChatUserId(user.id);
-    
-    // Clear search results and query
-    setSearchQuery("");
-    setSearchResults([]);
-    
-    // Automatically create the chat
-    setTimeout(() => {
-      createNewChat();
-    }, 100);
+    // Route into main chat so it's authenticated and persistent
+    startChatViaMainPage(user.id);
   };
 
   const fetchTopCreators = async () => {
@@ -1303,6 +1300,10 @@ export default function ConsumerChannelPage() {
                 <button
                   key={link.id}
                   onClick={() => {
+                    if (link.href && link.href.startsWith('/')) {
+                      router.push(link.href);
+                      return;
+                    }
                     if (link.id === "product-store") {
                       router.push("/products-store");
                       return;
@@ -2270,161 +2271,18 @@ export default function ConsumerChannelPage() {
                 {activeTab === "chats" && (
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
-                      <div className="bg-blue-600 text-white p-4">
-                        <h3 className="text-xl font-bold">Direct Messages</h3>
-                        <p className="text-blue-100 text-sm">Chat with creators or users in real-time</p>
-                      </div>
-                      
-                      {/* Search Section */}
-                      <div className="p-4 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-800">
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search Users</label>
-                          <div className="relative">
-                            <input 
-                              value={searchQuery} 
-                              onChange={handleSearchChange}
-                              placeholder="Search by name or email..." 
-                              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                            />
-                            {isSearching && (
-                              <div className="absolute right-3 top-2">
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Search Results */}
-                          {searchResults.length > 0 && (
-                            <div className="mt-2 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800">
-                              {searchResults.map((result) => (
-                                <div 
-                                  key={result.id}
-                                  onClick={() => {
-                                    console.log("Clicked on user:", result);
-                                    startChatWithUser(result);
-                                  }}
-                                  className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors active:bg-blue-100 dark:active:bg-blue-900/40"
-                                  style={{ userSelect: 'none' }}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                      <div className="font-medium text-gray-900 dark:text-gray-100">{result.name}</div>
-                                      <div className="text-sm text-gray-500 dark:text-gray-400">{result.email}</div>
-                                    </div>
-                                    <Badge variant="secondary" className="text-xs ml-2">
-                                      {result.role}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Manual User ID Entry */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start New Chat (User ID)</label>
-                          <div className="flex gap-2">
-                            <input 
-                              value={newChatUserId} 
-                              onChange={(e) => setNewChatUserId(e.target.value)} 
-                              placeholder="Enter user ID to chat with" 
-                              className="flex-1 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                            />
-                            <Button 
-                              onClick={createNewChat} 
-                              disabled={!newChatUserId} 
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Start Chat
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-                          Hey <span className="font-semibold">{user?.name}</span>! Ready to chat?
+                      <div className="bg-blue-600 text-white p-6 text-center">
+                        <h3 className="text-xl font-bold mb-1">Direct Messages</h3>
+                        <p className="text-blue-100 text-sm">Chat in real-time with creators and users</p>
+                        <div className="mt-4">
+                          <button onClick={() => router.push('/chat-live')} className="bg-white text-blue-700 hover:bg-blue-50 px-5 py-2 rounded-lg font-medium">
+                            Open Chat
+                          </button>
                         </div>
                       </div>
-
-                      {/* Chat Tabs */}
-                      {dmTabs.length > 0 && (
-                        <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-                          <div className="flex overflow-x-auto">
-                            {dmTabs.map(tab => (
-                              <div key={tab.id} className={`flex-shrink-0 border-b-2 ${activeDmTabId===tab.id?'border-blue-500 bg-white dark:bg-gray-900':'border-transparent'}`}>
-                                <div className="flex items-center">
-                                  <button onClick={()=>{setActiveDmTabId(tab.id); setDmTabs(p=>p.map(t=>t.id===tab.id?{...t, unreadCount:0}:t));}} className={`px-4 py-2 text-sm font-medium ${activeDmTabId===tab.id?'text-blue-600':'text-gray-600 dark:text-gray-300 hover:text-gray-800'}`}>
-                                    <div className="flex items-center gap-2">
-                                      <span>{tab.targetUserName || tab.targetUserId}</span>
-                                      {tab.unreadCount>0 && (<span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] h-5 flex items-center justify-center">{tab.unreadCount}</span>)}
-                                    </div>
-                                  </button>
-                                  <button onClick={()=>{setDmTabs(p=>p.filter(t=>t.id!==tab.id)); if(activeDmTabId===tab.id){ const remaining=dmTabs.filter(t=>t.id!==tab.id); setActiveDmTabId(remaining[0]?.id||null);} }} className="px-2 py-2 text-gray-400 hover:text-gray-600">×</button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Chat Messages */}
-                      <div className="h-96 overflow-y-auto p-4 bg-white dark:bg-gray-900 space-y-3">
-                        {dmTabs.length===0 ? (
-                          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-                            <div className="text-center">
-                              <div className="text-6xl mb-4">💬</div>
-                              <p className="text-lg font-medium">No active chats</p>
-                              <p className="text-sm mt-2">Search for users to start chatting</p>
-                            </div>
-                          </div>
-                        ) : !activeDmTab ? (
-                          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-                            <div className="text-center">
-                              <div className="text-6xl mb-4">💬</div>
-                              <p className="text-lg font-medium">Select a chat to start messaging</p>
-                              <p className="text-sm mt-2">Click on a chat tab above to begin a conversation</p>
-                            </div>
-                          </div>
-                        ) : (
-                          activeDmTab.messages.map(m => (
-                            <div key={m.id} className={`flex ${m.senderId===user?.id?'justify-end':'justify-start'}`}>
-                              <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${m.senderId==='system'?'bg-gray-200 text-gray-700 text-center italic':(m.senderId===user?.id?'bg-blue-600 text-white':'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100')}`}>
-                                {m.senderId!=='system' && m.senderId!==user?.id && (
-                                  <div className="text-xs font-semibold mb-1 text-blue-600 dark:text-blue-400">
-                                    {m.senderName}
-                                  </div>
-                                )}
-                                <div className="break-words">{m.text}</div>
-                                <div className="text-xs opacity-75 mt-1">
-                                  {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
+                      <div className="p-6 text-center text-gray-600 dark:text-gray-300">
+                        The in-page chat has moved. Click "Open Chat" to continue.
                       </div>
-
-                      {/* Message Input */}
-                      {activeDmTab && (
-                        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-                          <div className="flex gap-2">
-                            <Input 
-                              value={messageInput} 
-                              onChange={(e) => setMessageInput(e.target.value)} 
-                              onKeyPress={handleDmKey} 
-                              placeholder={`Type a message to ${activeDmTab.targetUserName || activeDmTab.targetUserId}...`} 
-                              className="flex-1" 
-                            />
-                            <Button 
-                              onClick={sendDm} 
-                              disabled={!messageInput.trim()} 
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Send
-                            </Button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}

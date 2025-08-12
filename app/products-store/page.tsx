@@ -51,9 +51,14 @@ const TYPE_DISPLAY_NAMES: Record<Product['type'], string> = {
 
 export default function ProductsStorePage() {
   const router = useRouter()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  // Initialize from URL so landing searches filter immediately
+  const initialParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const initialSearch = initialParams?.get('search') || ''
+  const initialType = (initialParams?.get('type') as Product['type'] | null) || 'all'
+
+  const [searchTerm, setSearchTerm] = useState(initialSearch)
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch)
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialType)
   const [sortBy, setSortBy] = useState('popular')
   const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 })
   const [minRating, setMinRating] = useState(0)

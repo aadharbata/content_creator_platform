@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Skip eslint blocking during builds (we run lint separately in CI)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // for now for getting images from unsplash 
   images: {
     remotePatterns: [

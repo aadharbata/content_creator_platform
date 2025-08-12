@@ -1,52 +1,49 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useSession, signOut } from "next-auth/react"
-import { useLanguage } from "@/lib/contexts/LanguageContext"
+import React, { useEffect, useState } from "react"
 import Header from "@/frontend/components/Header"
 import Hero from "@/frontend/components/Hero"
 import SearchSection from "@/frontend/components/SearchSection"
-import TopCoursesSection from "@/frontend/components/TopCoursesSection"
 import TopCreatorsSection from "@/frontend/components/TopCreatorsSection"
+import TopCoursesSection from "@/frontend/components/TopCoursesSection"
 import CreatorCTA from "@/frontend/components/CreatorCTA"
 import Footer from "@/frontend/components/Footer"
-import { topCreators } from "@/frontend/data/creators"
-import { categories } from "@/frontend/data/categories"
+import { useLanguage } from "@/lib/contexts/LanguageContext"
+import TopProductsSection from "@/frontend/components/TopProductsSection"
 
-export default function HomePage() {
-  const { data: session } = useSession()
-  const { language, setLanguage, translations: appTranslations } = useLanguage()
-  const [mounted, setMounted] = useState(false)
+export default function LandingPage() {
+  const { language, setLanguage, translations } = useLanguage()
+  const [topCourses, setTopCourses] = useState<any[]>([])
 
   useEffect(() => {
-    setMounted(true)
+    const fetchTopCourses = async () => {
+      try {
+        const res = await fetch("/api/courses/topcourses")
+        if (res.ok) {
+          const data = await res.json()
+          setTopCourses(data.courses || [])
+        } else {
+          setTopCourses([])
+        }
+      } catch {
+        setTopCourses([])
+      }
+    }
+    fetchTopCourses()
   }, [])
 
-  if (!mounted) {
-    return null
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <Header 
-        language={language} 
-        setLanguage={setLanguage} 
-        translations={appTranslations} 
-      />
-      
-      <main>
-        <Hero language={language} translations={appTranslations} />
-        <SearchSection language={language} translations={appTranslations} categories={categories} />
-        <TopCoursesSection language={language} translations={appTranslations} topCourses={[]} />
-        <TopCreatorsSection 
-          language={language} 
-          translations={appTranslations}
-          topCreators={topCreators}
-        />
-        <CreatorCTA language={language} translations={appTranslations} />
-      </main>
-      
-      <Footer language={language} translations={appTranslations} />
-    </div>
+    <main className="min-h-screen bg-white dark:bg-gray-900">
+      <Header language={language} setLanguage={setLanguage} translations={translations} />
+      <Hero language={language} translations={translations} />
+      <SearchSection language={language} translations={translations} />
+      <TopProductsSection />
+      <TopCreatorsSection language={language} translations={translations} />
+      {topCourses.length > 0 && (
+        <TopCoursesSection language={language} translations={translations} topCourses={topCourses as any} />
+      )}
+      <CreatorCTA language={language} translations={translations} />
+      <Footer language={language} translations={translations} />
+    </main>
   )
 }

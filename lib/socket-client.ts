@@ -20,9 +20,20 @@ export const getSocket = (): Socket => {
   return socket;
 };
 
-export const connectSocket = () => {
-  if (socket && !socket.connected) {
-    socket.connect();
+// Allow callers to set handshake auth before connecting
+export const setSocketAuth = (auth: Record<string, unknown>) => {
+  const s = getSocket();
+  // socket.io client supports mutating auth before connect
+  (s as any).auth = { ...(s as any).auth, ...auth };
+};
+
+export const connectSocket = (auth?: Record<string, unknown>) => {
+  const s = getSocket();
+  if (auth) {
+    (s as any).auth = { ...(s as any).auth, ...auth };
+  }
+  if (!s.connected) {
+    s.connect();
   }
 };
 
