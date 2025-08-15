@@ -316,7 +316,14 @@ export default function ChatLivePage() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-4 -ml-2">
-          <button onClick={() => router.push("/consumer-channel")} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 transition-colors">
+          <button onClick={() => {
+            const userRole = (session?.user as any)?.role;
+            if (userRole === 'CREATOR') {
+              router.push(`/creator/${meId}/dashboard`);
+            } else {
+              router.push("/consumer-channel");
+            }
+          }} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span className="font-medium">Go Back</span>
           </button>

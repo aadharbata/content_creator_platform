@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
           post.media && post.media.length > 0 ? post.media[0].url : undefined,
         isPaid: shouldShowLocked,
         price: shouldShowLocked ? "₹" : undefined,
-        likes: post._count.likes,
+        likes: post.media.reduce((sum, media) => sum + (media.LikesCount || 0), 0),
         comments: post._count.comments,
         tips: {
           count: post._count.tip,

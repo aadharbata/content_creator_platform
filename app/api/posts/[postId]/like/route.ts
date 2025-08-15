@@ -67,6 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
       ]);
 
       return NextResponse.json({
+        success: true,
         action: "unliked",
         message: "Post unliked successfully",
       });
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
       ]);
 
       return NextResponse.json({
+        success: true,
         action: "liked",
         like,
         message: "Post liked successfully",

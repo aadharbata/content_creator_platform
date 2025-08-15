@@ -1089,3 +1089,86 @@ Error: listen EADDRINUSE: address already in use :::3001
     }
   ]
 }
+2025-08-15 15:04:16 [ERROR]: uncaughtException: listen EADDRINUSE: address already in use :::3001
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:633:16)
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at startServer (C:\Users\mbatr\Desktop\content7\content_creator_platform\websocket-server\src\server.ts:633:16)
+{
+  "error": {
+    "code": "EADDRINUSE",
+    "errno": -4091,
+    "syscall": "listen",
+    "address": "::",
+    "port": 3001
+  },
+  "exception": true,
+  "date": "Fri Aug 15 2025 15:04:16 GMT+0530 (India Standard Time)",
+  "process": {
+    "pid": 21112,
+    "uid": null,
+    "gid": null,
+    "cwd": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.12.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts"
+    ],
+    "memoryUsage": {
+      "rss": 95191040,
+      "heapTotal": 35487744,
+      "heapUsed": 19046656,
+      "external": 3636725,
+      "arrayBuffers": 180995
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 46023.609
+  },
+  "trace": [
+    {
+      "column": 16,
+      "file": "node:net",
+      "function": "Server.setupListenHandle [as _listen2]",
+      "line": 1912,
+      "method": "setupListenHandle [as _listen2]",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:net",
+      "function": "listenInCluster",
+      "line": 1969,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 7,
+      "file": "node:net",
+      "function": "Server.listen",
+      "line": 2074,
+      "method": "listen",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "C:\\Users\\mbatr\\Desktop\\content7\\content_creator_platform\\websocket-server\\src\\server.ts",
+      "function": "startServer",
+      "line": 633,
+      "method": null,
+      "native": false
+    }
+  ]
+}

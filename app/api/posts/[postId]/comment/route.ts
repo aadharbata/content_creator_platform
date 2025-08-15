@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import prisma from '@/lib/prisma'
-import { getToken } from "next-auth/jwt";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   const { postId } = await params;
-  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) {
-    return NextResponse.json({ error: 'Missing authentication token.' }, { status: 401 });
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
-  if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
-    return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
-  }
-  const userId: string = jwtUser.id;
+  
+  const userId = (session.user as any).id;
   let content: string | undefined = undefined;
   let body: Record<string, unknown> = {};
   try {
@@ -75,17 +73,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ post
   }
 }
 
-export async function DELETE(req: NextRequest) {
-  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) {
-    return NextResponse.json({ error: 'Missing authentication token.' }, { status: 401 });
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
+  const { postId } = await params;
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const jwtUser = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'Ishan' });
-  if (!jwtUser || typeof jwtUser.id !== 'string' || !jwtUser.id) {
-    return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
-  }
-  const userId: string = jwtUser.id;
+  
+  const userId = (session.user as any).id;
   let commentId: string | undefined = undefined;
   let body: Record<string, unknown> = {};
   try {
@@ -96,15 +92,36 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   if (!commentId) return NextResponse.json({ error: 'Missing commentId' }, { status: 400 });
+  
   try {
-    // Only allow deleting own comment
-    const comment = await prisma.comment.findUnique({ where: { id: commentId } });
-    if (!comment || comment.userId !== userId) {
-      return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+    // Get the comment and post details
+    const comment = await prisma.comment.findUnique({ 
+      where: { id: commentId },
+      include: {
+        post: {
+          include: {
+            creator: true
+          }
+        }
+      }
+    });
+    
+    if (!comment) {
+      return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
+
+    // Check if user is the comment author OR the post creator
+    const isCommentAuthor = comment.userId === userId;
+    const isPostCreator = comment.post.creator.userId === userId;
+    
+    if (!isCommentAuthor && !isPostCreator) {
+      return NextResponse.json({ error: 'Not authorized to delete this comment' }, { status: 403 });
+    }
+
     await prisma.comment.delete({ where: { id: commentId } });
-    return NextResponse.json({ success: true });
-  } catch {
+    return NextResponse.json({ success: true, message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
     return NextResponse.json({ error: 'Failed to delete comment' }, { status: 500 });
   }
 } 

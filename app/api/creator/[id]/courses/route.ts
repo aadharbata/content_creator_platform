@@ -38,34 +38,53 @@ export async function GET(
   try {
     const { id } = await params
     
-    const courses = await prisma.course.findMany({
-      where: {
-        authorId: id
-      },
-      include: {
-        _count: {
-          select: {
-            reviews: true
-          }
+    // Fetch both courses and products
+    const [courses, products] = await Promise.all([
+      prisma.course.findMany({
+        where: {
+          authorId: id
         },
-        contents: {
-          include: {
-            ContentAnalytics: true,
-            Category: {
-              select: {
-                id: true,
-                name: true
+        include: {
+          _count: {
+            select: {
+              reviews: true
+            }
+          },
+          contents: {
+            include: {
+              ContentAnalytics: true,
+              Category: {
+                select: {
+                  id: true,
+                  name: true
+                }
               }
             }
           }
+        },
+        orderBy: {
+          createdAt: "desc"
         }
-      },
-      orderBy: {
-        createdAt: "desc"
-      }
-    })
+      }),
+      prisma.product.findMany({
+        where: {
+          creatorId: id,
+          status: "PUBLISHED"
+        },
+        include: {
+          _count: {
+            select: {
+              reviews: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        }
+      })
+    ])
 
-    // Transform the data with category calculation logic
+    // Transform courses
     const transformedCourses = courses.map(course => ({
       id: course.id,
       title: course.title,
@@ -89,7 +108,29 @@ export async function GET(
       )
     }))
 
-    return NextResponse.json(transformedCourses)
+    // Transform products to course format
+    const transformedProducts = products.map(product => ({
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      students: product.salesCount,
+      rating: product.rating,
+      imgURL: product.thumbnail,
+      description: product.description,
+      salesCount: product.salesCount,
+      createdAt: product.createdAt,
+      duration: 0, // Products don't have duration
+      category: product.type,
+      _count: {
+        reviews: product._count.reviews
+      },
+      ContentAnalytics: []
+    }))
+
+    // Combine and return both courses and products
+    const allCourses = [...transformedCourses, ...transformedProducts]
+
+    return NextResponse.json(allCourses)
   } catch (error) {
     console.error("Error fetching creator courses:", error)
     return NextResponse.json(

@@ -112,6 +112,28 @@ export default function ConsumerChannelPage() {
   const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
   const [visibleComments, setVisibleComments] = useState<Set<string>>(new Set());
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+
+  // Load liked posts from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      const savedLikedPosts = localStorage.getItem(`likedPosts_${user.id}`);
+      if (savedLikedPosts) {
+        try {
+          const parsedLikedPosts = JSON.parse(savedLikedPosts);
+          setLikedPosts(new Set(parsedLikedPosts));
+        } catch (error) {
+          console.error('Error loading liked posts from localStorage:', error);
+        }
+      }
+    }
+  }, [user?.id]);
+
+  // Save liked posts to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      localStorage.setItem(`likedPosts_${user.id}`, JSON.stringify(Array.from(likedPosts)));
+    }
+  }, [likedPosts, user?.id]);
   const [commentCount, setCommentCount] = useState<{ [key: string]: number }>({});
   const [submittingComments, setSubmittingComments] = useState<Set<string>>(new Set());
   const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set());
@@ -265,6 +287,18 @@ export default function ConsumerChannelPage() {
       console.log("Posts response:", response.data);
       if (response.data.success) {
         setPost(response.data.posts);
+        
+        // Update liked posts state based on API response
+        const likedPostIds = response.data.posts
+          .filter((p: Post) => p.isLiked)
+          .map((p: Post) => p.id);
+        
+        setLikedPosts(prev => {
+          const newSet = new Set(prev);
+          // Add posts that are liked according to API
+          likedPostIds.forEach((id: string) => newSet.add(id));
+          return newSet;
+        });
       } else {
         console.log("Posts response not successful:", response.data);
         setPost([]);
@@ -825,8 +859,8 @@ export default function ConsumerChannelPage() {
       const currentPost = post.find(p => p.id === postId);
       if (!currentPost) return;
       const isCurrentlyLiked = likedPosts.has(postId) || currentPost.isLiked;
-      const newLikeCount = isCurrentlyLiked ? currentPost.likes - 1 : currentPost.likes + 1;
 
+      // Optimistic update
       setLikedPosts(prev => {
         const newSet = new Set(prev);
         if (isCurrentlyLiked) {
@@ -840,7 +874,11 @@ export default function ConsumerChannelPage() {
       setPost(prevPosts =>
         prevPosts.map(p =>
           p.id === postId
-            ? { ...p, likes: newLikeCount, isLiked: !isCurrentlyLiked }
+            ? { 
+                ...p, 
+                likes: isCurrentlyLiked ? Math.max(0, p.likes - 1) : p.likes + 1, 
+                isLiked: !isCurrentlyLiked 
+              }
             : p
         )
       );
@@ -848,6 +886,7 @@ export default function ConsumerChannelPage() {
       const response = await axios.post(`/api/posts/${postId}/like`);
 
       if (!response.data.success) {
+        // Revert optimistic update on failure
         setLikedPosts(prev => {
           const newSet = new Set(prev);
           if (isCurrentlyLiked) {
@@ -865,8 +904,27 @@ export default function ConsumerChannelPage() {
               : p
           )
         );
+      } else {
+        // Fetch updated like count from server to ensure accuracy
+        try {
+          const postResponse = await axios.get(`/api/posts/${postId}`);
+          if (postResponse.data.success && postResponse.data.post) {
+            const updatedPost = postResponse.data.post;
+            setPost(prevPosts =>
+              prevPosts.map(p =>
+                p.id === postId
+                  ? { ...p, likes: updatedPost.likes || p.likes }
+                  : p
+              )
+            );
+          }
+        } catch (fetchError) {
+          console.error('Failed to fetch updated like count:', fetchError);
+        }
       }
     } catch (error) {
+      console.error('Like toggle error:', error);
+      // Revert optimistic update on error
       const currentPost = post.find(p => p.id === postId);
       if (currentPost) {
         setLikedPosts(prev => {

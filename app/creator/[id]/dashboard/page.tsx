@@ -2,14 +2,10 @@
 
 import { useState, useEffect, use, useRef } from "react"
 import { useLanguage } from "@/lib/contexts/LanguageContext"
-import { socketManager } from "@/lib/socket"
 import { useSession, signOut } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
 import {
-  DashboardMessage,
-  DashboardConversation,
-  convertWebSocketToDashboard,
-  isValidMessage
+  DashboardConversation
 } from "@/lib/types/shared"
 import Link from "next/link"
 import {
@@ -30,7 +26,8 @@ import {
   Calendar,
   Search,
   LogOut,
-  CreditCard
+  CreditCard,
+  Trash2
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -49,6 +46,7 @@ import { cn } from "@/lib/utils"
 import { type Language } from "@/lib/translations"
 import { ApiError, NetworkError, handleApiError } from "@/lib/types/errors"
 import { SubscriptionManager } from "@/components/SubscriptionManager"
+
 
 // Professional constants
 const COURSE_BADGES = {
@@ -76,6 +74,29 @@ interface Course {
     views: number
     likes: number
   }[]
+}
+
+interface Product {
+  id: string
+  title: string
+  description: string
+  price: number
+  type: string
+  thumbnail: string
+  images: string[]
+  status: string
+  rating: number
+  salesCount: number
+  createdAt: string
+  updatedAt: string
+  creator: {
+    id: string
+    name: string
+    avatar: string | null
+  }
+  _count: {
+    reviews: number
+  }
 }
 
 interface Post {
@@ -155,29 +176,39 @@ interface Activity {
 
 // Using shared types for consistency
 type Conversation = DashboardConversation
-type Message = DashboardMessage
 
 // Professional utility functions
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat('en-IN').format(num)
+const formatNumber = (num: number) => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
+  return num.toString()
 }
 
-const formatDate = (timestamp: string): string => {
+const formatDate = (date: Date | string) => {
+  const d = new Date(date)
+  return d.toLocaleDateString('en-US', { 
+    day: 'numeric', 
+    month: 'short', 
+    year: 'numeric' 
+  })
+}
+
+const getBadge = (role: string) => {
+  switch (role) {
+    case 'CREATOR': return 'bg-orange-100 text-orange-800'
+    case 'CONSUMER': return 'bg-blue-100 text-blue-800'
+    default: return 'bg-gray-100 text-gray-800'
+  }
+}
+
+// Parse multilingual content to get English text
+const parseMultilingualContent = (content: string) => {
   try {
-    return new Date(timestamp).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  } catch { }
-  return '';
-}
-
-const getBadge = (course: Course, t: Record<string, string>) => {
-  if (course.salesCount >= COURSE_BADGES.BESTSELLER.threshold) return t.bestseller
-  if (course.salesCount >= COURSE_BADGES.POPULAR.threshold) return t.popular
-  if (course._count.reviews >= COURSE_BADGES.TOP_RATED.threshold) return t.topRated
-  return t.new
+    const parsed = JSON.parse(content)
+    return parsed.en || content // Return English content or original if not JSON
+  } catch {
+    return content // Return original content if not valid JSON
+  }
 }
 
 const validateUUID = (id: string): boolean => {
@@ -216,16 +247,18 @@ function CourseCard({ course, t }: { course: Course; t: Record<string, string> }
   return (
     <Card className="group hover:shadow-lg transition-shadow duration-300 border-0 bg-white/80 backdrop-blur-sm h-full flex flex-col">
       <div className="relative overflow-hidden rounded-t-lg">
-        <Image
+        <img
           src={course.imgURL || getCourseImageFallback(course.category)}
           alt={course.title}
-          layout="fill"
-          objectFit="cover"
           className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = getCourseImageFallback(course.category);
+          }}
         />
         <div className="absolute top-2 left-2 flex gap-2">
           <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
-            {getBadge(course, t)}
+            {getBadge(course.category)}
           </Badge>
         </div>
       </div>
@@ -243,7 +276,7 @@ function CourseCard({ course, t }: { course: Course; t: Record<string, string> }
           <div className="space-y-2">
             <div>
               <span className="text-gray-600">{t.price}:</span>
-              <span className="font-semibold ml-1">₹{formatNumber(course.price)}</span>
+              <span className="font-semibold ml-1">${Math.round(course.price)}</span>
             </div>
             <div className="flex items-center space-x-1 text-xs">
               <Star className="w-3 h-3 text-yellow-400 fill-current" aria-hidden="true" />
@@ -260,7 +293,64 @@ function CourseCard({ course, t }: { course: Course; t: Record<string, string> }
             <div className="text-xs">
               <span className="text-gray-600">{t.earnings}:</span>
               <span className="font-semibold text-green-600 ml-1">
-                ₹{formatNumber(course.price * course.salesCount)}
+                ${Math.round(course.price * course.salesCount)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Product Card Component
+function ProductCard({ product, t }: { product: Product; t: Record<string, string> }) {
+  return (
+    <Card className="group hover:shadow-lg transition-shadow duration-300 border-0 bg-white/80 backdrop-blur-sm h-full flex flex-col">
+      <div className="relative overflow-hidden rounded-t-lg">
+        <img
+          src={product.thumbnail || '/placeholder.jpg'}
+          alt={product.title}
+          className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+        <div className="absolute top-2 left-2 flex gap-2">
+          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+            {product.type}
+          </Badge>
+        </div>
+      </div>
+
+      <CardContent className="p-4 flex flex-col flex-grow">
+        <h3 className="font-semibold mb-2 group-hover:text-blue-600 transition-colors min-h-[3rem] line-clamp-2">
+          {product.title}
+        </h3>
+
+        <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-grow min-h-[2.5rem]">
+          {product.description}
+        </p>
+
+        <div className="flex justify-between items-end mt-auto pt-4 text-sm">
+          <div className="space-y-2">
+            <div>
+              <span className="text-gray-600">{t.price}:</span>
+              <span className="font-semibold ml-1">${Math.round(product.price)}</span>
+            </div>
+            <div className="flex items-center space-x-1 text-xs">
+              <Star className="w-3 h-3 text-yellow-400 fill-current" aria-hidden="true" />
+              <span aria-label={`${t.rating}: ${product.rating.toFixed(1)} out of 5`}>
+                {product.rating.toFixed(1)}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2 text-right">
+            <div>
+              <span className="text-gray-600">Sales:</span>
+              <span className="font-semibold ml-1">{formatNumber(product.salesCount)}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-gray-600">{t.earnings}:</span>
+              <span className="font-semibold text-green-600 ml-1">
+                ${Math.round(product.price * product.salesCount)}
               </span>
             </div>
           </div>
@@ -316,24 +406,24 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
 
   // State for real data (move all useState calls here, before any conditional logic)
   const [creator, setCreator] = useState<Creator | null>(null)
-  const [courses, setCourses] = useState<Course[]>([])
-  const [posts, setPosts] = useState<Post[]>([])
   const [stats, setStats] = useState<CreatorStats | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [newMessage, setNewMessage] = useState("")
-  const [conversationSearch, setConversationSearch] = useState("")
-  const [messagesLoading, setMessagesLoading] = useState(false)
-  const [sendingMessage, setSendingMessage] = useState(false)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [courses, setCourses] = useState<Course[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview")
+  const [deletePostId, setDeletePostId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [editingPostId, setEditingPostId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editContent, setEditContent] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [showComments, setShowComments] = useState<Set<string>>(new Set())
+  const [comments, setComments] = useState<{ [key: string]: any[] }>({})
+  const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set())
 
-  // Refs
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   // Validate UUID
   if (!validateUUID(id)) {
@@ -386,6 +476,184 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     }
   };
 
+  // Edit post functions
+  const handleEditPost = (post: Post) => {
+    setEditingPostId(post.id)
+    setEditTitle(parseMultilingualContent(post.title))
+    setEditContent(parseMultilingualContent(post.content))
+  }
+
+  const handleSaveEdit = async (postId: string) => {
+    if (!editTitle.trim() || !editContent.trim()) {
+      alert('Title and content cannot be empty')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/posts/${postId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: editTitle,
+          content: editContent,
+        }),
+      })
+
+      if (response.ok) {
+        // Update the post in local state
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId
+              ? {
+                  ...post,
+                  title: editTitle,
+                  content: editContent,
+                }
+              : post
+          )
+        )
+        setEditingPostId(null)
+        setEditTitle("")
+        setEditContent("")
+        console.log('Post updated successfully')
+      } else {
+        const errorData = await response.json()
+        console.error('Update error response:', errorData)
+        alert(`Failed to update post: ${errorData.error || errorData.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error updating post:', error)
+      alert('Failed to update post. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingPostId(null)
+    setEditTitle("")
+    setEditContent("")
+  }
+
+  // Comment functions
+  const toggleComments = (postId: string) => {
+    setShowComments(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(postId)) {
+        newSet.delete(postId)
+      } else {
+        newSet.add(postId)
+        fetchComments(postId)
+      }
+      return newSet
+    })
+  }
+
+  const fetchComments = async (postId: string) => {
+    if (comments[postId]) return // Already loaded
+
+    setLoadingComments(prev => new Set(prev).add(postId))
+    try {
+      const response = await fetch(`/api/posts/${postId}/comment`)
+      if (response.ok) {
+        const data = await response.json()
+        setComments(prev => ({
+          ...prev,
+          [postId]: data.comments || []
+        }))
+      }
+    } catch (error) {
+      console.error('Error fetching comments:', error)
+    } finally {
+      setLoadingComments(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(postId)
+        return newSet
+      })
+    }
+  }
+
+  const deleteComment = async (postId: string, commentId: string) => {
+    if (!confirm('Are you sure you want to delete this comment?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/comment`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ commentId }),
+      })
+
+      if (response.ok) {
+        // Remove the comment from local state
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId]?.filter(comment => comment.id !== commentId) || []
+        }))
+        
+        // Update the post's comment count
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId
+              ? { ...post, _count: { ...post._count, comments: Math.max(0, (post._count?.comments || 1) - 1), likes: post._count?.likes || 0 } }
+              : post
+          )
+        )
+        
+        console.log('Comment deleted successfully')
+      } else {
+        const errorData = await response.json()
+        alert(`Failed to delete comment: ${errorData.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error)
+      alert('Failed to delete comment. Please try again.')
+    }
+  }
+
+  // Delete post function
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      console.log('Attempting to delete post:', postId)
+      const response = await fetch(`/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      console.log('Delete response status:', response.status)
+      console.log('Delete response ok:', response.ok)
+
+      if (response.ok) {
+        // Remove the post from the local state
+        setPosts(prevPosts => prevPosts.filter(post => post.id !== postId))
+        setDeletePostId(null)
+        console.log('Post deleted successfully')
+      } else {
+        const errorData = await response.json()
+        console.error('Delete error response:', errorData)
+        alert(`Failed to delete post: ${errorData.error || errorData.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error deleting post:', error)
+      alert('Failed to delete post. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   // Fetch all creator data
   useEffect(() => {
     let isMounted = true
@@ -395,13 +663,15 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
         setLoading(true)
         setError(null)
 
-        // Fetch all data in parallel
-        const [creatorResponse, coursesResponse, postsResponse, statsResponse, activityResponse] = await Promise.all([
-          fetch(`/api/creator/${id}`, { credentials: 'include' }),
-          fetch(`/api/creator/${id}/courses`, { credentials: 'include' }),
-          fetch(`/api/creator/${id}/posts`, { credentials: 'include' }),
-          fetch(`/api/creator/${id}/stats`, { credentials: 'include' }),
-          fetch(`/api/creator/${id}/activity`, { credentials: 'include' })
+        // Fetch all data in parallel with cache busting
+        const timestamp = Date.now()
+        const [creatorResponse, coursesResponse, postsResponse, statsResponse, activityResponse, productsResponse] = await Promise.all([
+          fetch(`/api/creator/${id}?t=${timestamp}`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/courses?t=${timestamp}`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/posts?t=${timestamp}`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/stats?t=${timestamp}`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/activity?t=${timestamp}`, { credentials: 'include' }),
+          fetch(`/api/creator/${id}/products?t=${timestamp}`, { credentials: 'include' })
         ])
 
         // Check if component is still mounted
@@ -431,12 +701,17 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           throw new ApiError('Failed to fetch activity', activityResponse.status, `/api/creator/${id}/activity`)
         }
 
-        const [creatorData, coursesData, postsData, statsData, activityData] = await Promise.all([
+        if (!productsResponse.ok) {
+          throw new ApiError('Failed to fetch products', productsResponse.status, `/api/creator/${id}/products`)
+        }
+
+        const [creatorData, coursesData, postsData, statsData, activityData, productsData] = await Promise.all([
           creatorResponse.json(),
           coursesResponse.json(),
           postsResponse.json(),
           statsResponse.json(),
-          activityResponse.json()
+          activityResponse.json(),
+          productsResponse.json()
         ])
 
         if (isMounted) {
@@ -445,6 +720,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
           setPosts(postsData.posts || postsData)
           setStats(statsData)
           setActivities(activityData)
+          setProducts(productsData.products || productsData)
         }
 
       } catch (err) {
@@ -469,204 +745,9 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     }
   }, [id])
 
-  // Conversations fetch
-  useEffect(() => {
-    if (activeTab !== 'messages') return;
-    const fetchConversations = async () => {
-      try {
-        const response = await fetch(`/api/creator/${id}/conversations`, { credentials: 'include' })
-        if (response.ok) {
-          const data = await response.json()
-          setConversations(data)
-        }
-      } catch (error) {
-        console.error('Error fetching conversations:', error)
-      }
-    };
-    fetchConversations();
-  }, [activeTab, id]);
 
-  // Messages fetch
-  useEffect(() => {
-    if (!selectedConversation) return;
-    const fetchMessages = async (conversationId: string) => {
-      try {
-        setMessagesLoading(true)
-        const response = await fetch(`/api/creator/${id}/conversations/${conversationId}/messages`, { credentials: 'include' })
-        if (response.ok) {
-          const data = await response.json()
-          setMessages(data)
-          setTimeout(() => {
-            const container = messagesContainerRef.current
-            if (container) {
-              container.scrollTo({
-                top: container.scrollHeight,
-                behavior: 'smooth'
-              })
-            }
-          }, 100)
-        }
-      } catch (error) {
-        console.error('Error fetching messages:', error)
-      } finally {
-        setMessagesLoading(false)
-      }
-    };
-    fetchMessages(selectedConversation.id);
-    setNewMessage("");
-    socketManager.joinConversation(selectedConversation.id);
-    setConversations(prev => prev.map(conv =>
-      conv.id === selectedConversation.id
-        ? { ...conv, unreadCount: 0 }
-        : conv
-    ));
-  }, [selectedConversation, id]);
 
-  // Filter conversations based on search
-  const filteredConversations = conversations.filter(conv =>
-    conv.fan.name.toLowerCase().includes(conversationSearch.toLowerCase())
-  )
 
-  // WebSocket connection and event handling
-  useEffect(() => {
-    if (!creator || !session?.user) return
-
-    // Connect with user session instead of token
-    const socket = socketManager.connect(session.user.email || 'anonymous')
-
-    // Handle new messages
-    socketManager.onNewMessage((messageData) => {
-      try {
-        // Check if user was at bottom before updating
-        const container = messagesContainerRef.current
-        const wasAtBottom = container ?
-          Math.abs(container.scrollTop + container.clientHeight - container.scrollHeight) < 50 : true
-
-        // Convert WebSocket message data using shared converter
-        const message = convertWebSocketToDashboard.message(messageData)
-
-        // Validate the converted message
-        if (!isValidMessage(message)) {
-          console.error('Invalid message data received:', messageData)
-          return
-        }
-
-        setMessages(prev => [...prev, message])
-
-        // Only scroll if user was already at bottom
-        if (wasAtBottom) {
-          setTimeout(() => {
-            if (container) {
-              container.scrollTo({
-                top: container.scrollHeight,
-                behavior: 'smooth'
-              })
-            }
-          }, 100)
-        }
-      } catch (error) {
-        console.error('Error processing new message:', error, messageData)
-      }
-    })
-
-    // Handle message sent confirmation
-    socketManager.onMessageSent((messageData) => {
-      try {
-        setSendingMessage(false)
-
-        // Optionally add the sent message to the list if not already there
-        const message = convertWebSocketToDashboard.message(messageData)
-        if (isValidMessage(message)) {
-          setMessages(prev => {
-            // Check if message already exists to avoid duplicates
-            const exists = prev.some(msg => msg.id === message.id)
-            return exists ? prev : [...prev, message]
-          })
-        }
-
-        // Scroll to bottom after sending
-        setTimeout(() => {
-          const container = messagesContainerRef.current
-          if (container) {
-            container.scrollTo({
-              top: container.scrollHeight,
-              behavior: 'smooth'
-            })
-          }
-        }, 100)
-      } catch (error) {
-        console.error('Error processing message sent confirmation:', error, messageData)
-        setSendingMessage(false)
-      }
-    })
-
-    // Handle conversation updates
-    socketManager.onConversationUpdated((updateData) => {
-      try {
-        const convertedUpdate = convertWebSocketToDashboard.conversationUpdate(updateData)
-
-        setConversations(prev => prev.map(conv =>
-          conv.id === updateData.conversationId
-            ? {
-              ...conv,
-              ...convertedUpdate
-            }
-            : conv
-        ))
-      } catch (error) {
-        console.error('Error processing conversation update:', error, updateData)
-      }
-    })
-
-    // Handle messages read status updates
-    socketManager.onMessagesReadUpdate((readUpdate) => {
-      try {
-        // Update conversation unread count
-        setConversations(prev => prev.map(conv =>
-          conv.id === readUpdate.conversationId
-            ? { ...conv, unreadCount: readUpdate.unreadCount }
-            : conv
-        ))
-      } catch (error) {
-        console.error('Error processing read status update:', error, readUpdate)
-      }
-    })
-
-    // Handle errors
-    socketManager.onError((error) => {
-      console.error('Socket error:', error)
-      setSendingMessage(false)
-    })
-
-    return () => {
-      socketManager.removeAllListeners()
-    }
-  }, [creator, session?.user])
-
-  // Load conversations when messages tab is active
-  useEffect(() => {
-    if (activeTab === 'messages') {
-      // fetchConversations() // TODO: Implement this function
-    }
-  }, [activeTab, id])
-
-  // Load messages when conversation is selected
-  useEffect(() => {
-    if (selectedConversation) {
-      // fetchMessages(selectedConversation.id) // TODO: Implement this function
-      setNewMessage("")
-
-      // Join the conversation room (server auto-marks messages as read)
-      socketManager.joinConversation(selectedConversation.id)
-
-      // Update local unread count immediately since server marks as read
-      setConversations(prev => prev.map(conv =>
-        conv.id === selectedConversation.id
-          ? { ...conv, unreadCount: 0 }
-          : conv
-      ))
-    }
-  }, [selectedConversation, id])
 
   // Loading state
   if (loading) {
@@ -709,45 +790,7 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
     )
   }
 
-  // Send message function
-  const sendMessage = async () => {
-    if (!newMessage.trim() || sendingMessage) return;
-    setSendingMessage(true);
 
-    try {
-      const response = await fetch(`/api/creator/${id}/conversations/${selectedConversation?.id}/messages`, {
-        credentials: 'include',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: newMessage })
-      });
-
-      if (!response.ok) {
-        throw new ApiError('Failed to send message', response.status, `/api/creator/${id}/conversations/${selectedConversation?.id}/messages`);
-      }
-
-      const messageData = await response.json();
-      setMessages(prev => [...prev, messageData]);
-      setNewMessage('');
-
-      // Join the conversation room (server auto-marks messages as read)
-      socketManager.joinConversation(selectedConversation?.id || '');
-
-      // Update local unread count immediately since server marks as read
-      setConversations(prev => prev.map(conv =>
-        conv.id === selectedConversation?.id
-          ? { ...conv, unreadCount: 0 }
-          : conv
-      ));
-
-    } catch (err) {
-      setError(handleApiError(err, `/api/creator/${id}/conversations/${selectedConversation?.id}/messages`));
-    } finally {
-      setSendingMessage(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -878,6 +921,8 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                           handleProfileClick();
                         } else if (item.id === 'logout') {
                           handleLogout();
+                        } else if (item.id === 'messages') {
+                          router.push('/chat-live');
                         } else {
                           setActiveTab(item.id);
                         }
@@ -980,9 +1025,12 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {courses.slice(0, 3).map((course) => (
-                        <CourseCard key={course.id} course={course} t={t} />
-                      ))}
+                      {courses
+                        .sort((a, b) => (b.price * b.salesCount) - (a.price * a.salesCount))
+                        .slice(0, 3)
+                        .map((course) => (
+                          <CourseCard key={course.id} course={course} t={t} />
+                        ))}
                     </div>
                     {courses.length === 0 && (
                       <div className="text-center py-8">
@@ -1034,234 +1082,13 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                 </Card>
               </TabsContent>
 
-              <TabsContent value="messages" className="h-full">
-                <div className="h-[calc(100vh-200px)] flex border border-gray-200 rounded-lg overflow-hidden bg-white shadow-lg">
-                  {/* Left Panel - Conversations List */}
-                  <div className="w-1/3 border-r border-gray-200 flex flex-col bg-gray-50/50">
-                    {/* Header */}
-                    <div className="p-4 bg-white h-[73px] flex items-center border-b border-gray-200">
-                      <h2 className="text-xl font-bold text-gray-800">{t.conversations}</h2>
-                    </div>
 
-                    {/* Search */}
-                    <div className="p-3 bg-white h-[69px] flex items-center border-b border-gray-200">
-                      <div className="relative w-full">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <Input
-                          placeholder={t.searchConversations}
-                          value={conversationSearch || ""}
-                          onChange={(e) => setConversationSearch(e.target.value || "")}
-                          className="pl-9 bg-gray-100 rounded-lg border-gray-200 focus:bg-white focus:border-blue-300 w-full"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Conversations List */}
-                    <div className="flex-1 overflow-y-auto bg-white">
-                      {filteredConversations.length === 0 ? (
-                        <div className="p-6 text-center text-gray-500">
-                          <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                          <p className="text-sm font-medium text-gray-600">{t.noConversations}</p>
-                          <p className="text-xs mt-1 text-gray-500">{t.startConversation}</p>
-                        </div>
-                      ) : (
-                        filteredConversations.map((conversation) => (
-                          <div
-                            key={conversation.id}
-                            onClick={() => setSelectedConversation(conversation)}
-                            className={cn(
-                              "p-4 border-b border-gray-100 cursor-pointer hover:bg-blue-50 transition-all duration-200",
-                              selectedConversation === conversation ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
-                            )}
-                          >
-                            <div className="flex items-start space-x-3">
-                              <Avatar
-                                className="w-11 h-11 flex-shrink-0 cursor-pointer ring-2 ring-transparent hover:ring-blue-300 transition-all"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCreatorClick(conversation.fan.id);
-                                }}
-                              >
-                                <AvatarImage src={conversation.fan.avatarUrl || undefined} />
-                                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium">
-                                  {conversation.fan.name.split(" ").map(n => n[0]).join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p
-                                    className="text-sm font-semibold text-gray-900 truncate hover:text-blue-600 cursor-pointer transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleCreatorClick(conversation.fan.id);
-                                    }}
-                                  >
-                                    {conversation.fan.name}
-                                  </p>
-                                  <p className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                                    {formatMessageTime(conversation.lastMessageAt)}
-                                  </p>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  {conversation.lastMessage && (
-                                    <p className="text-sm text-gray-600 truncate">
-                                      {conversation.lastMessage.isFromFan ? "" : `${t.you}: `}
-                                      {conversation.lastMessage.content}
-                                    </p>
-                                  )}
-                                  {conversation.unreadCount > 0 && (
-                                    <Badge className="ml-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex-shrink-0">
-                                      {conversation.unreadCount}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Panel - Chat Area */}
-                  <div className="flex-1 flex flex-col">
-                    {selectedConversation ? (
-                      <>
-                        {/* Chat Header */}
-                        <div className="p-4 bg-white h-[73px] flex items-center border-b border-gray-200">
-                          {(() => {
-                            const conversation = conversations.find(c => c.id === selectedConversation.id)
-                            return conversation ? (
-                              <div className="flex items-center space-x-3">
-                                <Avatar
-                                  className="w-10 h-10 cursor-pointer ring-2 ring-transparent hover:ring-blue-300 transition-all"
-                                  onClick={() => handleCreatorClick(conversation.fan.id)}
-                                >
-                                  <AvatarImage src={conversation.fan.avatarUrl || undefined} />
-                                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-medium">
-                                    {conversation.fan.name.split(" ").map(n => n[0]).join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p
-                                    className="font-semibold text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
-                                    onClick={() => handleCreatorClick(conversation.fan.id)}
-                                  >
-                                    {conversation.fan.name}
-                                  </p>
-                                </div>
-                              </div>
-                            ) : null
-                          })()}
-                        </div>
-
-                        {/* Messages Area */}
-                        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30">
-                          {messagesLoading ? (
-                            <div className="h-full flex flex-col items-center justify-center">
-                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                              <p className="text-sm text-gray-600 mt-3 font-medium">{t.loadingMessages}</p>
-                            </div>
-                          ) : (
-                            messages.map((message) => (
-                              <div
-                                key={message.id}
-                                className={cn("flex", message.isFromCreator ? "justify-end" : "justify-start")}
-                              >
-                                <div className={cn("max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
-                                  message.isFromCreator
-                                    ? "bg-blue-500 text-white rounded-br-md"
-                                    : "bg-white text-gray-900 border border-gray-100 rounded-bl-md"
-                                )}
-                                >
-                                  <p className="text-sm leading-relaxed">{message.content}</p>
-                                  <p className={cn("text-xs mt-2 text-right",
-                                    message.isFromCreator ? "text-blue-100" : "text-gray-500"
-                                  )}
-                                  >
-                                    {formatMessageTime(message.createdAt)}
-                                  </p>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                          <div ref={messagesEndRef} />
-                        </div>
-
-                        {/* Message Input */}
-                        <div className="p-4 bg-white h-[69px] flex items-center border-t border-gray-200">
-                          <div className="flex space-x-3 w-full">
-                            <Input
-                              key={selectedConversation.id}
-                              placeholder={t.typeMessage}
-                              value={newMessage || ""}
-                              onChange={(e) => setNewMessage(e.target.value || "")}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault()
-                                  sendMessage()
-                                }
-                              }}
-                              disabled={sendingMessage}
-                              className="flex-1 bg-gray-100 rounded-full border-gray-200 focus:bg-white focus:border-blue-300 px-4 py-2"
-                            />
-                            <Button
-                              onClick={sendMessage}
-                              disabled={!newMessage.trim() || sendingMessage}
-                              className="bg-blue-500 hover:bg-blue-600 rounded-full px-4 py-2 shadow-sm"
-                            >
-                              {sendingMessage ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              ) : (
-                                <Send className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Empty State Header */}
-                        <div className="p-4 bg-white h-[73px] flex items-center border-b border-gray-200">
-                          <h2 className="text-xl font-bold text-gray-800">{t.selectConversation}</h2>
-                        </div>
-
-                        {/* Empty State Content */}
-                        <div className="flex-1 flex items-center justify-center bg-gray-50/30">
-                          <div className="text-center text-gray-500">
-                            <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                            <p className="font-semibold text-gray-600">{t.selectConversation}</p>
-                            <p className="text-sm text-gray-500 mt-1">Choose a conversation to start messaging</p>
-                          </div>
-                        </div>
-
-                        {/* Empty State Footer */}
-                        <div className="p-4 bg-white h-[69px] flex items-center border-t border-gray-200">
-                          <div className="flex space-x-3 w-full opacity-50">
-                            <Input
-                              placeholder={t.typeMessage}
-                              disabled
-                              className="flex-1 bg-gray-100 rounded-full border-gray-200 px-4 py-2"
-                            />
-                            <Button
-                              disabled
-                              className="bg-gray-400 rounded-full px-4 py-2"
-                            >
-                              <Send className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
 
               <TabsContent value="courses">
                 <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl font-bold">{t.courses}</CardTitle>
+                      <CardTitle className="text-xl font-bold">Courses & Products</CardTitle>
                       <Button asChild className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                         <Link href="/upload">
                           <Upload className="w-4 h-4 mr-2" />
@@ -1272,10 +1099,33 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {courses.map((course) => (
-                        <CourseCard key={course.id} course={course} t={t} />
-                      ))}
+                      {/* Display Courses (sorted by earnings) */}
+                      {courses
+                        .sort((a, b) => (b.price * b.salesCount) - (a.price * a.salesCount))
+                        .map((course) => (
+                          <CourseCard key={course.id} course={course} t={t} />
+                        ))}
+                      
+                      {/* Display Products (sorted by earnings) */}
+                      {products
+                        .sort((a, b) => (b.price * b.salesCount) - (a.price * a.salesCount))
+                        .map((product) => (
+                          <ProductCard key={product.id} product={product} t={t} />
+                        ))}
                     </div>
+                    
+                    {courses.length === 0 && products.length === 0 && (
+                      <div className="text-center py-8">
+                        <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600">No courses or products available</p>
+                        <Button asChild className="mt-4">
+                          <Link href="/upload">
+                            <Upload className="w-4 h-4 mr-2" />
+                            Create your first course or product
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1286,23 +1136,83 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">
-                        {t.featuredPosts}
+                        My Posts
                       </h2>
                       <p className="text-gray-600 mt-1">
-                        {t.yourMostEngagingContent}
+                        Create and manage your content posts
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium">
-                        ⭐ {posts.length} {t.trending}
-                      </div>
-                      <Button asChild className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6">
-                        <Link href={`/creator/${id}/post`}>
-                          <Upload className="w-4 h-4 mr-2" />
-                          {t.createNewPost}
-                        </Link>
-                      </Button>
-                    </div>
+                    <Button asChild className="bg-purple-600 hover:bg-purple-700 text-white px-6">
+                      <Link href={`/creator/${id}/post`}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Post
+                      </Link>
+                    </Button>
+                  </div>
+
+                  {/* Summary Statistics */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card className="bg-white border-0 shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Edit3 className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Total Posts</p>
+                            <p className="text-2xl font-bold text-gray-900">{posts.length}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white border-0 shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                            <Star className="w-5 h-5 text-red-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Total Likes</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {posts.reduce((total, post) => total + (post._count?.likes || 0), 0)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white border-0 shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <MessageCircle className="w-5 h-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Comments</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {posts.reduce((total, post) => total + (post._count?.comments || 0), 0)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white border-0 shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                            <DollarSign className="w-5 h-5 text-yellow-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Revenue</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              ${posts.reduce((total, post) => total + (post.tip?.reduce((sum, tip) => sum + tip.amount, 0) || 0), 0)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
 
                   {posts.length === 0 ? (
@@ -1326,135 +1236,233 @@ export default function CreatorDashboard({ params }: { params: Promise<{ id: str
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {posts.map((post) => (
-                        <Card key={post.id} className="bg-white border-0 shadow-md hover:shadow-lg transition-all">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <CardTitle className="text-lg font-semibold text-gray-800 line-clamp-2">
-                                  {post.title}
-                                </CardTitle>
-                                <p className="text-sm text-gray-500 mt-1">
-                                  {formatDate(post.createdAt)}
-                                </p>
-                              </div>
-                              {post.isPaidOnly && (
-                                <Crown className="w-5 h-5 text-yellow-500 flex-shrink-0 ml-2" />
-                              )}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <p className="text-gray-600 text-sm line-clamp-3 mb-4">
-                              {post.content}
-                            </p>
-                            
-                            {post.media && post.media.length > 0 && (
-                              <div className="grid grid-cols-2 gap-2 mb-4">
-                                {post.media.slice(0, 4).map((media, index) => (
-                                  <div key={media.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                                    {media.type === 'image' || media.type === 'photo' ? (
-                                      <Image
-                                        src={media.url}
-                                        alt={`Post media ${index + 1}`}
-                                        fill
-                                        className="object-cover"
-                                      />
-                                    ) : (
-                                      <video
-                                        src={media.url}
-                                        className="w-full h-full object-cover"
-                                        muted
-                                      />
-                                    )}
-                                    {index === 3 && post.media && post.media.length > 4 && (
-                                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                        <span className="text-white font-semibold">
-                                          +{post.media.length - 4}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            
-                            {/* Enhanced Interactions Section */}
-                            <div className="space-y-3">
-                              {/* Stats Row */}
-                              <div className="flex items-center justify-between text-sm text-gray-500">
-                                <div className="flex items-center space-x-4">
-                                  <div className="flex items-center space-x-1">
-                                    <Star className="w-4 h-4 text-yellow-500" />
-                                    <span className="font-medium">{post._count?.likes || 0} {t.likes}</span>
-                                  </div>
-                                  <div className="flex items-center space-x-1">
-                                    <MessageCircle className="w-4 h-4 text-blue-500" />
-                                    <span className="font-medium">{post._count?.comments || 0} {t.comments}</span>
-                                  </div>
-                                  {/* Tips Display */}
-                                  <div className="flex items-center space-x-1">
-                                    <DollarSign className="w-4 h-4 text-green-500" />
-                                    <span className="font-medium text-green-600">
-                                      ${post.tip?.reduce((sum, tip) => sum + tip.amount, 0) || 0}
-                                    </span>
-                                  </div>
-                                </div>
-                                <Badge variant={post.isPaidOnly ? "default" : "secondary"}>
+                        <Card key={post.id} className="bg-white border-0 shadow-md hover:shadow-lg transition-all overflow-hidden">
+                          {/* Image Section */}
+                          {post.media && post.media.length > 0 ? (
+                            <div className="relative h-48 overflow-hidden">
+                              <Image
+                                src={post.media[0].url}
+                                alt={post.title}
+                                fill
+                                className="object-cover"
+                              />
+                              {/* Badge Overlay */}
+                              <div className="absolute top-3 left-3">
+                                <Badge className={post.isPaidOnly ? "bg-blue-600 text-white" : "bg-green-600 text-white"}>
                                   {post.isPaidOnly ? "Premium" : "Free"}
                                 </Badge>
                               </div>
-
-                              {/* Recent Comments Preview */}
-                              {post.comments && post.comments.length > 0 && (
-                                <div className="border-t pt-3">
-                                  <p className="text-xs text-gray-500 mb-2">
-                                    {t.recentComments}:
-                                  </p>
-                                  <div className="space-y-2 max-h-20 overflow-y-auto">
-                                    {post.comments.slice(0, 2).map((comment) => (
-                                      <div key={comment.id} className="text-xs">
-                                        <span className="font-medium text-gray-700">
-                                          {comment.user.name}:
-                                        </span>
-                                        <span className="text-gray-600 ml-1">
-                                          {comment.content}
-                                        </span>
-                                      </div>
-                                    ))}
-                                    {post.comments.length > 2 && (
-                                      <p className="text-xs text-blue-500">
-                                        +{post.comments.length - 2} {t.moreComments}
-                                      </p>
-                                    )}
+                              {/* Edit Icon - Right side, next to delete */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditPost(post);
+                                }}
+                                className="absolute top-3 right-12 w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg"
+                                title="Edit post"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              {/* Delete Icon - Right side */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePost(post.id);
+                                }}
+                                disabled={isDeleting}
+                                className={`absolute top-3 right-3 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg ${
+                                  isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                                title="Delete post"
+                              >
+                                {isDeleting ? (
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                              <Edit3 className="w-12 h-12 text-gray-400" />
+                              {/* Badge Overlay */}
+                              <div className="absolute top-3 left-3">
+                                <Badge className={post.isPaidOnly ? "bg-blue-600 text-white" : "bg-green-600 text-white"}>
+                                  {post.isPaidOnly ? "Premium" : "Free"}
+                                </Badge>
+                              </div>
+                              {/* Edit Icon - Right side, next to delete */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditPost(post);
+                                }}
+                                className="absolute top-3 right-12 w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg"
+                                title="Edit post"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              {/* Delete Icon - Right side */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePost(post.id);
+                                }}
+                                disabled={isDeleting}
+                                className={`absolute top-3 right-3 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg ${
+                                  isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                                title="Delete post"
+                              >
+                                {isDeleting ? (
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          )}
+                          
+                          <CardContent className="p-4">
+                            {/* Date */}
+                            <p className="text-sm text-gray-500 mb-2">
+                              {formatDate(post.createdAt)}
+                            </p>
+                            
+                            {/* Content - Fixed to show proper title and content */}
+                            <div className="mb-4">
+                              {editingPostId === post.id ? (
+                                // Edit mode
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Title
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editTitle}
+                                      onChange={(e) => setEditTitle(e.target.value)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      placeholder="Enter title..."
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Content
+                                    </label>
+                                    <textarea
+                                      value={editContent}
+                                      onChange={(e) => setEditContent(e.target.value)}
+                                      rows={3}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                      placeholder="Enter content..."
+                                    />
+                                  </div>
+                                  <div className="flex space-x-2">
+                                    <button
+                                      onClick={() => handleSaveEdit(post.id)}
+                                      disabled={isSaving}
+                                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {isSaving ? 'Saving...' : 'Save'}
+                                    </button>
+                                    <button
+                                      onClick={handleCancelEdit}
+                                      className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
                                   </div>
                                 </div>
-                              )}
-
-                              {/* Tips Preview */}
-                              {post.tip && post.tip.length > 0 && (
-                                <div className="border-t pt-3">
-                                  <p className="text-xs text-gray-500 mb-2">
-                                    {t.recentTips}:
+                              ) : (
+                                // View mode
+                                <>
+                                  {post.title && (
+                                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1">
+                                      {parseMultilingualContent(post.title)}
+                                    </h3>
+                                  )}
+                                  <p className="text-gray-600 text-sm line-clamp-3">
+                                    {parseMultilingualContent(post.content)}
                                   </p>
-                                  <div className="space-y-1 max-h-16 overflow-y-auto">
-                                    {post.tip.slice(0, 3).map((tip) => (
-                                      <div key={tip.id} className="text-xs flex items-center justify-between">
-                                        <span className="font-medium text-gray-700">
-                                          {tip.user.name}
-                                        </span>
-                                        <span className="text-green-600 font-medium">
-                                          ${tip.amount}
-                                        </span>
-                                      </div>
-                                    ))}
-                                    {post.tip.length > 3 && (
-                                      <p className="text-xs text-green-500">
-                                        +{post.tip.length - 3} {t.moreTips}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
+                                </>
                               )}
                             </div>
+                            
+                            {/* Statistics */}
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="flex items-center space-x-1">
+                                <Star className="w-4 h-4 text-red-500" />
+                                <span className="text-gray-700">{post._count?.likes || 0} Likes</span>
+                              </div>
+                              <button
+                                onClick={() => toggleComments(post.id)}
+                                className="flex items-center space-x-1 hover:text-green-600 transition-colors"
+                              >
+                                <MessageCircle className="w-4 h-4 text-green-500" />
+                                <span className="text-gray-700">{post._count?.comments || 0} Comments</span>
+                              </button>
+                              <div className="flex items-center space-x-1">
+                                <DollarSign className="w-4 h-4 text-yellow-500" />
+                                <span className="text-gray-700">
+                                  ${post.tip?.reduce((sum, tip) => sum + tip.amount, 0) || 0} {post.isPaidOnly ? "" : "Free"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Comments Section */}
+                            {showComments.has(post.id) && (
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                <div className="space-y-3">
+                                  {loadingComments.has(post.id) ? (
+                                    <div className="text-center py-4">
+                                      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                      <p className="text-sm text-gray-500 mt-2">Loading comments...</p>
+                                    </div>
+                                  ) : comments[post.id] && comments[post.id].length > 0 ? (
+                                    comments[post.id].map((comment: any) => (
+                                      <div key={comment.id} className="flex space-x-2">
+                                        <Avatar className="w-6 h-6">
+                                          <AvatarImage src={comment.user?.profile?.avatarUrl || undefined} />
+                                          <AvatarFallback className="text-xs">
+                                            {comment.user?.name?.charAt(0) || 'U'}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <div className="bg-gray-100 rounded-lg px-3 py-2 relative">
+                                            <div className="flex justify-between items-start">
+                                              <div className="flex-1">
+                                                <p className="text-xs font-medium text-gray-900">
+                                                  {comment.user?.name || 'Unknown User'}
+                                                </p>
+                                                <p className="text-xs text-gray-700">
+                                                  {comment.content}
+                                                </p>
+                                              </div>
+                                              <button
+                                                onClick={() => deleteComment(post.id, comment.id)}
+                                                className="ml-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                                title="Delete comment"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                          <p className="text-xs text-gray-500 mt-1">
+                                            {new Date(comment.createdAt).toLocaleDateString()}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-center py-4">
+                                      <MessageCircle className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                                      <p className="text-sm text-gray-500">No comments yet</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       ))}
